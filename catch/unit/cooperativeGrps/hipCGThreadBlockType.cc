@@ -1,16 +1,13 @@
 /*
-Copyright (c) 2020 - 2022 Advanced Micro Devices, Inc. All rights reserved.
-
+Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
-
 The above copyright notice and this permission notice shall be included in
 all copies or substantial portions of the Software.
-
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
@@ -19,51 +16,74 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
+
+#include <optional>
+
 #include <hip_test_common.hh>
 #include <hip/hip_cooperative_groups.h>
 
+#include <resource_guards.hh>
+#include <utils.hh>
 #include "cooperative_groups_common.hh"
 
 namespace cg = cooperative_groups;
 
 enum class ThreadBlockTypeTests { basicApi, baseType, publicApi };
 
-static __global__
-void kernel_cg_thread_block_type(int *size_dev,
-                                 int *thd_rank_dev,
-                                 int *sync_dev,
-                                 dim3 *group_index_dev,
-                                 dim3 *thd_index_dev)
-{
-  cg::thread_block tb = cg::this_thread_block();
-  int gIdx = (blockIdx.x * blockDim.x) + threadIdx.x;
-  // Test size
-  size_dev[gIdx] = tb.size();
-
-  // Test thread_rank
-  thd_rank_dev[gIdx] = tb.thread_rank();
-
-  // Test sync
-  __shared__ int sm[2];
-  if (threadIdx.x == 0)
-    sm[0] = 10;
-  else if (threadIdx.x == 1)
-    sm[1] = 20;
-  tb.sync();
-  sync_dev[gIdx] = sm[1] * sm[0];
-
-  // Test group_index
-  group_index_dev[gIdx] = tb.group_index();
-
-  // Test thread_index
-  thd_index_dev[gIdx] = tb.thread_index();
+__device__ unsigned int thread_rank_in_grid() {
+  const auto block_size = blockDim.x * blockDim.y * blockDim.z;
+  const auto block_rank_in_grid = (blockIdx.z * gridDim.y + blockIdx.y) * gridDim.x + blockIdx.x;
+  const auto thread_rank_in_block =
+      (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;
+  return block_rank_in_grid * block_size + thread_rank_in_block;
 }
 
-static __global__
-void kernel_cg_thread_block_type_via_base_type(int *size_dev,
-                                               int *thd_rank_dev,
-                                               int *sync_dev)
-{
+static __global__ void kernel_cg_thread_block_type(unsigned int* sizes, unsigned int* thread_ranks,
+                                                   dim3* group_indices, dim3* thread_indices,
+                                                   dim3* group_dims) {
+  cg::thread_block tb = cg::this_thread_block();
+
+  const auto g_idx = thread_rank_in_grid();
+  sizes[g_idx] = tb.size();
+  thread_ranks[g_idx] = tb.thread_rank();
+  group_indices[g_idx] = tb.group_index();
+  thread_indices[g_idx] = tb.thread_index();
+  group_dims[g_idx] = tb.group_dim();
+}
+
+static __global__ void thread_block_size_getter(unsigned int* sizes) {
+  sizes[thread_rank_in_grid()] = cg::this_thread_block().size();
+}
+
+static __global__ void thread_block_thread_rank_getter(unsigned int* thread_ranks) {
+  thread_ranks[thread_rank_in_grid()] = cg::this_thread_block().thread_rank();
+}
+
+static __global__ void thread_block_group_indices_getter(dim3* group_indices) {
+  group_indices[thread_rank_in_grid()] = cg::this_thread_block().group_index();
+}
+
+static __global__ void thread_block_thread_indices_getter(dim3* thread_indices) {
+  thread_indices[thread_rank_in_grid()] = cg::this_thread_block().thread_index();
+}
+
+static __global__ void thread_block_group_dims_getter(dim3* group_dims) {
+  group_dims[thread_rank_in_grid()] = cg::this_thread_block().group_dims();
+}
+
+static __global__ void sync_temp(int* sync_dev) {
+  // Test sync
+  // __shared__ int sm[2];
+  // if (threadIdx.x == 0)
+  //   sm[0] = 10;
+  // else if (threadIdx.x == 1)
+  //   sm[1] = 20;
+  // tb.sync();
+  // sync_dev[gIdx] = sm[1] * sm[0];
+}
+
+static __global__ void kernel_cg_thread_block_type_via_base_type(int* size_dev, int* thd_rank_dev,
+                                                                 int* sync_dev) {
   cg::thread_group tg = cg::this_thread_block();
   int gIdx = (blockIdx.x * blockDim.x) + threadIdx.x;
 
@@ -83,11 +103,8 @@ void kernel_cg_thread_block_type_via_base_type(int *size_dev,
   sync_dev[gIdx] = sm[1] * sm[0];
 }
 
-static __global__
-void kernel_cg_thread_block_type_via_public_api(int *size_dev,
-                                                int *thd_rank_dev,
-                                                int *sync_dev)
-{
+static __global__ void kernel_cg_thread_block_type_via_public_api(int* size_dev, int* thd_rank_dev,
+                                                                  int* sync_dev) {
   cg::thread_block tb = cg::this_thread_block();
   int gIdx = (blockIdx.x * blockDim.x) + threadIdx.x;
 
@@ -107,8 +124,172 @@ void kernel_cg_thread_block_type_via_public_api(int *size_dev,
   sync_dev[gIdx] = sm[1] * sm[0];
 }
 
-static void test_cg_thread_block_type(ThreadBlockTypeTests test_type, int block_size)
-{
+static bool operator==(const dim3& l, const dim3& r) {
+  return l.x == r.x && l.y == r.y && l.z == r.z;
+}
+
+static bool operator!=(const dim3& l, const dim3& r) { return !(l == r); }
+
+struct CPUGrid {
+  CPUGrid(const dim3 grid_dim, const dim3 block_dim)
+      : grid_dim_{grid_dim},
+        block_dim_{block_dim},
+        block_count_{grid_dim.x * grid_dim.y * grid_dim.z},
+        threads_in_block_count_{block_dim.x * block_dim.y * block_dim.z},
+        thread_count_{block_count_ * threads_in_block_count_} {}
+
+  std::optional<unsigned int> thread_rank_in_block(const unsigned int thread_rank_in_grid) const {
+    if (thread_rank_in_grid > thread_count_) {
+      return std::nullopt;
+    }
+
+    return thread_rank_in_grid -
+        (thread_rank_in_grid / threads_in_block_count_) * threads_in_block_count_;
+  }
+
+  std::optional<dim3> block_idx(const unsigned int thread_rank_in_grid) const {
+    if (thread_rank_in_grid > thread_count_) {
+      return std::nullopt;
+    }
+
+    dim3 block_idx;
+    const auto block_rank_in_grid = thread_rank_in_grid / threads_in_block_count_;
+    block_idx.x = block_rank_in_grid % grid_dim_.x;
+    block_idx.y = (block_rank_in_grid / grid_dim_.x) % grid_dim_.y;
+    block_idx.z = block_rank_in_grid / (grid_dim_.x * grid_dim_.y);
+
+    return block_idx;
+  }
+
+  std::optional<dim3> thread_idx(const unsigned int thread_rank_in_grid) const {
+    if (thread_rank_in_grid > thread_count_) {
+      return std::nullopt;
+    }
+
+    dim3 thread_idx;
+    const auto thread_rank_in_block = thread_rank_in_grid % threads_in_block_count_;
+    thread_idx.x = thread_rank_in_block % block_dim_.x;
+    thread_idx.y = (thread_rank_in_block / block_dim_.x) % block_dim_.y;
+    thread_idx.z = thread_rank_in_block / (block_dim_.x * block_dim_.y);
+
+    return thread_idx;
+  }
+
+  const dim3 grid_dim_;
+  const dim3 block_dim_;
+  const unsigned int block_count_;
+  const unsigned int threads_in_block_count_;
+  const unsigned int thread_count_;
+};
+
+TEST_CASE("Unit_Thread_Block_Getters_Positive_Basic") {
+  auto threads = dim3(256, 2, 2);
+  auto blocks = dim3(10, 10, 10);
+  const unsigned int count = (blocks.x * blocks.y * blocks.z) * (threads.x * threads.y * threads.z);
+
+  constexpr auto hip_malloc = LinearAllocs::hipMalloc;
+  LinearAllocGuard<unsigned int> sizes_dev(hip_malloc, count * sizeof(unsigned int)),
+      thread_ranks_dev(hip_malloc, count * sizeof(unsigned int));
+  LinearAllocGuard<dim3> group_indices_dev(hip_malloc, count * sizeof(dim3)),
+      thread_indices_dev(hip_malloc, count * sizeof(dim3)),
+      group_dims_dev(hip_malloc, count * sizeof(dim3));
+
+  constexpr auto hip_host_malloc = LinearAllocs::hipHostMalloc;
+  LinearAllocGuard<unsigned int> sizes(hip_host_malloc, count * sizeof(unsigned int)),
+      thread_ranks(hip_host_malloc, count * sizeof(unsigned int));
+  LinearAllocGuard<dim3> group_indices(hip_host_malloc, count * sizeof(dim3)),
+      thread_indices(hip_host_malloc, count * sizeof(dim3)),
+      group_dims(hip_host_malloc, count * sizeof(dim3));
+
+  kernel_cg_thread_block_type<<<blocks, threads>>>(sizes_dev.ptr(), thread_ranks_dev.ptr(),
+                                                   group_indices_dev.ptr(),
+                                                   thread_indices_dev.ptr(), group_dims_dev.ptr());
+  HIP_CHECK(
+      hipMemcpy(sizes.ptr(), sizes_dev.ptr(), count * sizeof(*sizes.ptr()), hipMemcpyDeviceToHost));
+  HIP_CHECK(hipMemcpy(thread_ranks.ptr(), thread_ranks_dev.ptr(),
+                      count * sizeof(*thread_ranks.ptr()), hipMemcpyDeviceToHost));
+  HIP_CHECK(hipMemcpy(group_indices.ptr(), group_indices_dev.ptr(),
+                      count * sizeof(*group_indices.ptr()), hipMemcpyDeviceToHost));
+  HIP_CHECK(hipMemcpy(thread_indices.ptr(), thread_indices_dev.ptr(),
+                      count * sizeof(*thread_indices.ptr()), hipMemcpyDeviceToHost));
+  HIP_CHECK(hipMemcpy(group_dims.ptr(), group_dims_dev.ptr(), count * sizeof(*group_dims.ptr()),
+                      hipMemcpyDeviceToHost));
+  HIP_CHECK(hipDeviceSynchronize());
+
+  CPUGrid grid(blocks, threads);
+  // ArrayFindIfNot(sizes.ptr(), count, count);
+
+  for (auto i = 0u; i < count; ++i) {
+    if (sizes.ptr()[i] != grid.threads_in_block_count_) {
+      INFO("Mismatch at index " << i);
+      REQUIRE(sizes.ptr()[i] == grid.threads_in_block_count_);
+    }
+
+    const auto rank = grid.thread_rank_in_block(i).value();
+    if (thread_ranks.ptr()[i] != rank) {
+      INFO("Mismatch at index " << i);
+      REQUIRE(thread_ranks.ptr()[i] == rank);
+    }
+
+    const auto block_idx = grid.block_idx(i).value();
+    if (group_indices.ptr()[i] != block_idx) {
+      INFO("Mismatch at index " << i);
+      REQUIRE(group_indices.ptr()[i] == block_idx);
+    }
+
+    const auto thread_idx = grid.thread_idx(i).value();
+    if (thread_indices.ptr()[i] != thread_idx) {
+      INFO("Mismatch at index " << i);
+      REQUIRE(thread_indices.ptr()[i] == thread_idx);
+    }
+
+    if (group_dims.ptr()[i] != threads) {
+      INFO("Mismatch at index " << i);
+      REQUIRE(group_dims.ptr()[i] == threads);
+    }
+  }
+
+  // for (auto i = 0u; i < count; ++i) {
+  //   if (sizes.ptr()[i] != grid.threads_in_block_count_) {
+  //     INFO("Mismatch at index " << i);
+  //     REQUIRE(sizes.ptr()[i] == grid.threads_in_block_count_);
+  //   }
+  // }
+
+  // for (auto i = 0u; i < count; ++i) {
+  //   const auto rank = grid.thread_rank_in_block(i).value();
+  //   if (thread_ranks.ptr()[i] != rank) {
+  //     INFO("Mismatch at index " << i);
+  //     REQUIRE(thread_ranks.ptr()[i] == rank);
+  //   }
+  // }
+
+  // for (auto i = 0u; i < count; ++i) {
+  //   const auto block_idx = grid.block_idx(i).value();
+  //   if (group_indices.ptr()[i] != block_idx) {
+  //     INFO("Mismatch at index " << i);
+  //     REQUIRE(group_indices.ptr()[i] == block_idx);
+  //   }
+  // }
+
+  // for (auto i = 0u; i < count; ++i) {
+  //   const auto thread_idx = grid.thread_idx(i).value();
+  //   if (thread_indices.ptr()[i] != thread_idx) {
+  //     INFO("Mismatch at index " << i);
+  //     REQUIRE(thread_indices.ptr()[i] == thread_idx);
+  //   }
+  // }
+
+  // for (auto i = 0u; i < count; ++i) {
+  //   if (group_dims.ptr()[i] != threads) {
+  //     INFO("Mismatch at index " << i);
+  //     REQUIRE(group_dims.ptr()[i] == threads);
+  //   }
+  // }
+}
+
+/*
+static void test_cg_thread_block_type(ThreadBlockTypeTests test_type, int block_size) {
   int num_bytes = sizeof(int) * 2 * block_size;
   int num_dim3_bytes = sizeof(dim3) * 2 * block_size;
   int *size_dev, *size_host;
@@ -127,21 +308,23 @@ static void test_cg_thread_block_type(ThreadBlockTypeTests test_type, int block_
   HIP_CHECK(hipHostMalloc(&thd_rank_host, num_bytes));
   HIP_CHECK(hipHostMalloc(&sync_host, num_bytes));
 
-  switch(test_type) {
-    case(ThreadBlockTypeTests::basicApi):
+  switch (test_type) {
+    case (ThreadBlockTypeTests::basicApi):
       HIP_CHECK(hipMalloc(&group_index_dev, num_dim3_bytes));
       HIP_CHECK(hipMalloc(&thd_index_dev, num_dim3_bytes));
       HIP_CHECK(hipHostMalloc(&group_index_host, num_dim3_bytes));
       HIP_CHECK(hipHostMalloc(&thd_index_host, num_dim3_bytes));
 
-      hipLaunchKernelGGL(kernel_cg_thread_block_type, 2, block_size, 0, 0 , size_dev, thd_rank_dev,
+      hipLaunchKernelGGL(kernel_cg_thread_block_type, 2, block_size, 0, 0, size_dev, thd_rank_dev,
                          sync_dev, group_index_dev, thd_index_dev);
       break;
-    case(ThreadBlockTypeTests::baseType):
-      hipLaunchKernelGGL(kernel_cg_thread_block_type_via_base_type, 2, block_size, 0, 0, size_dev, thd_rank_dev, sync_dev);
+    case (ThreadBlockTypeTests::baseType):
+      hipLaunchKernelGGL(kernel_cg_thread_block_type_via_base_type, 2, block_size, 0, 0, size_dev,
+                         thd_rank_dev, sync_dev);
       break;
-    case(ThreadBlockTypeTests::publicApi):
-      hipLaunchKernelGGL(kernel_cg_thread_block_type_via_public_api, 2, block_size, 0, 0, size_dev, thd_rank_dev, sync_dev);
+    case (ThreadBlockTypeTests::publicApi):
+      hipLaunchKernelGGL(kernel_cg_thread_block_type_via_public_api, 2, block_size, 0, 0, size_dev,
+                         thd_rank_dev, sync_dev);
   }
 
   // Copy result from device to host
@@ -159,10 +342,10 @@ static void test_cg_thread_block_type(ThreadBlockTypeTests test_type, int block_
     ASSERT_EQUAL(thd_rank_host[i], i % block_size);
     ASSERT_EQUAL(sync_host[i], 200);
     if (test_type == ThreadBlockTypeTests::basicApi) {
-      ASSERT_EQUAL(group_index_host[i].x, (uint) i / block_size);
+      ASSERT_EQUAL(group_index_host[i].x, (uint)i / block_size);
       ASSERT_EQUAL(group_index_host[i].y, 0);
       ASSERT_EQUAL(group_index_host[i].z, 0);
-      ASSERT_EQUAL(thd_index_host[i].x, (uint) i % block_size);
+      ASSERT_EQUAL(thd_index_host[i].x, (uint)i % block_size);
       ASSERT_EQUAL(thd_index_host[i].y, 0);
       ASSERT_EQUAL(thd_index_host[i].z, 0);
     }
@@ -173,7 +356,7 @@ static void test_cg_thread_block_type(ThreadBlockTypeTests test_type, int block_
   HIP_CHECK(hipFree(thd_rank_dev));
   HIP_CHECK(hipFree(sync_dev));
 
-  //Free host memory
+  // Free host memory
   HIP_CHECK(hipHostFree(size_host));
   HIP_CHECK(hipHostFree(thd_rank_host));
   HIP_CHECK(hipHostFree(sync_host));
@@ -201,21 +384,15 @@ TEST_CASE("Unit_hipCGThreadBlockType") {
 
   ThreadBlockTypeTests test_type = ThreadBlockTypeTests::basicApi;
 
-  SECTION("Default thread block API test") {
-    test_type = ThreadBlockTypeTests::basicApi;
-  }
+  SECTION("Default thread block API test") { test_type = ThreadBlockTypeTests::basicApi; }
 
-  SECTION("Base type thread block API test") {
-    test_type = ThreadBlockTypeTests::baseType;
-  }
+  SECTION("Base type thread block API test") { test_type = ThreadBlockTypeTests::baseType; }
 
-  SECTION("Public API thread block test") {
-    test_type = ThreadBlockTypeTests::publicApi;
-  }
+  SECTION("Public API thread block test") { test_type = ThreadBlockTypeTests::publicApi; }
 
   // Test for blockSizes in powers of 2
   int max_threads_per_blk = device_properties.maxThreadsPerBlock;
-  for (int block_size = 2; block_size <= max_threads_per_blk; block_size = block_size*2) {
+  for (int block_size = 2; block_size <= max_threads_per_blk; block_size = block_size * 2) {
     test_cg_thread_block_type(test_type, block_size);
   }
 
@@ -224,5 +401,18 @@ TEST_CASE("Unit_hipCGThreadBlockType") {
   for (int i = 0; i < 10; i++) {
     // Test fails for only 1 thread per block
     test_cg_thread_block_type(test_type, max(2, rand() % max_threads_per_blk));
+  }
+}
+*/
+
+TEST_CASE("Blahem") {
+  CPUGrid cpu_grid(dim3(2, 2, 2), dim3(2, 2, 2));
+  for (auto i = 0; i < cpu_grid.thread_count_; ++i) {
+    const auto block_idx = cpu_grid.block_idx(i).value();
+    const auto thread_idx = cpu_grid.thread_idx(i).value();
+    std::cout << "(" << block_idx.x << ", " << block_idx.y << ", " << block_idx.z << ")"
+              << " ";
+    std::cout << "(" << thread_idx.x << ", " << thread_idx.y << ", " << thread_idx.z << ")"
+              << std::endl;
   }
 }

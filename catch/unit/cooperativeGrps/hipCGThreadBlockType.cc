@@ -38,19 +38,6 @@ __device__ unsigned int thread_rank_in_grid() {
   return block_rank_in_grid * block_size + thread_rank_in_block;
 }
 
-static __global__ void kernel_cg_thread_block_type(unsigned int* sizes, unsigned int* thread_ranks,
-                                                   dim3* group_indices, dim3* thread_indices,
-                                                   dim3* group_dims) {
-  cg::thread_block tb = cg::this_thread_block();
-
-  const auto g_idx = thread_rank_in_grid();
-  sizes[g_idx] = tb.size();
-  thread_ranks[g_idx] = tb.thread_rank();
-  group_indices[g_idx] = tb.group_index();
-  thread_indices[g_idx] = tb.thread_index();
-  group_dims[g_idx] = tb.group_dim();
-}
-
 static __global__ void thread_block_size_getter(unsigned int* sizes) {
   sizes[thread_rank_in_grid()] = cg::this_thread_block().size();
 }
@@ -68,7 +55,7 @@ static __global__ void thread_block_thread_indices_getter(dim3* thread_indices) 
 }
 
 static __global__ void thread_block_group_dims_getter(dim3* group_dims) {
-  group_dims[thread_rank_in_grid()] = cg::this_thread_block().group_dims();
+  group_dims[thread_rank_in_grid()] = cg::this_thread_block().group_dim();
 }
 
 static __global__ void sync_temp(int* sync_dev) {
@@ -182,110 +169,76 @@ struct CPUGrid {
   const unsigned int thread_count_;
 };
 
-TEST_CASE("Unit_Thread_Block_Getters_Positive_Basic") {
-  auto threads = dim3(256, 2, 2);
-  auto blocks = dim3(10, 10, 10);
-  const unsigned int count = (blocks.x * blocks.y * blocks.z) * (threads.x * threads.y * threads.z);
-
-  constexpr auto hip_malloc = LinearAllocs::hipMalloc;
-  LinearAllocGuard<unsigned int> sizes_dev(hip_malloc, count * sizeof(unsigned int)),
-      thread_ranks_dev(hip_malloc, count * sizeof(unsigned int));
-  LinearAllocGuard<dim3> group_indices_dev(hip_malloc, count * sizeof(dim3)),
-      thread_indices_dev(hip_malloc, count * sizeof(dim3)),
-      group_dims_dev(hip_malloc, count * sizeof(dim3));
-
-  constexpr auto hip_host_malloc = LinearAllocs::hipHostMalloc;
-  LinearAllocGuard<unsigned int> sizes(hip_host_malloc, count * sizeof(unsigned int)),
-      thread_ranks(hip_host_malloc, count * sizeof(unsigned int));
-  LinearAllocGuard<dim3> group_indices(hip_host_malloc, count * sizeof(dim3)),
-      thread_indices(hip_host_malloc, count * sizeof(dim3)),
-      group_dims(hip_host_malloc, count * sizeof(dim3));
-
-  kernel_cg_thread_block_type<<<blocks, threads>>>(sizes_dev.ptr(), thread_ranks_dev.ptr(),
-                                                   group_indices_dev.ptr(),
-                                                   thread_indices_dev.ptr(), group_dims_dev.ptr());
-  HIP_CHECK(
-      hipMemcpy(sizes.ptr(), sizes_dev.ptr(), count * sizeof(*sizes.ptr()), hipMemcpyDeviceToHost));
-  HIP_CHECK(hipMemcpy(thread_ranks.ptr(), thread_ranks_dev.ptr(),
-                      count * sizeof(*thread_ranks.ptr()), hipMemcpyDeviceToHost));
-  HIP_CHECK(hipMemcpy(group_indices.ptr(), group_indices_dev.ptr(),
-                      count * sizeof(*group_indices.ptr()), hipMemcpyDeviceToHost));
-  HIP_CHECK(hipMemcpy(thread_indices.ptr(), thread_indices_dev.ptr(),
-                      count * sizeof(*thread_indices.ptr()), hipMemcpyDeviceToHost));
-  HIP_CHECK(hipMemcpy(group_dims.ptr(), group_dims_dev.ptr(), count * sizeof(*group_dims.ptr()),
-                      hipMemcpyDeviceToHost));
-  HIP_CHECK(hipDeviceSynchronize());
-
-  CPUGrid grid(blocks, threads);
-  // ArrayFindIfNot(sizes.ptr(), count, count);
-
+template <typename T, typename F>
+static inline void ArrayAllOf(const T* arr, uint32_t count, F value_gen) {
   for (auto i = 0u; i < count; ++i) {
-    if (sizes.ptr()[i] != grid.threads_in_block_count_) {
-      INFO("Mismatch at index " << i);
-      REQUIRE(sizes.ptr()[i] == grid.threads_in_block_count_);
-    }
-
-    const auto rank = grid.thread_rank_in_block(i).value();
-    if (thread_ranks.ptr()[i] != rank) {
-      INFO("Mismatch at index " << i);
-      REQUIRE(thread_ranks.ptr()[i] == rank);
-    }
-
-    const auto block_idx = grid.block_idx(i).value();
-    if (group_indices.ptr()[i] != block_idx) {
-      INFO("Mismatch at index " << i);
-      REQUIRE(group_indices.ptr()[i] == block_idx);
-    }
-
-    const auto thread_idx = grid.thread_idx(i).value();
-    if (thread_indices.ptr()[i] != thread_idx) {
-      INFO("Mismatch at index " << i);
-      REQUIRE(thread_indices.ptr()[i] == thread_idx);
-    }
-
-    if (group_dims.ptr()[i] != threads) {
-      INFO("Mismatch at index " << i);
-      REQUIRE(group_dims.ptr()[i] == threads);
+    const auto expected_val = value_gen(i);
+    // Using require on every iteration leads to a noticeable performance loss on large arrays, even
+    // when the require passes.
+    if (arr[i] != expected_val) {
+      INFO("Mismatch at index: " << i);
+      REQUIRE(arr[i] == expected_val);
     }
   }
+}
 
-  // for (auto i = 0u; i < count; ++i) {
-  //   if (sizes.ptr()[i] != grid.threads_in_block_count_) {
-  //     INFO("Mismatch at index " << i);
-  //     REQUIRE(sizes.ptr()[i] == grid.threads_in_block_count_);
-  //   }
-  // }
+TEST_CASE("Unit_Thread_Block_Getters_Positive_Basic") {
+  auto threads = GENERATE(dim3(256, 2, 2));
+  auto blocks = GENERATE(dim3(10, 10, 10));
 
-  // for (auto i = 0u; i < count; ++i) {
-  //   const auto rank = grid.thread_rank_in_block(i).value();
-  //   if (thread_ranks.ptr()[i] != rank) {
-  //     INFO("Mismatch at index " << i);
-  //     REQUIRE(thread_ranks.ptr()[i] == rank);
-  //   }
-  // }
+  const CPUGrid grid(blocks, threads);
 
-  // for (auto i = 0u; i < count; ++i) {
-  //   const auto block_idx = grid.block_idx(i).value();
-  //   if (group_indices.ptr()[i] != block_idx) {
-  //     INFO("Mismatch at index " << i);
-  //     REQUIRE(group_indices.ptr()[i] == block_idx);
-  //   }
-  // }
+  LinearAllocGuard<unsigned int> uint_arr_dev(LinearAllocs::hipMalloc,
+                                              grid.thread_count_ * sizeof(unsigned int));
+  LinearAllocGuard<unsigned int> uint_arr(LinearAllocs::hipHostMalloc,
+                                          grid.thread_count_ * sizeof(unsigned int));
 
-  // for (auto i = 0u; i < count; ++i) {
-  //   const auto thread_idx = grid.thread_idx(i).value();
-  //   if (thread_indices.ptr()[i] != thread_idx) {
-  //     INFO("Mismatch at index " << i);
-  //     REQUIRE(thread_indices.ptr()[i] == thread_idx);
-  //   }
-  // }
+  thread_block_size_getter<<<blocks, threads>>>(uint_arr_dev.ptr());
+  HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(),
+                      grid.thread_count_ * sizeof(*uint_arr.ptr()), hipMemcpyDeviceToHost));
+  HIP_CHECK(hipDeviceSynchronize());
+  thread_block_thread_rank_getter<<<blocks, threads>>>(uint_arr_dev.ptr());
 
-  // for (auto i = 0u; i < count; ++i) {
-  //   if (group_dims.ptr()[i] != threads) {
-  //     INFO("Mismatch at index " << i);
-  //     REQUIRE(group_dims.ptr()[i] == threads);
-  //   }
-  // }
+  // Verify thread_block.size() values
+  ArrayAllOf(uint_arr.ptr(), grid.thread_count_,
+             [size = grid.threads_in_block_count_](uint32_t) { return size; });
+
+  HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(),
+                      grid.thread_count_ * sizeof(*uint_arr.ptr()), hipMemcpyDeviceToHost));
+  HIP_CHECK(hipDeviceSynchronize());
+
+  // Verify thread_block.thread_rank() values
+  ArrayAllOf(uint_arr.ptr(), grid.thread_count_,
+             [&grid](uint32_t i) { return grid.thread_rank_in_block(i).value(); });
+
+  LinearAllocGuard<dim3> dim3_arr_dev(LinearAllocs::hipMalloc, grid.thread_count_ * sizeof(dim3));
+  LinearAllocGuard<dim3> dim3_arr(LinearAllocs::hipHostMalloc, grid.thread_count_ * sizeof(dim3));
+
+  thread_block_group_indices_getter<<<blocks, threads>>>(dim3_arr_dev.ptr());
+  HIP_CHECK(hipMemcpy(dim3_arr.ptr(), dim3_arr_dev.ptr(),
+                      grid.thread_count_ * sizeof(*dim3_arr.ptr()), hipMemcpyDeviceToHost));
+  HIP_CHECK(hipDeviceSynchronize());
+  thread_block_thread_indices_getter<<<blocks, threads>>>(dim3_arr_dev.ptr());
+
+  // Verify thread_block.group_index() values
+  ArrayAllOf(dim3_arr.ptr(), grid.thread_count_,
+             [&grid](uint32_t i) { return grid.block_idx(i).value(); });
+
+  HIP_CHECK(hipMemcpy(dim3_arr.ptr(), dim3_arr_dev.ptr(),
+                      grid.thread_count_ * sizeof(*dim3_arr.ptr()), hipMemcpyDeviceToHost));
+  HIP_CHECK(hipDeviceSynchronize());
+  thread_block_group_dims_getter<<<blocks, threads>>>(dim3_arr_dev.ptr());
+
+  // Verify thread_block.thread_index() values
+  ArrayAllOf(dim3_arr.ptr(), grid.thread_count_,
+             [&grid](uint32_t i) { return grid.thread_idx(i).value(); });
+
+  HIP_CHECK(hipMemcpy(dim3_arr.ptr(), dim3_arr_dev.ptr(),
+                      grid.thread_count_ * sizeof(*dim3_arr.ptr()), hipMemcpyDeviceToHost));
+  HIP_CHECK(hipDeviceSynchronize());
+
+  // Verify thread_block.group_dim() values
+  ArrayAllOf(dim3_arr.ptr(), grid.thread_count_, [threads](uint32_t) { return threads; });
 }
 
 /*

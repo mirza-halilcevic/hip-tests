@@ -38,9 +38,7 @@ __global__ void thread_block_partition_thread_rank_getter(unsigned int* thread_r
   thread_ranks[thread_rank_in_grid()] = cg::tiled_partition<tile_size>(group).thread_rank();
 }
 
-template <typename... sizes> void block_tile_partition_getters_basic_test() {}
-
-template <size_t tile_size, size_t... sizes> void block_tile_partition_getters_basic_test() {
+template <size_t tile_size> void BlockTilePartitionGettersBasicTestImpl() {
   DYNAMIC_SECTION("Tile size: " << tile_size) {
     auto threads = GENERATE(dim3(256, 2, 2));
     auto blocks = GENERATE(dim3(10, 10, 10));
@@ -63,13 +61,54 @@ template <size_t tile_size, size_t... sizes> void block_tile_partition_getters_b
     ArrayAllOf(uint_arr.ptr(), grid.thread_count_,
                [grid](unsigned int i) { return i % tile_size; });
   }
+}
 
-  block_tile_partition_getters_basic_test<sizes...>();
+template <size_t... tile_sizes> void BlockTilePartitionGettersBasicTest() {
+  int _[] = {(BlockTilePartitionGettersBasicTestImpl<tile_sizes>(), 0)...};
+  static_cast<void>(_);
+}
+
+TEST_CASE("Thread_Block_Tile_Getter_Positive_Basic") {
+  BlockTilePartitionGettersBasicTest<2, 4, 8, 16, 32>();
 }
 
 
-TEST_CASE("Thread_Block_Tile_Getter_Positive_Basic") {
-  block_tile_partition_getters_basic_test<2, 4, 8, 16, 32>();
+template <typename T, size_t tile_size>
+__global__ void block_tile_partition_shfl_down(T* const out, const unsigned int delta) {
+  const auto partition = cg::tiled_partition<tile_size>(cg::this_thread_block());
+  T var = static_cast<T>(partition.thread_rank());
+  out[thread_rank_in_grid()] = partition.shfl_down(var, delta);
+}
+
+template <typename T, size_t tile_size> void TilePartitionShflDownTestImpl() {
+  DYNAMIC_SECTION("Tile size: " << tile_size) {
+    auto threads = GENERATE(dim3(256, 2, 2));
+    auto blocks = GENERATE(dim3(10, 10, 10));
+    auto delta = GENERATE(range(static_cast<size_t>(0), tile_size));
+    CPUGrid grid(blocks, threads);
+
+    const auto alloc_size = grid.thread_count_ * sizeof(T);
+    LinearAllocGuard<T> arr_dev(LinearAllocs::hipMalloc, alloc_size);
+    LinearAllocGuard<T> arr(LinearAllocs::hipHostMalloc, alloc_size);
+
+    block_tile_partition_shfl_down<T, tile_size><<<blocks, threads>>>(arr_dev.ptr(), delta);
+    HIP_CHECK(hipMemcpy(arr.ptr(), arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
+
+    ArrayAllOf(arr.ptr(), grid.thread_count_, [delta](unsigned int i) {
+      const auto rank_in_group = i % tile_size;
+      return rank_in_group < tile_size - delta ? rank_in_group + delta : rank_in_group;
+    });
+  }
+}
+
+template <typename T, size_t... tile_sizes> void TilePartitionShflDownTest() {
+  static_cast<void>((TilePartitionShflDownTestImpl<T, tile_sizes>(),...));
+}
+
+TEMPLATE_TEST_CASE("Blahem", "", int, unsigned int, long, unsigned long, long long,
+                   unsigned long long, float, double) {
+  TilePartitionShflDownTest<TestType, 2, 4, 8, 16, 32>();
 }
 
 // /* Parallel reduce kernel.

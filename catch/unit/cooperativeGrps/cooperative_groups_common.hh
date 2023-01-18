@@ -58,3 +58,30 @@ void verifyResults(T* hPtr, T* dPtr, int size) {
     }
   }
 }
+
+inline bool operator==(const dim3& l, const dim3& r) {
+  return l.x == r.x && l.y == r.y && l.z == r.z;
+}
+
+inline bool operator!=(const dim3& l, const dim3& r) { return !(l == r); }
+
+template <typename T, typename F>
+static inline void ArrayAllOf(const T* arr, uint32_t count, F value_gen) {
+  for (auto i = 0u; i < count; ++i) {
+    const auto expected_val = value_gen(i);
+    // Using require on every iteration leads to a noticeable performance loss on large arrays, even
+    // when the require passes.
+    if (arr[i] != expected_val) {
+      INFO("Mismatch at index: " << i);
+      REQUIRE(arr[i] == expected_val);
+    }
+  }
+}
+
+__device__ inline unsigned int thread_rank_in_grid() {
+  const auto block_size = blockDim.x * blockDim.y * blockDim.z;
+  const auto block_rank_in_grid = (blockIdx.z * gridDim.y + blockIdx.y) * gridDim.x + blockIdx.x;
+  const auto thread_rank_in_block =
+      (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;
+  return block_rank_in_grid * block_size + thread_rank_in_block;
+}

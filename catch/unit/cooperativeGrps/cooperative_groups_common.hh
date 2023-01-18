@@ -77,3 +77,11 @@ static inline void ArrayAllOf(const T* arr, uint32_t count, F value_gen) {
     }
   }
 }
+
+__device__ inline unsigned int thread_rank_in_grid() {
+  const auto block_size = blockDim.x * blockDim.y * blockDim.z;
+  const auto block_rank_in_grid = (blockIdx.z * gridDim.y + blockIdx.y) * gridDim.x + blockIdx.x;
+  const auto thread_rank_in_block =
+      (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;
+  return block_rank_in_grid * block_size + thread_rank_in_block;
+}

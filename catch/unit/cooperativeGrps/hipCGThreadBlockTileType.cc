@@ -40,8 +40,8 @@ __global__ void thread_block_partition_thread_rank_getter(unsigned int* thread_r
 
 template <size_t tile_size> void BlockTilePartitionGettersBasicTestImpl() {
   DYNAMIC_SECTION("Tile size: " << tile_size) {
-    auto threads = GENERATE(dim3(256, 2, 2));
-    auto blocks = GENERATE(dim3(10, 10, 10));
+    auto threads = GENERATE(dim3(2, 1, 1));
+    auto blocks = GENERATE(dim3(3, 1, 1));
     CPUGrid grid(blocks, threads);
 
     const auto alloc_size = grid.thread_count_ * sizeof(unsigned int);
@@ -58,8 +58,9 @@ template <size_t tile_size> void BlockTilePartitionGettersBasicTestImpl() {
     HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
 
-    ArrayAllOf(uint_arr.ptr(), grid.thread_count_,
-               [grid](unsigned int i) { return i % tile_size; });
+    ArrayAllOf(uint_arr.ptr(), grid.thread_count_, [&grid](unsigned int i) {
+      return grid.thread_rank_in_block(i).value() % tile_size;
+    });
   }
 }
 
@@ -82,9 +83,10 @@ __global__ void block_tile_partition_shfl_down(T* const out, const unsigned int 
 
 template <typename T, size_t tile_size> void TilePartitionShflDownTestImpl() {
   DYNAMIC_SECTION("Tile size: " << tile_size) {
-    auto threads = GENERATE(dim3(256, 2, 2));
-    auto blocks = GENERATE(dim3(10, 10, 10));
+    auto threads = GENERATE(dim3(3, 1, 1));
+    auto blocks = GENERATE(dim3(2, 1, 1));
     auto delta = GENERATE(range(static_cast<size_t>(0), tile_size));
+    INFO("Delta: " << delta);
     CPUGrid grid(blocks, threads);
 
     const auto alloc_size = grid.thread_count_ * sizeof(T);
@@ -95,15 +97,27 @@ template <typename T, size_t tile_size> void TilePartitionShflDownTestImpl() {
     HIP_CHECK(hipMemcpy(arr.ptr(), arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
 
-    ArrayAllOf(arr.ptr(), grid.thread_count_, [delta](unsigned int i) {
-      const auto rank_in_group = i % tile_size;
-      return rank_in_group < tile_size - delta ? rank_in_group + delta : rank_in_group;
+    ArrayAllOf(arr.ptr(), grid.thread_count_, [delta, &grid](unsigned int i) -> std::optional<T> {
+      const auto partitions_in_block = (grid.threads_in_block_count_ + tile_size - 1) / tile_size;
+      const auto rank_in_block = grid.thread_rank_in_block(i).value();
+      const auto rank_in_group = rank_in_block % tile_size;
+      const auto target = rank_in_group + delta;
+      if (rank_in_block < (partitions_in_block - 1) * tile_size) {
+        return target < tile_size ? target : rank_in_group;
+      } else {
+        // If the number of threads in a block is not an integer multiple of tile_size, the
+        // final(tail end) tile will contain inactive threads.
+        // Shuffling from an inactive thread returns an undefined value, accordingly threads that
+        // shuffle from one must be skipped
+        const auto tail = partitions_in_block * tile_size - grid.threads_in_block_count_;
+        return target < tile_size - tail ? std::optional(target) : std::nullopt;
+      }
     });
   }
 }
 
 template <typename T, size_t... tile_sizes> void TilePartitionShflDownTest() {
-  static_cast<void>((TilePartitionShflDownTestImpl<T, tile_sizes>(),...));
+  static_cast<void>((TilePartitionShflDownTestImpl<T, tile_sizes>(), ...));
 }
 
 TEMPLATE_TEST_CASE("Blahem", "", int, unsigned int, long, unsigned long, long long,

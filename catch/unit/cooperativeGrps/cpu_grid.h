@@ -37,8 +37,7 @@ struct CPUGrid {
       return std::nullopt;
     }
 
-    return thread_rank_in_grid -
-        (thread_rank_in_grid / threads_in_block_count_) * threads_in_block_count_;
+    return thread_rank_in_grid % threads_in_block_count_;
   }
 
   inline std::optional<dim3> block_idx(const unsigned int thread_rank_in_grid) const {

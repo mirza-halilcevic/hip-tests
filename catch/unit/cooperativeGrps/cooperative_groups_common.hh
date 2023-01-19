@@ -31,8 +31,7 @@ THE SOFTWARE.
 
 constexpr int MaxGPUs = 8;
 
-template <typename T>
-void compareResults(T* cpu, T* gpu, int size) {
+template <typename T> void compareResults(T* cpu, T* gpu, int size) {
   for (unsigned int i = 0; i < size / sizeof(T); i++) {
     if (cpu[i] != gpu[i]) {
       INFO("Results do not match at index " << i);
@@ -43,8 +42,7 @@ void compareResults(T* cpu, T* gpu, int size) {
 
 
 // Search if the sum exists in the expected results array
-template <typename T>
-void verifyResults(T* hPtr, T* dPtr, int size) {
+template <typename T> void verifyResults(T* hPtr, T* dPtr, int size) {
   int i = 0, j = 0;
   for (i = 0; i < size; i++) {
     for (j = 0; j < size; j++) {
@@ -68,12 +66,13 @@ inline bool operator!=(const dim3& l, const dim3& r) { return !(l == r); }
 template <typename T, typename F>
 static inline void ArrayAllOf(const T* arr, uint32_t count, F value_gen) {
   for (auto i = 0u; i < count; ++i) {
-    const auto expected_val = value_gen(i);
+    const std::optional<T> expected_val = value_gen(i);
+    if (!expected_val.has_value()) continue;
     // Using require on every iteration leads to a noticeable performance loss on large arrays, even
     // when the require passes.
-    if (arr[i] != expected_val) {
+    if (arr[i] != expected_val.value()) {
       INFO("Mismatch at index: " << i);
-      REQUIRE(arr[i] == expected_val);
+      REQUIRE(arr[i] == expected_val.value());
     }
   }
 }

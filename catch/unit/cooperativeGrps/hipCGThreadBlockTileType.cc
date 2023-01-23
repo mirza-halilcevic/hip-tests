@@ -24,21 +24,35 @@ THE SOFTWARE.
 #include "cooperative_groups_common.hh"
 #include "cpu_grid.h"
 
+/**
+ * @addtogroup tiled_partition tiled_partition
+ * @{
+ * @ingroup coopGrpTest
+ */
+
 namespace cg = cooperative_groups;
 
-template <unsigned int tile_size>
+template <unsigned int tile_size, bool dynamic = false>
 __global__ void thread_block_partition_size_getter(unsigned int* sizes) {
   const auto group = cg::this_thread_block();
-  sizes[thread_rank_in_grid()] = cg::tiled_partition<tile_size>(group).size();
+  if constexpr (dynamic) {
+    sizes[thread_rank_in_grid()] = cg::tiled_partition(group, tile_size).size();
+  } else {
+    sizes[thread_rank_in_grid()] = cg::tiled_partition<tile_size>(group).size();
+  }
 }
 
-template <unsigned int tile_size>
+template <unsigned int tile_size, bool dynamic = false>
 __global__ void thread_block_partition_thread_rank_getter(unsigned int* thread_ranks) {
   const auto group = cg::this_thread_block();
-  thread_ranks[thread_rank_in_grid()] = cg::tiled_partition<tile_size>(group).thread_rank();
+  if constexpr (dynamic) {
+    thread_ranks[thread_rank_in_grid()] = cg::tiled_partition(group, tile_size).thread_rank();
+  } else {
+    thread_ranks[thread_rank_in_grid()] = cg::tiled_partition<tile_size>(group).thread_rank();
+  }
 }
 
-template <size_t tile_size> void BlockTilePartitionGettersBasicTestImpl() {
+template <size_t tile_size, bool dynamic = false> void BlockTilePartitionGettersBasicTestImpl() {
   DYNAMIC_SECTION("Tile size: " << tile_size) {
     auto threads = GENERATE(dim3(2, 1, 1));
     auto blocks = GENERATE(dim3(3, 1, 1));
@@ -64,13 +78,96 @@ template <size_t tile_size> void BlockTilePartitionGettersBasicTestImpl() {
   }
 }
 
-template <size_t... tile_sizes> void BlockTilePartitionGettersBasicTest() {
-  int _[] = {(BlockTilePartitionGettersBasicTestImpl<tile_sizes>(), 0)...};
-  static_cast<void>(_);
+template <bool dynamic, size_t... tile_sizes> void BlockTilePartitionGettersBasicTest() {
+  static_cast<void>((BlockTilePartitionGettersBasicTestImpl<tile_sizes, dynamic>(), ...));
 }
 
+/**
+ * Test Description
+ * ------------------------
+ *    - Creates tile partitions for each of the valid sizes{2, 4, 8, 16, 32} and writes the return
+ * values of size and thread_rank member functions to an output array that is validated on the host
+ * side.
+ * Test source
+ * ------------------------
+ *    - unit/cooperativeGrps/hipCGThreadBlockTileType.cc
+ * Test requirements
+ * ------------------------
+ *    - HIP_VERSION >= 5.2
+ */
 TEST_CASE("Thread_Block_Tile_Getter_Positive_Basic") {
-  BlockTilePartitionGettersBasicTest<2, 4, 8, 16, 32>();
+  BlockTilePartitionGettersBasicTest<false, 2, 4, 8, 16, 32>();
+}
+
+/**
+ * Test Description
+ * ------------------------
+ *    - Creates tile partitions for each of the valid sizes{2, 4, 8, 16, 32} via the dynamic tiled
+ * partition api and writes the return values of size and thread_rank member functions to an output
+ * array that is validated on host.
+ * Test source
+ * ------------------------
+ *    - unit/cooperativeGrps/hipCGThreadBlockTileType.cc
+ * Test requirements
+ * ------------------------
+ *    - HIP_VERSION >= 5.2
+ */
+TEST_CASE("Thread_Block_Dynamic_Tile_Getter_Positive_Basic") {
+  BlockTilePartitionGettersBasicTest<true, 2, 4, 8, 16, 32>();
+}
+
+
+template <typename T, size_t tile_size>
+__global__ void block_tile_partition_shfl_up(T* const out, const unsigned int delta) {
+  const auto partition = cg::tiled_partition<tile_size>(cg::this_thread_block());
+  T var = static_cast<T>(partition.thread_rank());
+  out[thread_rank_in_grid()] = partition.shfl_up(var, delta);
+}
+
+template <typename T, size_t tile_size> void TilePartitionShflUpTestImpl() {
+  DYNAMIC_SECTION("Tile size: " << tile_size) {
+    auto threads = GENERATE(dim3(3, 1, 1), dim3(57, 2, 8));
+    auto blocks = GENERATE(dim3(2, 1, 1), dim3(5, 5, 5));
+    auto delta = GENERATE(range(static_cast<size_t>(0), tile_size));
+    INFO("Delta: " << delta);
+    CPUGrid grid(blocks, threads);
+
+    const auto alloc_size = grid.thread_count_ * sizeof(T);
+    LinearAllocGuard<T> arr_dev(LinearAllocs::hipMalloc, alloc_size);
+    LinearAllocGuard<T> arr(LinearAllocs::hipHostMalloc, alloc_size);
+
+    block_tile_partition_shfl_up<T, tile_size><<<blocks, threads>>>(arr_dev.ptr(), delta);
+    HIP_CHECK(hipMemcpy(arr.ptr(), arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
+
+    ArrayAllOf(arr.ptr(), grid.thread_count_, [delta, &grid](unsigned int i) -> std::optional<T> {
+      const int rank_in_partition = grid.thread_rank_in_block(i).value() % tile_size;
+      const int target = rank_in_partition - delta;
+      return target < 0 ? rank_in_partition : target;
+    });
+  }
+}
+
+template <typename T, size_t... tile_sizes> void TilePartitionShflUpTest() {
+  static_cast<void>((TilePartitionShflUpTestImpl<T, tile_sizes>(), ...));
+}
+
+/**
+ * Test Description
+ * ------------------------
+ *    - Validates the shuffle up behavior of tiled groups of all valid sizes{2, 4, 8, 16, 32} for
+ * delta values of [0, tile size). The test is run for all overloads of shfl_up.
+ * Test source
+ * ------------------------
+ *    - unit/cooperativeGrps/hipCGThreadBlockTileType.cc
+ * Test requirements
+ * ------------------------
+ *    - HIP_VERSION >= 5.2
+ */
+// Add FP16 type tests if supported
+TEMPLATE_TEST_CASE("Thread_Block_Tile_Shfl_Up_Positive_Basic", "", int, unsigned int, long,
+                   unsigned long, long long, unsigned long long, float, double) {
+  TilePartitionShflUpTest<TestType, 2, 4, 8, 16, 32>();
 }
 
 
@@ -120,240 +217,152 @@ template <typename T, size_t... tile_sizes> void TilePartitionShflDownTest() {
   static_cast<void>((TilePartitionShflDownTestImpl<T, tile_sizes>(), ...));
 }
 
-TEMPLATE_TEST_CASE("Blahem", "", int, unsigned int, long, unsigned long, long long,
-                   unsigned long long, float, double) {
+/**
+ * Test Description
+ * ------------------------
+ *    - Validates the shuffle down behavior of tiled groups of all valid sizes{2, 4, 8, 16, 32} for
+ * delta values of [0, tile size). The test is run for all overloads of shfl_down.
+ * Test source
+ * ------------------------
+ *    - unit/cooperativeGrps/hipCGThreadBlockTileType.cc
+ * Test requirements
+ * ------------------------
+ *    - HIP_VERSION >= 5.2
+ */
+// Add FP16 type tests if supported
+TEMPLATE_TEST_CASE("Thread_Block_Tile_Shfl_Down_Positive_Basic", "", int, unsigned int, long,
+                   unsigned long, long long, unsigned long long, float, double) {
   TilePartitionShflDownTest<TestType, 2, 4, 8, 16, 32>();
 }
 
-// /* Parallel reduce kernel.
-//  *
-//  * Step complexity: O(log n)
-//  * Work complexity: O(n)
-//  *
-//  * Note: This kernel works only with power of 2 input arrays.
-//  */
-// __device__ int reduction_kernel(cg::thread_group g, int* x, int val) {
-//   int lane = g.thread_rank();
-//   int sz = g.size();
 
-//   for (int i = g.size() / 2; i > 0; i /= 2) {
-//     // use lds to store the temporary result
-//     x[lane] = val;
-//     // Ensure all the stores are completed.
-//     g.sync();
+template <typename T, size_t tile_size>
+__global__ void block_tile_partition_shfl_xor(T* const out, const unsigned mask) {
+  const auto partition = cg::tiled_partition<tile_size>(cg::this_thread_block());
+  T var = static_cast<T>(partition.thread_rank());
+  out[thread_rank_in_grid()] = partition.shfl_xor(var, mask);
+}
 
-//     if (lane < i) {
-//       val += x[lane + i];
-//     }
-//     // It must work on one tiled thread group at a time,
-//     // and it must make sure all memory operations are
-//     // completed before moving to the next stride.
-//     // sync() here just does that.
-//     g.sync();
-//   }
+template <typename T, size_t tile_size> void TilePartitionShflXORTestImpl() {
+  DYNAMIC_SECTION("Tile size: " << tile_size) {
+    auto threads = GENERATE(dim3(3, 1, 1));
+    auto blocks = GENERATE(dim3(2, 1, 1));
+    const auto mask = GENERATE(range(static_cast<size_t>(0), tile_size));
+    INFO("Mask: 0x" << std::hex << mask);
+    CPUGrid grid(blocks, threads);
 
-//   // Choose the 0'th indexed thread that holds the reduction value to return
-//   if (g.thread_rank() == 0) {
-//     return val;
-//   }
-//   // Rest of the threads return no useful values
-//   else {
-//     return -1;
-//   }
-// }
+    const auto alloc_size = grid.thread_count_ * sizeof(T);
+    LinearAllocGuard<T> arr_dev(LinearAllocs::hipMalloc, alloc_size);
+    LinearAllocGuard<T> arr(LinearAllocs::hipHostMalloc, alloc_size);
 
-// template <unsigned int tile_size>
-// __global__ void kernel_cg_group_partition_static(int* result,
-//                                                   bool is_global_mem, int* global_mem) {
-//   cg::thread_block thread_block_CG_ty = cg::this_thread_block();
+    block_tile_partition_shfl_xor<T, tile_size><<<blocks, threads>>>(arr_dev.ptr(), mask);
+    HIP_CHECK(hipMemcpy(arr.ptr(), arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
 
-//   int* workspace = NULL;
+    const auto f = [mask, &grid](unsigned int i) -> std::optional<T> {
+      const auto partitions_in_block = (grid.threads_in_block_count_ + tile_size - 1) / tile_size;
+      const auto rank_in_block = grid.thread_rank_in_block(i).value();
+      const int rank_in_partition = rank_in_block % tile_size;
+      const auto target = rank_in_partition ^ mask;
+      if (rank_in_block < (partitions_in_block - 1) * tile_size) {
+        return target;
+      }
+      const auto tail = partitions_in_block * tile_size - grid.threads_in_block_count_;
+      return target < tile_size - tail ? std::optional(target) : std::nullopt;
+    };
+    ArrayAllOf(arr.ptr(), grid.thread_count_, f);
+  }
+}
 
-//   if (is_global_mem) {
-//     workspace = global_mem;
-//   } else {
-//     // Declare a shared memory
-//     extern __shared__ int shared_mem[];
-//     workspace = shared_mem;
-//   }
+template <typename T, size_t... tile_sizes> void TilePartitionShflXORTest() {
+  static_cast<void>((TilePartitionShflXORTestImpl<T, tile_sizes>(), ...));
+}
 
-//   int input, output_sum;
+/**
+ * Test Description
+ * ------------------------
+ *    - Validates the shuffle xor behavior of tiled groups of all valid sizes{2, 4, 8, 16, 32} for
+ * mask values of [0, tile size). The test is run for all overloads of shfl_xor.
+ * Test source
+ * ------------------------
+ *    - unit/cooperativeGrps/hipCGThreadBlockTileType.cc
+ * Test requirements
+ * ------------------------
+ *    - HIP_VERSION >= 5.2
+ */
+// Add FP16 type tests if supported
+TEMPLATE_TEST_CASE("Thread_Block_Tile_Shfl_XOR_Positive_Basic", "", int, unsigned int, long,
+                   unsigned long, long long, unsigned long long, float, double) {
+  TilePartitionShflXORTest<TestType, 2, 4, 8, 16, 32>();
+}
 
-//   // input to reduction, for each thread, is its' rank in the group
-//   input = thread_block_CG_ty.thread_rank();
 
-//   output_sum = reduction_kernel(thread_block_CG_ty, workspace, input);
+template <typename T, size_t tile_size>
+__global__ void block_tile_partition_shfl(T* const out, uint8_t* target_lanes) {
+  const auto partition = cg::tiled_partition<tile_size>(cg::this_thread_block());
+  T var = static_cast<T>(partition.thread_rank());
+  out[thread_rank_in_grid()] = partition.shfl(var, target_lanes[partition.thread_rank()]);
+}
 
-//   if (thread_block_CG_ty.thread_rank() == 0) {
-//     printf("\n\n\n Sum of all ranks 0..%d in threadBlockCooperativeGroup is %d\n\n",
-//            (int)thread_block_CG_ty.size() - 1, output_sum);
-//     printf(" Creating %d groups, of tile size %d threads:\n\n",
-//            (int)thread_block_CG_ty.size() / tile_size, tile_size);
-//   }
+template <typename T, size_t tile_size> void TilePartitionShflTestImpl() {
+  DYNAMIC_SECTION("Tile size: " << tile_size) {
+    auto threads = GENERATE(dim3(3, 1, 1));
+    auto blocks = GENERATE(dim3(2, 1, 1));
+    CPUGrid grid(blocks, threads);
 
-//   thread_block_CG_ty.sync();
+    const auto alloc_size = grid.thread_count_ * sizeof(T);
+    LinearAllocGuard<T> arr_dev(LinearAllocs::hipMalloc, alloc_size);
+    LinearAllocGuard<T> arr(LinearAllocs::hipHostMalloc, alloc_size);
 
-//   cg::thread_block_tile<tile_size> tiled_part =
-//   cg::tiled_partition<tile_size>(thread_block_CG_ty);
+    LinearAllocGuard<uint8_t> target_lanes_dev(LinearAllocs::hipMalloc,
+                                               tile_size * sizeof(uint8_t));
+    LinearAllocGuard<uint8_t> target_lanes(LinearAllocs::hipHostMalloc,
+                                           tile_size * sizeof(uint8_t));
+    // Generate a couple different combinations for target lanes
+    for (auto i = 0u; i < tile_size; ++i) {
+      target_lanes.ptr()[i] = tile_size - 1 - i;
+    }
 
-//   // This offset allows each group to have its own unique area in the workspace array
-//   int workspace_offset = thread_block_CG_ty.thread_rank() - tiled_part.thread_rank();
+    HIP_CHECK(hipMemcpy(target_lanes_dev.ptr(), target_lanes.ptr(), tile_size * sizeof(uint8_t),
+                        hipMemcpyHostToDevice));
+    block_tile_partition_shfl<T, tile_size>
+        <<<blocks, threads>>>(arr_dev.ptr(), target_lanes_dev.ptr());
+    HIP_CHECK(hipMemcpy(arr.ptr(), arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
 
-//   output_sum = reduction_kernel(tiled_part, workspace + workspace_offset, input);
+    const auto f = [&target_lanes, &grid](unsigned int i) -> std::optional<T> {
+      const auto partitions_in_block = (grid.threads_in_block_count_ + tile_size - 1) / tile_size;
+      const auto rank_in_block = grid.thread_rank_in_block(i).value();
+      const int rank_in_partition = rank_in_block % tile_size;
+      const auto target = target_lanes.ptr()[rank_in_partition] % tile_size;
+      if (rank_in_block < (partitions_in_block - 1) * tile_size) {
+        return target;
+      }
+      const auto tail = partitions_in_block * tile_size - grid.threads_in_block_count_;
+      return target < tile_size - tail ? std::optional(target) : std::nullopt;
+    };
+    ArrayAllOf(arr.ptr(), grid.thread_count_, f);
+  }
+}
 
-//   if (tiled_part.thread_rank() == 0) {
-//     printf("   Sum of all ranks %d..%d in this tiled_part group is %d.\n",
-//         input, input + static_cast<int>(tiled_part.size()) - 1, output_sum);
-//     result[input / (tile_size)] = output_sum;
-//   }
-//   return;
-// }
+template <typename T, size_t... tile_sizes> void TilePartitionShflTest() {
+  static_cast<void>((TilePartitionShflTestImpl<T, tile_sizes>(), ...));
+}
 
-// __global__ void kernel_cg_group_partition_dynamic(unsigned int tile_size, int* result,
-//                                                   bool is_global_mem, int* global_mem) {
-//   cg::thread_block thread_block_CG_ty = cg::this_thread_block();
-
-//   int* workspace = NULL;
-
-//   if (is_global_mem) {
-//     workspace = global_mem;
-//   } else {
-//     // Declare a shared memory
-//     extern __shared__ int shared_mem[];
-//     workspace = shared_mem;
-//   }
-
-//   int input, output_sum;
-
-//   // input to reduction, for each thread, is its' rank in the group
-//   input = thread_block_CG_ty.thread_rank();
-
-//   output_sum = reduction_kernel(thread_block_CG_ty, workspace, input);
-
-//   if (thread_block_CG_ty.thread_rank() == 0) {
-//     printf("\n\n\n Sum of all ranks 0..%d in threadBlockCooperativeGroup is %d\n\n",
-//            (int)thread_block_CG_ty.size() - 1, output_sum);
-//     printf(" Creating %d groups, of tile size %d threads:\n\n",
-//            (int)thread_block_CG_ty.size() / tile_size, tile_size);
-//   }
-
-//   thread_block_CG_ty.sync();
-
-//   cg::thread_group tiled_part = cg::tiled_partition(thread_block_CG_ty, tile_size);
-
-//   // This offset allows each group to have its own unique area in the workspace array
-//   int workspace_offset = thread_block_CG_ty.thread_rank() - tiled_part.thread_rank();
-
-//   output_sum = reduction_kernel(tiled_part, workspace + workspace_offset, input);
-
-//   if (tiled_part.thread_rank() == 0) {
-//     printf("   Sum of all ranks %d..%d in this tiled_part group is %d.\n",
-//         input, input + static_cast<int>(tiled_part.size()) - 1, output_sum);
-//     result[input / (tile_size)] = output_sum;
-//   }
-//   return;
-// }
-
-// template <typename F>
-// static void common_group_partition(F kernel_func, unsigned int tile_size, void** params, size_t
-// num_params, bool use_global_mem) {
-//   int block_size = 1;
-//   int threads_per_blk = 64;
-
-//   int num_tiles = (block_size * threads_per_blk) / tile_size;
-
-//   // Build an array of expected reduction sum output on the host
-//   // based on the sum of their respective thread ranks for verification.
-//   // eg: parent group has 64threads.
-//   // child thread ranks: 0-15, 16-31, 32-47, 48-63
-//   // expected sum:       120,   376,  632,  888
-//   int* expected_sum = new int[num_tiles];
-//   int temp = 0, sum = 0;
-
-//   for (int i = 1; i <= num_tiles; i++) {
-//     sum = temp;
-//     temp = (((tile_size * i) - 1) * (tile_size * i)) / 2;
-//     expected_sum[i-1] = temp - sum;
-//   }
-
-//   int* result_dev = NULL;
-//   HIP_CHECK(hipMalloc((void**)&result_dev, num_tiles * sizeof(int)));
-
-//   int* global_mem = NULL;
-//   if (use_global_mem) {
-//     HIP_CHECK(hipMalloc((void**)&global_mem, threads_per_blk * sizeof(int)));
-//   }
-
-//   int* result_host = NULL;
-//   HIP_CHECK(hipHostMalloc(&result_host, num_tiles * sizeof(int), hipHostMallocDefault));
-//   memset(result_host, 0, num_tiles * sizeof(int));
-
-//   params[num_params + 0] = &result_dev;
-//   params[num_params + 1] = &use_global_mem;
-//   params[num_params + 2] = &global_mem;
-
-//   if (use_global_mem) {
-//     // Launch Kernel
-//     HIP_CHECK(hipLaunchCooperativeKernel(kernel_func, block_size, threads_per_blk, params, 0,
-//     0)); HIP_CHECK(hipDeviceSynchronize());
-//   } else {
-//     // Launch Kernel
-//     HIP_CHECK(hipLaunchCooperativeKernel(kernel_func, block_size, threads_per_blk, params,
-//     threads_per_blk * sizeof(int), 0)); HIP_CHECK(hipDeviceSynchronize());
-//   }
-
-//   HIP_CHECK(hipMemcpy(result_host, result_dev, num_tiles * sizeof(int), hipMemcpyDeviceToHost));
-
-//   verifyResults(expected_sum, result_host, num_tiles);
-
-//   // Free all allocated memory on host and device
-//   HIP_CHECK(hipFree(result_dev));
-//   HIP_CHECK(hipHostFree(result_host));
-//   if (use_global_mem) {
-//     HIP_CHECK(hipFree(global_mem));
-//   }
-//   delete[] expected_sum;
-// }
-
-// template <unsigned int tile_size> static void test_group_partition(bool use_global_mem) {
-//   void* params[3];
-//   size_t num_params = 0;
-//   common_group_partition(kernel_cg_group_partition_static<tile_size>, tile_size, params,
-//   num_params, use_global_mem);
-// }
-
-// static void test_group_partition(unsigned int tile_size, bool use_global_mem) {
-//   void* params[4];
-//   params[0] = &tile_size;
-//   size_t num_params = 1;
-//   common_group_partition(kernel_cg_group_partition_dynamic, tile_size, params, num_params,
-//   use_global_mem);
-// }
-
-// TEST_CASE("Unit_hipCGThreadBlockTileType") {
-//   // Use default device for validating the test
-//   int device;
-//   hipDeviceProp_t device_properties;
-//   HIP_CHECK(hipGetDevice(&device));
-//   HIP_CHECK(hipGetDeviceProperties(&device_properties, device));
-
-//   if (!device_properties.cooperativeLaunch) {
-//     HipTest::HIP_SKIP_TEST("Device doesn't support cooperative launch!");
-//     return;
-//   }
-
-//   bool use_global_mem = GENERATE(true, false);
-
-//   SECTION("Static tile partition") {
-//     test_group_partition<2>(use_global_mem);
-//     test_group_partition<4>(use_global_mem);
-//     test_group_partition<8>(use_global_mem);
-//     test_group_partition<16>(use_global_mem);
-//     test_group_partition<32>(use_global_mem);
-//   }
-
-//   SECTION("Dynamic tile partition") {
-//     unsigned int tile_size = GENERATE(2, 4, 8, 16, 32);
-//     test_group_partition(tile_size, use_global_mem);
-//   }
-// }
+/**
+ * Test Description
+ * ------------------------
+ *    - Validates the shuffle behavior of tiled groups of all valid sizes{2, 4, 8, 16, 32} for
+ * ... . The test is run for all overloads of shfl.
+ * Test source
+ * ------------------------
+ *    - unit/cooperativeGrps/hipCGThreadBlockTileType.cc
+ * Test requirements
+ * ------------------------
+ *    - HIP_VERSION >= 5.2
+ */
+// Add FP16 type tests if supported
+TEMPLATE_TEST_CASE("Thread_Block_Tile_Shfl_Positive_Basic", "", int, unsigned int, long,
+                   unsigned long, long long, unsigned long long, float, double) {
+  TilePartitionShflTest<TestType, 2, 4, 8, 16, 32>();
+}

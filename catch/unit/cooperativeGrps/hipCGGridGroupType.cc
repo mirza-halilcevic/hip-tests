@@ -47,6 +47,45 @@ static __global__ void grid_group_non_member_thread_rank_getter(unsigned int* th
   thread_ranks[thread_rank_in_grid()] = cg::thread_rank(cg::this_grid());
 }
 
+static __global__ void
+sync_kernel(unsigned int *atomic_val, unsigned int *array,
+            unsigned int loops) {
+  cg::grid_group grid = cg::this_grid();
+  unsigned rank = grid.thread_rank();
+
+  int offset = (blockIdx.z * gridDim.y + blockIdx.y) * gridDim.x + blockIdx.x;
+  for (int i = 0; i < loops; i++) {
+    // Make the last thread run way behind everyone else.
+    // If the sync below fails, then the other threads may hit the
+    // atomicInc instruction many times before the last thread ever gets to it.
+    // As such, without the sync, the last array entry will eventually
+    // contain a very large value, defined by however many times the other
+    // wavefronts make it through this loop.
+    // If the sync works, then it will likely contain some number
+    // near "total number of blocks". It will be the last wavefront to
+    // reach the atomicInc, but everyone will have only hit the atomic once.
+    if (rank == (grid.size() - 1)) {
+      long long time_diff = 0;
+      long long last_clock = clock64();
+      do {
+        long long cur_clock = clock64();
+        if (cur_clock > last_clock) {
+          time_diff += (cur_clock - last_clock);
+        }
+        // If it rolls over, we don't know how much to add to catch up.
+        // So just ignore those slipped cycles.
+        last_clock = cur_clock;
+      } while(time_diff < 1000000);
+    }
+
+    if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+      array[offset] = atomicInc(&atomic_val[0], UINT_MAX);
+    }
+    grid.sync();
+    offset += gridDim.x * gridDim.y * gridDim.z;
+  }
+}
+
 TEST_CASE("Unit_Grid_Group_Getters_Positive_Basic") {
   int device;
   hipDeviceProp_t device_properties;
@@ -162,4 +201,55 @@ TEST_CASE("Unit_Grid_Group_Getters_Positive_Non_Member_Functions") {
   // Verify grid_group.thread_rank() values
   ArrayAllOf(uint_arr.ptr(), grid.thread_count_,
               [](uint32_t i) { return i; });
+}
+
+TEST_CASE("Unit_Grid_Group_Positive_Sync") {
+  int device;
+  hipDeviceProp_t device_properties;
+  HIP_CHECK(hipGetDevice(&device));
+  HIP_CHECK(hipGetDeviceProperties(&device_properties, device));
+
+  if (!device_properties.cooperativeLaunch) {
+    HipTest::HIP_SKIP_TEST("Device doesn't support cooperative launch!");
+    return;
+  }
+
+  auto loops = GENERATE(2, 4, 8, 16);
+  auto threads = GENERATE(dim3(256, 2, 2));
+  auto blocks = GENERATE(dim3(2, 2, 2));
+
+  const CPUGrid grid(blocks, threads);
+  unsigned int array_len = grid.block_count_ * loops;
+
+  LinearAllocGuard<unsigned int> uint_arr_dev(LinearAllocs::hipMalloc,
+                                              array_len * sizeof(unsigned int));
+  LinearAllocGuard<unsigned int> uint_arr(LinearAllocs::hipHostMalloc,
+                                          array_len * sizeof(unsigned int));
+  LinearAllocGuard<unsigned int> atomic_val(LinearAllocs::hipMalloc,
+                                           sizeof(unsigned int));
+  HIP_CHECK(hipMemset(atomic_val.ptr(), 0, sizeof(unsigned int)));
+
+  // Launch Kernel
+  unsigned int* uint_arr_dev_ptr = uint_arr_dev.ptr();
+  unsigned int* atomic_val_ptr = atomic_val.ptr();
+  void *params[3];
+  params[0] = reinterpret_cast<void*>(&atomic_val_ptr);
+  params[1] = reinterpret_cast<void*>(&uint_arr_dev_ptr);
+  params[2] = reinterpret_cast<void*>(&loops);
+
+  HIP_CHECK(hipLaunchCooperativeKernel(sync_kernel, blocks, threads, params, 0, 0));
+
+  HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(),
+                        array_len * sizeof(*uint_arr.ptr()), hipMemcpyDeviceToHost));
+
+  HIP_CHECK(hipDeviceSynchronize());
+
+  // Verify host buffer values
+  unsigned int max_in_this_loop = 0;
+  for (unsigned int i = 0; i < loops; i++) {
+    max_in_this_loop += grid.block_count_;
+    for (unsigned int j = 0; j < grid.block_count_; j++) {
+      REQUIRE(uint_arr.ptr()[i*grid.block_count_+j] <= max_in_this_loop);
+    }
+  }
 }

@@ -93,7 +93,7 @@ sync_kernel(unsigned int *atomic_val, unsigned int *global_array,
         last_clock = cur_clock;
       } while(time_diff < 1000000);
     }
-    if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+    if (threadIdx.x == blockDim.x - 1 && threadIdx.y == blockDim.y - 1 && threadIdx.z == blockDim.z - 1) {
       array[offset] = atomicInc(atomic_val, UINT_MAX);
     }
     grid.sync();
@@ -457,9 +457,11 @@ TEST_CASE("Unit_Multi_Grid_Group_Positive_Sync") {
     unsigned int max_in_this_loop = 0;
     for (unsigned int j = 0; j < loops; j++) {
       max_in_this_loop += grid.block_count_;
-      for (unsigned int k = 0; k < grid.block_count_; k++) {
-        REQUIRE(uint_arr[i].ptr()[j*grid.block_count_+k] <= max_in_this_loop);
+      unsigned int k = 0;
+      for (k = 0; k < grid.block_count_ - 1; k++) {
+        REQUIRE(uint_arr[i].ptr()[j*grid.block_count_+k] < max_in_this_loop);
       }
+      REQUIRE(uint_arr[i].ptr()[j*grid.block_count_+k] == max_in_this_loop - 1);
     }
   }
 

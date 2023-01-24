@@ -59,7 +59,7 @@ template <typename T> class LinearAllocGuard {
   }
 
   LinearAllocGuard(const LinearAllocGuard&) = delete;
-  LinearAllocGuard(LinearAllocGuard&&) = delete;
+  LinearAllocGuard(LinearAllocGuard&&) = default;
 
   ~LinearAllocGuard() {
     // No Catch macros, don't want to possibly throw in the destructor
@@ -214,7 +214,7 @@ class StreamGuard {
   }
 
   StreamGuard(const StreamGuard&) = delete;
-  StreamGuard(StreamGuard&&) = delete;
+  StreamGuard(StreamGuard&&) = default;
 
   ~StreamGuard() {
     if (stream_type_ == Streams::created) {

@@ -59,12 +59,10 @@ static __global__ void multi_grid_group_non_member_thread_rank_getter(unsigned i
   thread_ranks[thread_rank_in_grid()] = cg::thread_rank(cg::this_multi_grid());
 }
 
-static __global__ void
-sync_kernel(unsigned int *atomic_val, unsigned int *global_array,
-            unsigned int *array, uint32_t loops) {
+static __global__ void sync_kernel(unsigned int* atomic_val, unsigned int* global_array,
+                                   unsigned int* array, uint32_t loops) {
   cooperative_groups::grid_group grid = cooperative_groups::this_grid();
-  cooperative_groups::multi_grid_group mgrid =
-                      cooperative_groups::this_multi_grid();
+  cooperative_groups::multi_grid_group mgrid = cooperative_groups::this_multi_grid();
   unsigned rank = grid.thread_rank();
   unsigned global_rank = mgrid.thread_rank();
 
@@ -91,9 +89,10 @@ sync_kernel(unsigned int *atomic_val, unsigned int *global_array,
         // If it rolls over, we don't know how much to add to catch up.
         // So just ignore those slipped cycles.
         last_clock = cur_clock;
-      } while(time_diff < 1000000);
+      } while (time_diff < 1000000);
     }
-    if (threadIdx.x == blockDim.x - 1 && threadIdx.y == blockDim.y - 1 && threadIdx.z == blockDim.z - 1) {
+    if (threadIdx.x == blockDim.x - 1 && threadIdx.y == blockDim.y - 1 &&
+        threadIdx.z == blockDim.z - 1) {
       array[offset] = atomicInc(atomic_val, UINT_MAX);
     }
     grid.sync();
@@ -114,7 +113,7 @@ sync_kernel(unsigned int *atomic_val, unsigned int *global_array,
         // If it rolls over, we don't know how much to add to catch up.
         // So just ignore those slipped cycles.
         last_clock = cur_clock;
-      } while(time_diff < 1000000);
+      } while (time_diff < 1000000);
     }
     // During even iterations, add into your own array entry
     // During odd iterations, add into next array entry
@@ -136,7 +135,6 @@ TEST_CASE("Unit_Multi_Grid_Group_Getters_Positive_Basic") {
   int num_devices = 0;
   HIP_CHECK(hipGetDeviceCount(&num_devices));
   num_devices = min(num_devices, MaxGPUs);
-
   auto threads = GENERATE(dim3(256, 2, 2));
   auto blocks = GENERATE(dim3(2, 2, 2));
 
@@ -160,20 +158,21 @@ TEST_CASE("Unit_Multi_Grid_Group_Getters_Positive_Basic") {
   for (int i = 0; i < num_devices; i++) {
     HIP_CHECK(hipSetDevice(i));
     HIP_CHECK(hipDeviceSynchronize());
+    streams.emplace_back(Streams::created);
+
     uint_arr_dev.emplace_back(LinearAllocs::hipMalloc, grid.thread_count_ * sizeof(unsigned int));
     uint_arr_dev_ptr[i] = uint_arr_dev[i].ptr();
     uint_arr.emplace_back(LinearAllocs::hipHostMalloc, grid.thread_count_ * sizeof(unsigned int));
-    streams.emplace_back(Streams::created);
   }
 
   // Launch Kernel
   hipLaunchParams launchParamsList[num_devices];
   void* args[num_devices];
   for (int i = 0; i < num_devices; i++) {
-
     args[i] = &uint_arr_dev_ptr[i];
 
-    launchParamsList[i].func = reinterpret_cast<void*>(multi_grid_group_size_getter<cg::multi_grid_group>);
+    launchParamsList[i].func =
+        reinterpret_cast<void*>(multi_grid_group_size_getter<cg::multi_grid_group>);
     launchParamsList[i].gridDim = blocks;
     launchParamsList[i].blockDim = threads;
     launchParamsList[i].sharedMem = 0;
@@ -187,7 +186,8 @@ TEST_CASE("Unit_Multi_Grid_Group_Getters_Positive_Basic") {
                         grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
 
-    launchParamsList[i].func = reinterpret_cast<void*>(multi_grid_group_thread_rank_getter<cg::multi_grid_group>);
+    launchParamsList[i].func =
+        reinterpret_cast<void*>(multi_grid_group_thread_rank_getter<cg::multi_grid_group>);
   }
   HIP_CHECK(hipLaunchCooperativeKernelMultiDevice(launchParamsList, num_devices, 0));
 
@@ -197,7 +197,7 @@ TEST_CASE("Unit_Multi_Grid_Group_Getters_Positive_Basic") {
     ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_,
                [size = multi_grid_thread_count](uint32_t) { return size; });
     HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(),
-                      grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
+                        grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
 
     launchParamsList[i].func = reinterpret_cast<void*>(multi_grid_group_grid_rank_getter);
@@ -210,7 +210,7 @@ TEST_CASE("Unit_Multi_Grid_Group_Getters_Positive_Basic") {
     ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_,
                [rank_0 = multi_grid_grid_rank_0[i]](uint32_t j) { return rank_0 + j; });
     HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(),
-                      grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
+                        grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
 
     launchParamsList[i].func = reinterpret_cast<void*>(multi_grid_group_num_grids_getter);
@@ -220,15 +220,14 @@ TEST_CASE("Unit_Multi_Grid_Group_Getters_Positive_Basic") {
   for (int i = 0; i < num_devices; i++) {
     HIP_CHECK(hipSetDevice(i));
     // Verify multi_grid_group.grid_rank() values
-    ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_,
-             [rank = i](uint32_t) { return rank; });
+    ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_, [rank = i](uint32_t) { return rank; });
 
     HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(),
-                      grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
+                        grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
     // Verify multi_grid_group.num_grids() values
     ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_,
-              [num = num_devices](uint32_t) { return num; });
+               [num = num_devices](uint32_t) { return num; });
   }
 }
 
@@ -260,10 +259,11 @@ TEST_CASE("Unit_Multi_Grid_Group_Getters_Positive_Base_Type") {
   for (int i = 0; i < num_devices; i++) {
     HIP_CHECK(hipSetDevice(i));
     HIP_CHECK(hipDeviceSynchronize());
+    streams.emplace_back(Streams::created);
+
     uint_arr_dev.emplace_back(LinearAllocs::hipMalloc, grid.thread_count_ * sizeof(unsigned int));
     uint_arr_dev_ptr[i] = uint_arr_dev[i].ptr();
     uint_arr.emplace_back(LinearAllocs::hipHostMalloc, grid.thread_count_ * sizeof(unsigned int));
-    streams.emplace_back(Streams::created);
   }
 
   // Launch Kernel
@@ -272,7 +272,8 @@ TEST_CASE("Unit_Multi_Grid_Group_Getters_Positive_Base_Type") {
   for (int i = 0; i < num_devices; i++) {
     args[i] = &uint_arr_dev_ptr[i];
 
-    launchParamsList[i].func = reinterpret_cast<void*>(multi_grid_group_size_getter<cg::thread_group>);
+    launchParamsList[i].func =
+        reinterpret_cast<void*>(multi_grid_group_size_getter<cg::thread_group>);
     launchParamsList[i].gridDim = blocks;
     launchParamsList[i].blockDim = threads;
     launchParamsList[i].sharedMem = 0;
@@ -287,7 +288,8 @@ TEST_CASE("Unit_Multi_Grid_Group_Getters_Positive_Base_Type") {
                         grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
 
-    launchParamsList[i].func = reinterpret_cast<void*>(multi_grid_group_thread_rank_getter<cg::thread_group>);
+    launchParamsList[i].func =
+        reinterpret_cast<void*>(multi_grid_group_thread_rank_getter<cg::thread_group>);
   }
   HIP_CHECK(hipLaunchCooperativeKernelMultiDevice(launchParamsList, num_devices, 0));
 
@@ -297,7 +299,7 @@ TEST_CASE("Unit_Multi_Grid_Group_Getters_Positive_Base_Type") {
     ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_,
                [size = multi_grid_thread_count](uint32_t) { return size; });
     HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(),
-                      grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
+                        grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
 
     // Verify multi_grid_group.thread_rank() values
@@ -334,12 +336,11 @@ TEST_CASE("Unit_Multi_Grid_Group_Getters_Positive_Non_Member_Functions") {
   for (int i = 0; i < num_devices; i++) {
     HIP_CHECK(hipSetDevice(i));
     HIP_CHECK(hipDeviceSynchronize());
+    streams.emplace_back(Streams::created);
 
     uint_arr_dev.emplace_back(LinearAllocs::hipMalloc, grid.thread_count_ * sizeof(unsigned int));
     uint_arr_dev_ptr[i] = uint_arr_dev[i].ptr();
     uint_arr.emplace_back(LinearAllocs::hipHostMalloc, grid.thread_count_ * sizeof(unsigned int));
-
-    streams.emplace_back(Streams::created);
   }
 
   // Launch Kernel
@@ -362,7 +363,8 @@ TEST_CASE("Unit_Multi_Grid_Group_Getters_Positive_Non_Member_Functions") {
                         grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
 
-    launchParamsList[i].func = reinterpret_cast<void*>(multi_grid_group_non_member_thread_rank_getter);
+    launchParamsList[i].func =
+        reinterpret_cast<void*>(multi_grid_group_non_member_thread_rank_getter);
   }
   HIP_CHECK(hipLaunchCooperativeKernelMultiDevice(launchParamsList, num_devices, 0));
 
@@ -372,7 +374,7 @@ TEST_CASE("Unit_Multi_Grid_Group_Getters_Positive_Non_Member_Functions") {
     ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_,
                [size = multi_grid_thread_count](uint32_t) { return size; });
     HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(),
-                      grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
+                        grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
     // Verify multi_grid_group.thread_rank() values
     ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_,
@@ -408,6 +410,9 @@ TEST_CASE("Unit_Multi_Grid_Group_Positive_Sync") {
   unsigned int* atomic_val_ptr[num_devices];
   for (int i = 0; i < num_devices; i++) {
     HIP_CHECK(hipSetDevice(i));
+    HIP_CHECK(hipDeviceSynchronize());
+    streams.emplace_back(Streams::created);
+
     // Allocate grid sync arrays
     uint_arr_dev.emplace_back(LinearAllocs::hipMalloc, array_len * sizeof(unsigned int));
     uint_arr_dev_ptr[i] = uint_arr_dev[i].ptr();
@@ -416,15 +421,14 @@ TEST_CASE("Unit_Multi_Grid_Group_Positive_Sync") {
     atomic_val.emplace_back(LinearAllocs::hipMalloc, sizeof(unsigned int));
     HIP_CHECK(hipMemset(atomic_val[i].ptr(), 0, sizeof(unsigned int)));
     atomic_val_ptr[i] = atomic_val[i].ptr();
-
-    streams.emplace_back(Streams::created);
   }
   // Allocate multi_grid sync array
-  LinearAllocGuard<unsigned int> global_arr(LinearAllocs::hipHostMalloc, num_devices * sizeof(unsigned int));
+  LinearAllocGuard<unsigned int> global_arr(LinearAllocs::hipHostMalloc,
+                                            num_devices * sizeof(unsigned int));
   HIP_CHECK(hipMemset(global_arr.ptr(), 0, num_devices * sizeof(unsigned int)));
   unsigned int* global_arr_ptr = global_arr.ptr();
 
-  void *dev_params[num_devices][4];
+  void* dev_params[num_devices][4];
   hipLaunchParams md_params[num_devices];
   for (int i = 0; i < num_devices; i++) {
     dev_params[i][0] = reinterpret_cast<void*>(&atomic_val_ptr[i]);
@@ -447,7 +451,7 @@ TEST_CASE("Unit_Multi_Grid_Group_Positive_Sync") {
   // Read back the grid sync buffer to host
   for (int i = 0; i < num_devices; i++) {
     HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(), array_len * sizeof(unsigned int),
-                           hipMemcpyDeviceToHost));
+                        hipMemcpyDeviceToHost));
   }
 
   HIP_CHECK(hipDeviceSynchronize());
@@ -459,9 +463,9 @@ TEST_CASE("Unit_Multi_Grid_Group_Positive_Sync") {
       max_in_this_loop += grid.block_count_;
       unsigned int k = 0;
       for (k = 0; k < grid.block_count_ - 1; k++) {
-        REQUIRE(uint_arr[i].ptr()[j*grid.block_count_+k] < max_in_this_loop);
+        REQUIRE(uint_arr[i].ptr()[j * grid.block_count_ + k] < max_in_this_loop);
       }
-      REQUIRE(uint_arr[i].ptr()[j*grid.block_count_+k] == max_in_this_loop - 1);
+      REQUIRE(uint_arr[i].ptr()[j * grid.block_count_ + k] == max_in_this_loop - 1);
     }
   }
 
@@ -471,8 +475,7 @@ TEST_CASE("Unit_Multi_Grid_Group_Positive_Sync") {
     for (int j = 0; j < loops; j++) {
       if (j % 2 == 0) {
         desired_val += 2;
-      }
-      else {
+      } else {
         desired_val *= 2;
       }
     }

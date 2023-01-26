@@ -47,9 +47,8 @@ static __global__ void grid_group_non_member_thread_rank_getter(unsigned int* th
   thread_ranks[thread_rank_in_grid()] = cg::thread_rank(cg::this_grid());
 }
 
-static __global__ void
-sync_kernel(unsigned int *atomic_val, unsigned int *array,
-            unsigned int loops) {
+static __global__ void sync_kernel(unsigned int* atomic_val, unsigned int* array,
+                                   unsigned int loops) {
   cg::grid_group grid = cg::this_grid();
   unsigned rank = grid.thread_rank();
 
@@ -75,9 +74,10 @@ sync_kernel(unsigned int *atomic_val, unsigned int *array,
         // If it rolls over, we don't know how much to add to catch up.
         // So just ignore those slipped cycles.
         last_clock = cur_clock;
-      } while(time_diff < 1000000);
+      } while (time_diff < 1000000);
     }
-    if (threadIdx.x == blockDim.x - 1 && threadIdx.y == blockDim.y - 1 && threadIdx.z == blockDim.z - 1) {
+    if (threadIdx.x == blockDim.x - 1 && threadIdx.y == blockDim.y - 1 &&
+        threadIdx.z == blockDim.z - 1) {
       array[offset] = atomicInc(&atomic_val[0], UINT_MAX);
     }
     grid.sync();
@@ -109,29 +109,27 @@ TEST_CASE("Unit_Grid_Group_Getters_Positive_Basic") {
 
     // Launch Kernel
     unsigned int* uint_arr_dev_ptr = uint_arr_dev.ptr();
-    void *params[1];
+    void* params[1];
     params[0] = &uint_arr_dev_ptr;
 
-    HIP_CHECK(hipLaunchCooperativeKernel(grid_group_size_getter, blocks, threads,
-                               params, 0, 0));
+    HIP_CHECK(hipLaunchCooperativeKernel(grid_group_size_getter, blocks, threads, params, 0, 0));
 
     HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(),
                         grid.thread_count_ * sizeof(*uint_arr.ptr()), hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
-    HIP_CHECK(hipLaunchCooperativeKernel(grid_group_thread_rank_getter, blocks, threads,
-                             params, 0, 0));
+    HIP_CHECK(
+        hipLaunchCooperativeKernel(grid_group_thread_rank_getter, blocks, threads, params, 0, 0));
 
     // Verify grid_group.size() values
     ArrayAllOf(uint_arr.ptr(), grid.thread_count_,
                [size = grid.thread_count_](uint32_t) { return size; });
 
     HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(),
-                      grid.thread_count_ * sizeof(*uint_arr.ptr()), hipMemcpyDeviceToHost));
+                        grid.thread_count_ * sizeof(*uint_arr.ptr()), hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
 
     // Verify grid_group.thread_rank() values
-    ArrayAllOf(uint_arr.ptr(), grid.thread_count_,
-               [](uint32_t i) { return i; });
+    ArrayAllOf(uint_arr.ptr(), grid.thread_count_, [](uint32_t i) { return i; });
   }
 
   {
@@ -139,18 +137,17 @@ TEST_CASE("Unit_Grid_Group_Getters_Positive_Basic") {
     LinearAllocGuard<bool> bool_arr(LinearAllocs::hipHostMalloc, grid.thread_count_ * sizeof(bool));
 
     bool* bool_arr_dev_ptr = bool_arr_dev.ptr();
-    void *params[1];
+    void* params[1];
     params[0] = &bool_arr_dev_ptr;
-    HIP_CHECK(hipLaunchCooperativeKernel(grid_group_is_valid_getter, blocks, threads,
-                               params, 0, 0));
+    HIP_CHECK(
+        hipLaunchCooperativeKernel(grid_group_is_valid_getter, blocks, threads, params, 0, 0));
 
     HIP_CHECK(hipMemcpy(bool_arr.ptr(), bool_arr_dev.ptr(),
-                      grid.thread_count_ * sizeof(*bool_arr.ptr()), hipMemcpyDeviceToHost));
+                        grid.thread_count_ * sizeof(*bool_arr.ptr()), hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
 
     // Verify grid_group.is_valid() values
-    ArrayAllOf(bool_arr.ptr(), grid.thread_count_,
-               [](uint32_t i) { return 1; });
+    ArrayAllOf(bool_arr.ptr(), grid.thread_count_, [](uint32_t i) { return 1; });
   }
 }
 
@@ -177,29 +174,28 @@ TEST_CASE("Unit_Grid_Group_Getters_Positive_Non_Member_Functions") {
 
   // Launch Kernel
   unsigned int* uint_arr_dev_ptr = uint_arr_dev.ptr();
-  void *params[1];
+  void* params[1];
   params[0] = &uint_arr_dev_ptr;
 
-  HIP_CHECK(hipLaunchCooperativeKernel(grid_group_non_member_size_getter, blocks, threads,
-                              params, 0, 0));
+  HIP_CHECK(
+      hipLaunchCooperativeKernel(grid_group_non_member_size_getter, blocks, threads, params, 0, 0));
 
   HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(),
-                        grid.thread_count_ * sizeof(*uint_arr.ptr()), hipMemcpyDeviceToHost));
+                      grid.thread_count_ * sizeof(*uint_arr.ptr()), hipMemcpyDeviceToHost));
   HIP_CHECK(hipDeviceSynchronize());
   HIP_CHECK(hipLaunchCooperativeKernel(grid_group_non_member_thread_rank_getter, blocks, threads,
-                            params, 0, 0));
+                                       params, 0, 0));
 
   // Verify grid_group.size() values
   ArrayAllOf(uint_arr.ptr(), grid.thread_count_,
-            [size = grid.thread_count_](uint32_t) { return size; });
+             [size = grid.thread_count_](uint32_t) { return size; });
 
   HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(),
-                    grid.thread_count_ * sizeof(*uint_arr.ptr()), hipMemcpyDeviceToHost));
+                      grid.thread_count_ * sizeof(*uint_arr.ptr()), hipMemcpyDeviceToHost));
   HIP_CHECK(hipDeviceSynchronize());
 
   // Verify grid_group.thread_rank() values
-  ArrayAllOf(uint_arr.ptr(), grid.thread_count_,
-              [](uint32_t i) { return i; });
+  ArrayAllOf(uint_arr.ptr(), grid.thread_count_, [](uint32_t i) { return i; });
 }
 
 TEST_CASE("Unit_Grid_Group_Positive_Sync") {
@@ -224,22 +220,21 @@ TEST_CASE("Unit_Grid_Group_Positive_Sync") {
                                               array_len * sizeof(unsigned int));
   LinearAllocGuard<unsigned int> uint_arr(LinearAllocs::hipHostMalloc,
                                           array_len * sizeof(unsigned int));
-  LinearAllocGuard<unsigned int> atomic_val(LinearAllocs::hipMalloc,
-                                           sizeof(unsigned int));
+  LinearAllocGuard<unsigned int> atomic_val(LinearAllocs::hipMalloc, sizeof(unsigned int));
   HIP_CHECK(hipMemset(atomic_val.ptr(), 0, sizeof(unsigned int)));
 
   // Launch Kernel
   unsigned int* uint_arr_dev_ptr = uint_arr_dev.ptr();
   unsigned int* atomic_val_ptr = atomic_val.ptr();
-  void *params[3];
+  void* params[3];
   params[0] = reinterpret_cast<void*>(&atomic_val_ptr);
   params[1] = reinterpret_cast<void*>(&uint_arr_dev_ptr);
   params[2] = reinterpret_cast<void*>(&loops);
 
   HIP_CHECK(hipLaunchCooperativeKernel(sync_kernel, blocks, threads, params, 0, 0));
 
-  HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(),
-                        array_len * sizeof(*uint_arr.ptr()), hipMemcpyDeviceToHost));
+  HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(), array_len * sizeof(*uint_arr.ptr()),
+                      hipMemcpyDeviceToHost));
 
   HIP_CHECK(hipDeviceSynchronize());
 
@@ -249,8 +244,8 @@ TEST_CASE("Unit_Grid_Group_Positive_Sync") {
     max_in_this_loop += grid.block_count_;
     unsigned int j = 0;
     for (j = 0; j < grid.block_count_ - 1; j++) {
-      REQUIRE(uint_arr.ptr()[i*grid.block_count_+j] < max_in_this_loop);
+      REQUIRE(uint_arr.ptr()[i * grid.block_count_ + j] < max_in_this_loop);
     }
-    REQUIRE(uint_arr.ptr()[i*grid.block_count_+ j] == max_in_this_loop - 1);
+    REQUIRE(uint_arr.ptr()[i * grid.block_count_ + j] == max_in_this_loop - 1);
   }
 }

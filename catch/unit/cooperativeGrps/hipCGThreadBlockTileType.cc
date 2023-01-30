@@ -24,6 +24,12 @@ THE SOFTWARE.
 #include "cooperative_groups_common.hh"
 #include "cpu_grid.h"
 
+#ifdef _CG_HAS_FP16_COLLECTIVE
+#define FP16 , __half
+#else
+#define FP16 
+#endif
+
 /**
  * @addtogroup tiled_partition tiled_partition
  * @{
@@ -63,9 +69,11 @@ template <size_t tile_size, bool dynamic = false> void BlockTilePartitionGetters
     LinearAllocGuard<unsigned int> uint_arr(LinearAllocs::hipHostMalloc, alloc_size);
 
     thread_block_partition_size_getter<tile_size><<<blocks, threads>>>(uint_arr_dev.ptr());
+    HIP_CHECK(hipGetLastError());
     HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
     thread_block_partition_thread_rank_getter<tile_size><<<blocks, threads>>>(uint_arr_dev.ptr());
+    HIP_CHECK(hipGetLastError());
 
     ArrayAllOf(uint_arr.ptr(), grid.thread_count_, [](unsigned int) { return tile_size; });
 
@@ -137,6 +145,7 @@ template <typename T, size_t tile_size> void TilePartitionShflUpTestImpl() {
     LinearAllocGuard<T> arr(LinearAllocs::hipHostMalloc, alloc_size);
 
     block_tile_partition_shfl_up<T, tile_size><<<blocks, threads>>>(arr_dev.ptr(), delta);
+    HIP_CHECK(hipGetLastError());
     HIP_CHECK(hipMemcpy(arr.ptr(), arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
 
@@ -166,7 +175,7 @@ template <typename T, size_t... tile_sizes> void TilePartitionShflUpTest() {
  */
 // Add FP16 type tests if supported
 TEMPLATE_TEST_CASE("Thread_Block_Tile_Shfl_Up_Positive_Basic", "", int, unsigned int, long,
-                   unsigned long, long long, unsigned long long, float, double) {
+                   unsigned long, long long, unsigned long long, float, double FP16) {
   TilePartitionShflUpTest<TestType, 2, 4, 8, 16, 32>();
 }
 
@@ -191,6 +200,7 @@ template <typename T, size_t tile_size> void TilePartitionShflDownTestImpl() {
     LinearAllocGuard<T> arr(LinearAllocs::hipHostMalloc, alloc_size);
 
     block_tile_partition_shfl_down<T, tile_size><<<blocks, threads>>>(arr_dev.ptr(), delta);
+    HIP_CHECK(hipGetLastError());
     HIP_CHECK(hipMemcpy(arr.ptr(), arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
 
@@ -231,7 +241,7 @@ template <typename T, size_t... tile_sizes> void TilePartitionShflDownTest() {
  */
 // Add FP16 type tests if supported
 TEMPLATE_TEST_CASE("Thread_Block_Tile_Shfl_Down_Positive_Basic", "", int, unsigned int, long,
-                   unsigned long, long long, unsigned long long, float, double) {
+                   unsigned long, long long, unsigned long long, float, double FP16) {
   TilePartitionShflDownTest<TestType, 2, 4, 8, 16, 32>();
 }
 
@@ -256,6 +266,7 @@ template <typename T, size_t tile_size> void TilePartitionShflXORTestImpl() {
     LinearAllocGuard<T> arr(LinearAllocs::hipHostMalloc, alloc_size);
 
     block_tile_partition_shfl_xor<T, tile_size><<<blocks, threads>>>(arr_dev.ptr(), mask);
+    HIP_CHECK(hipGetLastError());
     HIP_CHECK(hipMemcpy(arr.ptr(), arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
 
@@ -292,7 +303,7 @@ template <typename T, size_t... tile_sizes> void TilePartitionShflXORTest() {
  */
 // Add FP16 type tests if supported
 TEMPLATE_TEST_CASE("Thread_Block_Tile_Shfl_XOR_Positive_Basic", "", int, unsigned int, long,
-                   unsigned long, long long, unsigned long long, float, double) {
+                   unsigned long, long long, unsigned long long, float, double FP16) {
   TilePartitionShflXORTest<TestType, 2, 4, 8, 16, 32>();
 }
 
@@ -327,6 +338,7 @@ template <typename T, size_t tile_size> void TilePartitionShflTestImpl() {
                         hipMemcpyHostToDevice));
     block_tile_partition_shfl<T, tile_size>
         <<<blocks, threads>>>(arr_dev.ptr(), target_lanes_dev.ptr());
+    HIP_CHECK(hipGetLastError());
     HIP_CHECK(hipMemcpy(arr.ptr(), arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
 
@@ -361,8 +373,7 @@ template <typename T, size_t... tile_sizes> void TilePartitionShflTest() {
  * ------------------------
  *    - HIP_VERSION >= 5.2
  */
-// Add FP16 type tests if supported
 TEMPLATE_TEST_CASE("Thread_Block_Tile_Shfl_Positive_Basic", "", int, unsigned int, long,
-                   unsigned long, long long, unsigned long long, float, double) {
+                   unsigned long, long long, unsigned long long, float, double FP16) {
   TilePartitionShflTest<TestType, 2, 4, 8, 16, 32>();
 }

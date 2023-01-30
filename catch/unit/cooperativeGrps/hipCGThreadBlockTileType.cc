@@ -27,7 +27,7 @@ THE SOFTWARE.
 #ifdef _CG_HAS_FP16_COLLECTIVE
 #define FP16 , __half
 #else
-#define FP16 
+#define FP16
 #endif
 
 /**
@@ -376,4 +376,90 @@ template <typename T, size_t... tile_sizes> void TilePartitionShflTest() {
 TEMPLATE_TEST_CASE("Thread_Block_Tile_Shfl_Positive_Basic", "", int, unsigned int, long,
                    unsigned long, long long, unsigned long long, float, double FP16) {
   TilePartitionShflTest<TestType, 2, 4, 8, 16, 32>();
+}
+
+
+static __device__ void busy_wait(unsigned long long wait_period) {
+  unsigned long long time_diff = 0;
+  unsigned long long last_clock = clock64();
+  while (time_diff < wait_period) {
+    unsigned long long cur_clock = clock64();
+    if (cur_clock > last_clock) {
+      time_diff += (cur_clock - last_clock);
+    }
+    last_clock = cur_clock;
+  }
+}
+
+template <bool use_global, size_t tile_size, typename T>
+__global__ void tiled_partition_sync_check(T* global_data, unsigned int* wait_modifiers) {
+  extern __shared__ uint8_t shared_data[];
+  T* const data = use_global ? global_data : reinterpret_cast<T*>(shared_data);
+  const auto tid = cg::this_grid().thread_rank();
+  const auto partition = cg::tiled_partition<tile_size>(cg::this_thread_block());
+
+  const auto wait_modifier = wait_modifiers[tid];
+  busy_wait(wait_modifier * 100'000);
+  data[tid] = partition.thread_rank();
+  partition.sync();
+  bool valid = true;
+  for (auto i = 0; i < partition.size(); ++i) {
+    const auto tile_base_idx = (tid / partition.size()) * partition.size();
+    const auto expected = (partition.thread_rank() + i) % partition.size();
+    const auto data_idx = tile_base_idx + expected;
+
+    if (data_idx >= cg::this_grid().size()) {
+      continue;
+    }
+
+    if (!(valid &= (data[tile_base_idx + expected] == expected))) {
+      break;
+    }
+  }
+  partition.sync();
+  data[tid] = valid;
+  if constexpr (!use_global) {
+    global_data[tid] = data[tid];
+  }
+}
+
+template <bool global_memory, typename T, size_t tile_size> void TiledPartitionSyncTestImpl() {
+  DYNAMIC_SECTION("Tile size: " << tile_size) {
+    const auto threads = GENERATE_COPY(dim3(35, 1, 1));
+    const auto blocks = dim3(1, 1, 1);
+    CPUGrid grid(blocks, threads);
+
+    const auto alloc_size = grid.thread_count_ * sizeof(T);
+    LinearAllocGuard<T> arr_dev(LinearAllocs::hipMalloc, alloc_size);
+    LinearAllocGuard<T> arr(LinearAllocs::hipHostMalloc, alloc_size);
+
+    LinearAllocGuard<unsigned int> wait_modifiers_dev(LinearAllocs::hipMalloc,
+                                                      grid.thread_count_ * sizeof(unsigned int));
+    LinearAllocGuard<unsigned int> wait_modifiers(LinearAllocs::hipHostMalloc,
+                                                  grid.thread_count_ * sizeof(unsigned int));
+    // Add random generation
+    std::fill(wait_modifiers.ptr(), wait_modifiers.ptr() + grid.thread_count_, 0u);
+    const auto shared_memory_size = global_memory ? 0u : alloc_size;
+    HIP_CHECK(hipMemcpy(wait_modifiers_dev.ptr(), wait_modifiers.ptr(),
+                        grid.thread_count_ * sizeof(unsigned int), hipMemcpyHostToDevice));
+
+    tiled_partition_sync_check<global_memory, tile_size>
+        <<<blocks, threads, shared_memory_size>>>(arr_dev.ptr(), wait_modifiers_dev.ptr());
+    HIP_CHECK(hipGetLastError());
+
+    HIP_CHECK(hipMemcpy(arr.ptr(), arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
+
+    REQUIRE(
+        std::all_of(arr.ptr(), arr.ptr() + grid.thread_count_, [](unsigned int e) { return e; }));
+  }
+}
+
+template <bool global_memory, typename T, size_t... tile_sizes> void TiledPartitionSyncTest() {
+  static_cast<void>((TiledPartitionSyncTestImpl<global_memory, T, tile_sizes>(), ...));
+}
+
+TEMPLATE_TEST_CASE("Blahem", "", uint8_t, uint16_t, uint32_t) {
+  SECTION("Global memory") { TiledPartitionSyncTest<true, uint32_t, 2, 4, 8, 16, 32>(); }
+  SECTION("Shared memory") { TiledPartitionSyncTest<false, uint32_t, 2, 4, 8, 16, 32>(); }
 }

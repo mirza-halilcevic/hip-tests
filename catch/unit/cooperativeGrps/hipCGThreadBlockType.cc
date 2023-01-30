@@ -242,7 +242,7 @@ TEST_CASE("Unit_Thread_Block_Getters_Via_Non_Member_Functions") {
 }
 
 
-__device__ void busy_wait(unsigned long long wait_period) {
+static __device__ void busy_wait(unsigned long long wait_period) {
   unsigned long long time_diff = 0;
   unsigned long long last_clock = clock64();
   while (time_diff < wait_period) {

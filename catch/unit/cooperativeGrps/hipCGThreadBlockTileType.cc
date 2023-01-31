@@ -25,12 +25,6 @@ THE SOFTWARE.
 #include "cooperative_groups_common.hh"
 #include "cpu_grid.h"
 
-#ifdef _CG_HAS_FP16_COLLECTIVE
-#define FP16 , __half
-#else
-#define FP16
-#endif
-
 /**
  * @addtogroup tiled_partition tiled_partition
  * @{
@@ -106,9 +100,9 @@ template <bool dynamic, size_t... tile_sizes> void BlockTilePartitionGettersBasi
  */
 TEST_CASE("Unit_Thread_Block_Tile_Getter_Positive_Basic") {
   BlockTilePartitionGettersBasicTest<false, 2, 4, 8, 16, 32>();
-  #if HT_AMD
+#if HT_AMD
   BlockTilePartitionGettersBasicTest<false, 64>();
-  #endif
+#endif
 }
 
 /**
@@ -126,9 +120,9 @@ TEST_CASE("Unit_Thread_Block_Tile_Getter_Positive_Basic") {
  */
 TEST_CASE("Unit_Thread_Block_Dynamic_Tile_Getter_Positive_Basic") {
   BlockTilePartitionGettersBasicTest<true, 2, 4, 8, 16, 32>();
-  #if HT_AMD
+#if HT_AMD
   BlockTilePartitionGettersBasicTest<true, 64>();
-  #endif
+#endif
 }
 
 
@@ -180,13 +174,12 @@ template <typename T, size_t... tile_sizes> void TilePartitionShflUpTest() {
  * ------------------------
  *    - HIP_VERSION >= 5.2
  */
-// Add FP16 type tests if supported
 TEMPLATE_TEST_CASE("Unit_Thread_Block_Tile_Shfl_Up_Positive_Basic", "", int, unsigned int, long,
-                   unsigned long, long long, unsigned long long, float, double FP16) {
+                   unsigned long, long long, unsigned long long, float, double) {
   TilePartitionShflUpTest<TestType, 2, 4, 8, 16, 32>();
-  #if HT_AMD
+#if HT_AMD
   TilePartitionShflUpTest<TestType, 64>();
-  #endif
+#endif
 }
 
 
@@ -249,13 +242,12 @@ template <typename T, size_t... tile_sizes> void TilePartitionShflDownTest() {
  * ------------------------
  *    - HIP_VERSION >= 5.2
  */
-// Add FP16 type tests if supported
 TEMPLATE_TEST_CASE("Unit_Thread_Block_Tile_Shfl_Down_Positive_Basic", "", int, unsigned int, long,
-                   unsigned long, long long, unsigned long long, float, double FP16) {
+                   unsigned long, long long, unsigned long long, float, double) {
   TilePartitionShflDownTest<TestType, 2, 4, 8, 16, 32>();
-  #if HT_AMD
+#if HT_AMD
   TilePartitionShflDownTest<TestType, 64>();
-  #endif
+#endif
 }
 
 
@@ -314,13 +306,12 @@ template <typename T, size_t... tile_sizes> void TilePartitionShflXORTest() {
  * ------------------------
  *    - HIP_VERSION >= 5.2
  */
-// Add FP16 type tests if supported
 TEMPLATE_TEST_CASE("Unit_Thread_Block_Tile_Shfl_XOR_Positive_Basic", "", int, unsigned int, long,
-                   unsigned long, long long, unsigned long long, float, double FP16) {
+                   unsigned long, long long, unsigned long long, float, double) {
   TilePartitionShflXORTest<TestType, 2, 4, 8, 16, 32>();
-  #if HT_AMD
+#if HT_AMD
   TilePartitionShflXORTest<TestType, 64>();
-  #endif
+#endif
 }
 
 
@@ -390,11 +381,11 @@ template <typename T, size_t... tile_sizes> void TilePartitionShflTest() {
  *    - HIP_VERSION >= 5.2
  */
 TEMPLATE_TEST_CASE("Unit_Thread_Block_Tile_Shfl_Positive_Basic", "", int, unsigned int, long,
-                   unsigned long, long long, unsigned long long, float, double FP16) {
+                   unsigned long, long long, unsigned long long, float, double) {
   TilePartitionShflTest<TestType, 2, 4, 8, 16, 32>();
-  #if HT_AMD
+#if HT_AMD
   TilePartitionShflTest<TestType, 64>();
-  #endif
+#endif
 }
 
 
@@ -491,16 +482,16 @@ template <bool global_memory, typename T, size_t... tile_sizes> void TiledPartit
 }
 
 TEMPLATE_TEST_CASE("Unit_Tiled_Partition_Sync_Positive_Basic", "", uint8_t, uint16_t, uint32_t) {
-  SECTION("Global memory") { 
-    TiledPartitionSyncTest<true, TestType, 2, 4, 8, 16, 32>(); 
-  #if HT_AMD
-  TiledPartitionSyncTest<true, TestType, 64>();
-  #endif
+  SECTION("Global memory") {
+    TiledPartitionSyncTest<true, TestType, 2, 4, 8, 16, 32>();
+#if HT_AMD
+    TiledPartitionSyncTest<true, TestType, 64>();
+#endif
   }
-  SECTION("Shared memory") { 
-    TiledPartitionSyncTest<false, TestType, 2, 4, 8, 16, 32>(); 
-  #if HT_AMD
-  TiledPartitionSyncTest<true, TestType, 64>();
-  #endif
+  SECTION("Shared memory") {
+    TiledPartitionSyncTest<false, TestType, 2, 4, 8, 16, 32>();
+#if HT_AMD
+    TiledPartitionSyncTest<true, TestType, 64>();
+#endif
   }
 }

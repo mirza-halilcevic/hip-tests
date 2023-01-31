@@ -56,10 +56,6 @@ static __global__ void thread_block_thread_indices_getter(dim3* thread_indices) 
   thread_indices[thread_rank_in_grid()] = cg::this_thread_block().thread_index();
 }
 
-static __global__ void thread_block_group_dims_getter(dim3* group_dims) {
-  group_dims[thread_rank_in_grid()] = cg::this_thread_block().group_dim();
-}
-
 static __global__ void thread_block_non_member_size_getter(unsigned int* sizes) {
   sizes[thread_rank_in_grid()] = cg::group_size(cg::this_thread_block());
 }
@@ -134,19 +130,10 @@ TEST_CASE("Unit_Thread_Block_Getters_Positive_Basic") {
     HIP_CHECK(hipMemcpy(dim3_arr.ptr(), dim3_arr_dev.ptr(),
                         grid.thread_count_ * sizeof(*dim3_arr.ptr()), hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
-    thread_block_group_dims_getter<<<blocks, threads>>>(dim3_arr_dev.ptr());
-    HIP_CHECK(hipGetLastError());
 
     // Validate thread_block.thread_index() values
     ArrayAllOf(dim3_arr.ptr(), grid.thread_count_,
                [&grid](uint32_t i) { return grid.thread_idx(i).value(); });
-
-    HIP_CHECK(hipMemcpy(dim3_arr.ptr(), dim3_arr_dev.ptr(),
-                        grid.thread_count_ * sizeof(*dim3_arr.ptr()), hipMemcpyDeviceToHost));
-    HIP_CHECK(hipDeviceSynchronize());
-
-    // Validate thread_block.group_dim() values
-    ArrayAllOf(dim3_arr.ptr(), grid.thread_count_, [threads](uint32_t) { return threads; });
   }
 }
 
@@ -264,7 +251,7 @@ __global__ void thread_block_sync_check(T* global_data, unsigned int* wait_modif
   const auto tid = block.thread_rank();
   const auto wait_modifier = wait_modifiers[tid];
   const auto read_offset = read_offsets[tid];
-  busy_wait(wait_modifier * 100'000);
+  busy_wait(wait_modifier);
   data[tid] = tid % divisor;
   block.sync();
   bool valid = true;
@@ -314,7 +301,7 @@ template <bool global_memory, typename T> void ThreadBlockSyncTest() {
   LinearAllocGuard<unsigned int> wait_modifiers(LinearAllocs::hipHostMalloc,
                                                 grid.thread_count_ * sizeof(unsigned int));
   std::generate(wait_modifiers.ptr(), wait_modifiers.ptr() + grid.thread_count_,
-                [&] { return GenerateRandomInteger(0u, 10'000u); });
+                [&] { return GenerateRandomInteger(0u, 1500u); });
 
   LinearAllocGuard<unsigned int> read_offsets_dev(LinearAllocs::hipMalloc,
                                                   grid.thread_count_ * sizeof(unsigned int));

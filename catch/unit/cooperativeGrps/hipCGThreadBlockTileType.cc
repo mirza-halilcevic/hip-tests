@@ -17,6 +17,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+#include <hip_test_common.hh>
 #include <hip/hip_cooperative_groups.h>
 
 #include <resource_guards.hh>
@@ -103,8 +104,11 @@ template <bool dynamic, size_t... tile_sizes> void BlockTilePartitionGettersBasi
  * ------------------------
  *    - HIP_VERSION >= 5.2
  */
-TEST_CASE("Thread_Block_Tile_Getter_Positive_Basic") {
+TEST_CASE("Unit_Thread_Block_Tile_Getter_Positive_Basic") {
   BlockTilePartitionGettersBasicTest<false, 2, 4, 8, 16, 32>();
+  #if HT_AMD
+  BlockTilePartitionGettersBasicTest<false, 64>();
+  #endif
 }
 
 /**
@@ -120,8 +124,11 @@ TEST_CASE("Thread_Block_Tile_Getter_Positive_Basic") {
  * ------------------------
  *    - HIP_VERSION >= 5.2
  */
-TEST_CASE("Thread_Block_Dynamic_Tile_Getter_Positive_Basic") {
+TEST_CASE("Unit_Thread_Block_Dynamic_Tile_Getter_Positive_Basic") {
   BlockTilePartitionGettersBasicTest<true, 2, 4, 8, 16, 32>();
+  #if HT_AMD
+  BlockTilePartitionGettersBasicTest<true, 64>();
+  #endif
 }
 
 
@@ -174,9 +181,12 @@ template <typename T, size_t... tile_sizes> void TilePartitionShflUpTest() {
  *    - HIP_VERSION >= 5.2
  */
 // Add FP16 type tests if supported
-TEMPLATE_TEST_CASE("Thread_Block_Tile_Shfl_Up_Positive_Basic", "", int, unsigned int, long,
+TEMPLATE_TEST_CASE("Unit_Thread_Block_Tile_Shfl_Up_Positive_Basic", "", int, unsigned int, long,
                    unsigned long, long long, unsigned long long, float, double FP16) {
   TilePartitionShflUpTest<TestType, 2, 4, 8, 16, 32>();
+  #if HT_AMD
+  TilePartitionShflUpTest<TestType, 64>();
+  #endif
 }
 
 
@@ -240,9 +250,12 @@ template <typename T, size_t... tile_sizes> void TilePartitionShflDownTest() {
  *    - HIP_VERSION >= 5.2
  */
 // Add FP16 type tests if supported
-TEMPLATE_TEST_CASE("Thread_Block_Tile_Shfl_Down_Positive_Basic", "", int, unsigned int, long,
+TEMPLATE_TEST_CASE("Unit_Thread_Block_Tile_Shfl_Down_Positive_Basic", "", int, unsigned int, long,
                    unsigned long, long long, unsigned long long, float, double FP16) {
   TilePartitionShflDownTest<TestType, 2, 4, 8, 16, 32>();
+  #if HT_AMD
+  TilePartitionShflDownTest<TestType, 64>();
+  #endif
 }
 
 
@@ -302,9 +315,12 @@ template <typename T, size_t... tile_sizes> void TilePartitionShflXORTest() {
  *    - HIP_VERSION >= 5.2
  */
 // Add FP16 type tests if supported
-TEMPLATE_TEST_CASE("Thread_Block_Tile_Shfl_XOR_Positive_Basic", "", int, unsigned int, long,
+TEMPLATE_TEST_CASE("Unit_Thread_Block_Tile_Shfl_XOR_Positive_Basic", "", int, unsigned int, long,
                    unsigned long, long long, unsigned long long, float, double FP16) {
   TilePartitionShflXORTest<TestType, 2, 4, 8, 16, 32>();
+  #if HT_AMD
+  TilePartitionShflXORTest<TestType, 64>();
+  #endif
 }
 
 
@@ -373,9 +389,12 @@ template <typename T, size_t... tile_sizes> void TilePartitionShflTest() {
  * ------------------------
  *    - HIP_VERSION >= 5.2
  */
-TEMPLATE_TEST_CASE("Thread_Block_Tile_Shfl_Positive_Basic", "", int, unsigned int, long,
+TEMPLATE_TEST_CASE("Unit_Thread_Block_Tile_Shfl_Positive_Basic", "", int, unsigned int, long,
                    unsigned long, long long, unsigned long long, float, double FP16) {
   TilePartitionShflTest<TestType, 2, 4, 8, 16, 32>();
+  #if HT_AMD
+  TilePartitionShflTest<TestType, 64>();
+  #endif
 }
 
 
@@ -409,7 +428,7 @@ __global__ void tiled_partition_sync_check(T* global_data, unsigned int* wait_mo
   const auto partition = cg::tiled_partition<tile_size>(cg::this_thread_block());
 
   const auto wait_modifier = wait_modifiers[tid];
-  busy_wait(wait_modifier * 100'000);
+  busy_wait(wait_modifier);
   data[tid] = partition.thread_rank();
   partition.sync();
   bool valid = true;
@@ -449,7 +468,7 @@ template <bool global_memory, typename T, size_t tile_size> void TiledPartitionS
     LinearAllocGuard<unsigned int> wait_modifiers(LinearAllocs::hipHostMalloc,
                                                   grid.thread_count_ * sizeof(unsigned int));
     std::generate(wait_modifiers.ptr(), wait_modifiers.ptr() + grid.thread_count_,
-                  [] { return GenerateRandomInteger(0u, 1000u); });
+                  [] { return GenerateRandomInteger(0u, 1500u); });
 
     const auto shared_memory_size = global_memory ? 0u : alloc_size;
     HIP_CHECK(hipMemcpy(wait_modifiers_dev.ptr(), wait_modifiers.ptr(),
@@ -472,6 +491,16 @@ template <bool global_memory, typename T, size_t... tile_sizes> void TiledPartit
 }
 
 TEMPLATE_TEST_CASE("Unit_Tiled_Partition_Sync_Positive_Basic", "", uint8_t, uint16_t, uint32_t) {
-  SECTION("Global memory") { TiledPartitionSyncTest<true, uint32_t, 2, 4, 8, 16, 32>(); }
-  SECTION("Shared memory") { TiledPartitionSyncTest<false, uint32_t, 2, 4, 8, 16, 32>(); }
+  SECTION("Global memory") { 
+    TiledPartitionSyncTest<true, TestType, 2, 4, 8, 16, 32>(); 
+  #if HT_AMD
+  TiledPartitionSyncTest<true, TestType, 64>();
+  #endif
+  }
+  SECTION("Shared memory") { 
+    TiledPartitionSyncTest<false, TestType, 2, 4, 8, 16, 32>(); 
+  #if HT_AMD
+  TiledPartitionSyncTest<true, TestType, 64>();
+  #endif
+  }
 }

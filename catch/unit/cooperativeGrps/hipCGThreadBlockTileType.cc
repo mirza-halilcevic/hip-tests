@@ -20,6 +20,8 @@ THE SOFTWARE.
 #include <hip_test_common.hh>
 #include <hip/hip_cooperative_groups.h>
 
+#include <bitset>
+
 #include <resource_guards.hh>
 
 #include "cooperative_groups_common.hh"
@@ -33,7 +35,7 @@ THE SOFTWARE.
 
 namespace cg = cooperative_groups;
 
-template <unsigned int tile_size, bool dynamic = false>
+template <bool dynamic, unsigned int tile_size>
 __global__ void thread_block_partition_size_getter(unsigned int* sizes) {
   const auto group = cg::this_thread_block();
   if constexpr (dynamic) {
@@ -43,7 +45,7 @@ __global__ void thread_block_partition_size_getter(unsigned int* sizes) {
   }
 }
 
-template <unsigned int tile_size, bool dynamic = false>
+template <bool dynamic, unsigned int tile_size>
 __global__ void thread_block_partition_thread_rank_getter(unsigned int* thread_ranks) {
   const auto group = cg::this_thread_block();
   if constexpr (dynamic) {
@@ -53,9 +55,9 @@ __global__ void thread_block_partition_thread_rank_getter(unsigned int* thread_r
   }
 }
 
-template <size_t tile_size, bool dynamic = false> void BlockTilePartitionGettersBasicTestImpl() {
+template <bool dynamic, size_t tile_size> void BlockTilePartitionGettersBasicTestImpl() {
   DYNAMIC_SECTION("Tile size: " << tile_size) {
-    auto threads = GENERATE(dim3(2, 1, 1));
+    auto threads = GENERATE(dim3(53, 1, 1));
     auto blocks = GENERATE(dim3(3, 1, 1));
     CPUGrid grid(blocks, threads);
 
@@ -63,14 +65,25 @@ template <size_t tile_size, bool dynamic = false> void BlockTilePartitionGetters
     LinearAllocGuard<unsigned int> uint_arr_dev(LinearAllocs::hipMalloc, alloc_size);
     LinearAllocGuard<unsigned int> uint_arr(LinearAllocs::hipHostMalloc, alloc_size);
 
-    thread_block_partition_size_getter<tile_size><<<blocks, threads>>>(uint_arr_dev.ptr());
+    thread_block_partition_size_getter<dynamic, tile_size><<<blocks, threads>>>(uint_arr_dev.ptr());
     HIP_CHECK(hipGetLastError());
     HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
-    thread_block_partition_thread_rank_getter<tile_size><<<blocks, threads>>>(uint_arr_dev.ptr());
+    thread_block_partition_thread_rank_getter<dynamic, tile_size>
+        <<<blocks, threads>>>(uint_arr_dev.ptr());
     HIP_CHECK(hipGetLastError());
 
-    ArrayAllOf(uint_arr.ptr(), grid.thread_count_, [](unsigned int) { return tile_size; });
+    ArrayAllOf(uint_arr.ptr(), grid.thread_count_, [&grid](unsigned int i) {
+      if constexpr (!dynamic) {
+        return tile_size;
+      }
+
+      const auto partitions_in_block = (grid.threads_in_block_count_ + tile_size - 1) / tile_size;
+      const auto rank_in_block = grid.thread_rank_in_block(i).value();
+
+      const auto tail = partitions_in_block * tile_size - grid.threads_in_block_count_;
+      return tile_size - tail * (rank_in_block >= (partitions_in_block - 1) * tile_size);
+    });
 
     HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
@@ -82,7 +95,7 @@ template <size_t tile_size, bool dynamic = false> void BlockTilePartitionGetters
 }
 
 template <bool dynamic, size_t... tile_sizes> void BlockTilePartitionGettersBasicTest() {
-  static_cast<void>((BlockTilePartitionGettersBasicTestImpl<tile_sizes, dynamic>(), ...));
+  static_cast<void>((BlockTilePartitionGettersBasicTestImpl<dynamic, tile_sizes>(), ...));
 }
 
 /**
@@ -494,4 +507,79 @@ TEMPLATE_TEST_CASE("Unit_Tiled_Partition_Sync_Positive_Basic", "", uint8_t, uint
     TiledPartitionSyncTest<true, TestType, 64>();
 #endif
   }
+}
+
+template <size_t warp_size> __device__ bool deactivate_thread(uint64_t* active_masks) {
+  const auto warp = cg::tiled_partition<warp_size>(cg::this_thread_block());
+  const auto idx = cg::this_grid().thread_rank() / warp.size();
+  return !(active_masks[idx] & (1u << warp.thread_rank()));
+}
+
+template <size_t warp_size>
+__global__ void coalesced_group_tiled_partition_size_getter(uint64_t* active_masks,
+                                                            unsigned int tile_size,
+                                                            unsigned int* sizes) {
+  if (deactivate_thread<warp_size>(active_masks)) {
+    return;
+  }
+  sizes[thread_rank_in_grid()] = cg::tiled_partition(cg::coalesced_threads(), tile_size).size();
+}
+
+TEST_CASE("Blahem") {
+  constexpr auto warp_size = 32u;
+  const auto tile_size = GENERATE(2u, 4u, 8u, 16u, 32u);
+  const auto x = GENERATE(range(1, 65));
+  auto threads = dim3(x, 1, 1);
+  const auto bx = GENERATE(range(1, 5));
+  auto blocks = dim3(bx, 1, 1);
+  INFO("Blocks: " << bx << ", threads: " << x);
+  INFO("Tile size: " << tile_size);
+  CPUGrid grid(blocks, threads);
+
+  const auto alloc_size = grid.thread_count_ * sizeof(unsigned int);
+  LinearAllocGuard<unsigned int> uint_arr_dev(LinearAllocs::hipMalloc, alloc_size);
+  LinearAllocGuard<unsigned int> uint_arr(LinearAllocs::hipHostMalloc, alloc_size);
+
+  const auto warps_in_block = (grid.threads_in_block_count_ + warp_size - 1) / warp_size;
+  const auto warps_in_grid = warps_in_block * grid.block_count_;
+  LinearAllocGuard<uint64_t> active_masks_dev(LinearAllocs::hipMalloc,
+                                              warps_in_grid * sizeof(uint64_t));
+  LinearAllocGuard<uint64_t> active_masks(LinearAllocs::hipHostMalloc,
+                                          warps_in_grid * sizeof(uint64_t));
+
+  std::fill_n(active_masks.ptr(), warps_in_grid, static_cast<uint64_t>(0xFF1F00FF));
+  HIP_CHECK(hipMemcpy(active_masks_dev.ptr(), active_masks.ptr(), warps_in_grid * sizeof(uint64_t),
+                      hipMemcpyHostToDevice));
+  HIP_CHECK(hipMemset(uint_arr_dev.ptr(), 0, alloc_size));
+  coalesced_group_tiled_partition_size_getter<32>
+      <<<blocks, threads>>>(active_masks_dev.ptr(), tile_size, uint_arr_dev.ptr());
+  HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
+  HIP_CHECK(hipDeviceSynchronize());
+
+  ArrayAllOf(uint_arr.ptr(), grid.thread_count_, [&](unsigned int idx) -> unsigned int {
+    auto current_warp_mask = active_masks.ptr()[idx / warp_size];
+    const auto i = grid.thread_rank_in_block(idx).value();
+    if (~current_warp_mask & (1u << i % warp_size)) {
+      return 0;
+    }
+    const auto tail =
+        warps_in_block * warp_size - grid.threads_in_block_count_ + 32 * TestContext::get().isNvidia();
+    const auto warp_rank = i / warp_size;
+    if (warp_rank == warps_in_block - 1) {
+      current_warp_mask = (current_warp_mask << tail) >> tail;
+    }
+
+    const uint64_t rank_in_warp = i % warp_size;
+    const uint64_t current_active_threads =
+        std::bitset<sizeof(current_warp_mask) * 8>(current_warp_mask).count();
+    const uint64_t foo = current_warp_mask & ((1u << rank_in_warp) - 1);
+    const auto active_rank = std::bitset<sizeof(foo) * 8>(foo).count();
+    const auto active_tiles = (current_active_threads + tile_size - 1) / tile_size;
+    const auto active_tile_rank = active_rank / tile_size;
+    if (active_tile_rank < active_tiles - 1) {
+      return tile_size;
+    } else {
+      return current_active_threads - active_tile_rank * tile_size;
+    }
+  });
 }

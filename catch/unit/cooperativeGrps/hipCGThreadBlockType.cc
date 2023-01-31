@@ -360,7 +360,7 @@ template <bool global_memory, typename T> void ThreadBlockSyncTest() {
  * ------------------------
  *    - HIP_VERSION >= 5.2
  */
-TEMPLATE_TEST_CASE("Thread_Block_Sync_Positive_Basic", "", uint8_t, uint16_t, uint32_t) {
+TEMPLATE_TEST_CASE("Unit_Thread_Block_Sync_Positive_Basic", "", uint8_t, uint16_t, uint32_t) {
   SECTION("Global memory") { ThreadBlockSyncTest<true, TestType>(); }
   SECTION("Shared memory") { ThreadBlockSyncTest<false, TestType>(); }
 }

@@ -379,6 +379,16 @@ TEMPLATE_TEST_CASE("Thread_Block_Tile_Shfl_Positive_Basic", "", int, unsigned in
 }
 
 
+static inline std::mt19937& GetRandomGenerator() {
+  static std::mt19937 mt(11);
+  return mt;
+}
+
+template <typename T> static inline T GenerateRandomInteger(const T min, const T max) {
+  std::uniform_int_distribution<T> dist(min, max);
+  return dist(GetRandomGenerator());
+}
+
 static __device__ void busy_wait(unsigned long long wait_period) {
   unsigned long long time_diff = 0;
   unsigned long long last_clock = clock64();
@@ -425,6 +435,7 @@ __global__ void tiled_partition_sync_check(T* global_data, unsigned int* wait_mo
 
 template <bool global_memory, typename T, size_t tile_size> void TiledPartitionSyncTestImpl() {
   DYNAMIC_SECTION("Tile size: " << tile_size) {
+    const auto randomized_run_count = GENERATE(range(0, 5));
     const auto threads = GENERATE_COPY(dim3(35, 1, 1));
     const auto blocks = dim3(1, 1, 1);
     CPUGrid grid(blocks, threads);
@@ -437,8 +448,9 @@ template <bool global_memory, typename T, size_t tile_size> void TiledPartitionS
                                                       grid.thread_count_ * sizeof(unsigned int));
     LinearAllocGuard<unsigned int> wait_modifiers(LinearAllocs::hipHostMalloc,
                                                   grid.thread_count_ * sizeof(unsigned int));
-    // Add random generation
-    std::fill(wait_modifiers.ptr(), wait_modifiers.ptr() + grid.thread_count_, 0u);
+    std::generate(wait_modifiers.ptr(), wait_modifiers.ptr() + grid.thread_count_,
+                  [] { return GenerateRandomInteger(0u, 1000u); });
+
     const auto shared_memory_size = global_memory ? 0u : alloc_size;
     HIP_CHECK(hipMemcpy(wait_modifiers_dev.ptr(), wait_modifiers.ptr(),
                         grid.thread_count_ * sizeof(unsigned int), hipMemcpyHostToDevice));
@@ -459,7 +471,7 @@ template <bool global_memory, typename T, size_t... tile_sizes> void TiledPartit
   static_cast<void>((TiledPartitionSyncTestImpl<global_memory, T, tile_sizes>(), ...));
 }
 
-TEMPLATE_TEST_CASE("Blahem", "", uint8_t, uint16_t, uint32_t) {
+TEMPLATE_TEST_CASE("Unit_Tiled_Partition_Sync_Positive_Basic", "", uint8_t, uint16_t, uint32_t) {
   SECTION("Global memory") { TiledPartitionSyncTest<true, uint32_t, 2, 4, 8, 16, 32>(); }
   SECTION("Shared memory") { TiledPartitionSyncTest<false, uint32_t, 2, 4, 8, 16, 32>(); }
 }

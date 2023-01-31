@@ -556,30 +556,30 @@ TEST_CASE("Blahem") {
   HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
   HIP_CHECK(hipDeviceSynchronize());
 
+  const auto tail = warps_in_block * warp_size - grid.threads_in_block_count_ +
+      32 * TestContext::get().isNvidia();
+
   ArrayAllOf(uint_arr.ptr(), grid.thread_count_, [&](unsigned int idx) -> unsigned int {
     auto current_warp_mask = active_masks.ptr()[idx / warp_size];
     const auto i = grid.thread_rank_in_block(idx).value();
     if (~current_warp_mask & (1u << i % warp_size)) {
       return 0;
     }
-    const auto tail =
-        warps_in_block * warp_size - grid.threads_in_block_count_ + 32 * TestContext::get().isNvidia();
-    const auto warp_rank = i / warp_size;
-    if (warp_rank == warps_in_block - 1) {
-      current_warp_mask = (current_warp_mask << tail) >> tail;
-    }
 
-    const uint64_t rank_in_warp = i % warp_size;
+    // Reset bits corresponding to threads that are inactive due to launch dimension configuration
+    // This only (potentially) applies to the final warp in a block
+    const auto shift_amount = tail * (i / warp_size == warps_in_block - 1);
+    current_warp_mask = (current_warp_mask << shift_amount) >> shift_amount;
+
     const uint64_t current_active_threads =
         std::bitset<sizeof(current_warp_mask) * 8>(current_warp_mask).count();
-    const uint64_t foo = current_warp_mask & ((1u << rank_in_warp) - 1);
-    const auto active_rank = std::bitset<sizeof(foo) * 8>(foo).count();
+
+    const uint64_t active_up_to = current_warp_mask & ((1u << i % warp_size) - 1);
+    const auto active_rank = std::bitset<sizeof(active_up_to) * 8>(active_up_to).count();
+
     const auto active_tiles = (current_active_threads + tile_size - 1) / tile_size;
     const auto active_tile_rank = active_rank / tile_size;
-    if (active_tile_rank < active_tiles - 1) {
-      return tile_size;
-    } else {
-      return current_active_threads - active_tile_rank * tile_size;
-    }
+    const auto active_tail = active_tiles * tile_size - current_active_threads;
+    return tile_size - active_tail * (active_tile_rank == active_tiles - 1);
   });
 }

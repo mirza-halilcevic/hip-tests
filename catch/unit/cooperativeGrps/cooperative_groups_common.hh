@@ -25,6 +25,14 @@ THE SOFTWARE.
 #include <hip_test_common.hh>
 #include <hip/hip_cooperative_groups.h>
 
+namespace {
+#if HT_AMD
+constexpr size_t kWarpSize = 64;
+#else
+constexpr size_t kWarpSize = 32;
+#endif
+}  // namespace
+
 #define ASSERT_EQUAL(lhs, rhs) HIP_ASSERT(lhs == rhs)
 #define ASSERT_LE(lhs, rhs) HIPASSERT(lhs <= rhs)
 #define ASSERT_GE(lhs, rhs) HIPASSERT(lhs >= rhs)

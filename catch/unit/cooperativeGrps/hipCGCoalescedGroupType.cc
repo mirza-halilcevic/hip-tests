@@ -548,3 +548,127 @@ TEMPLATE_TEST_CASE("Unit_Coalesced_Group_Shfl_Positive_Basic", "", int) {
   CoalescedGroupShflTest<TestType, 32>();
 #endif
 }
+
+static inline std::mt19937& GetRandomGenerator() {
+  static std::mt19937 mt(11);
+  return mt;
+}
+
+template <typename T> static inline T GenerateRandomInteger(const T min, const T max) {
+  std::uniform_int_distribution<T> dist(min, max);
+  return dist(GetRandomGenerator());
+}
+
+static __device__ void busy_wait(unsigned long long wait_period) {
+  unsigned long long time_diff = 0;
+  unsigned long long last_clock = clock64();
+  while (time_diff < wait_period) {
+    unsigned long long cur_clock = clock64();
+    if (cur_clock > last_clock) {
+      time_diff += (cur_clock - last_clock);
+    }
+    last_clock = cur_clock;
+  }
+}
+
+template <bool use_global, size_t warp_size, typename T>
+__global__ void coalesced_group_sync_check(T* global_data, unsigned int* wait_modifiers, const uint64_t active_mask) {
+  extern __shared__ uint8_t shared_data[];
+  T* const data = use_global ? global_data : reinterpret_cast<T*>(shared_data);
+  const auto tid = cg::this_grid().thread_rank();
+  const auto partition = cg::tiled_partition<warp_size>(cg::this_thread_block());
+
+  if (active_mask & (static_cast<uint64_t>(1) << partition.thread_rank())) {
+    cg::coalesced_group active = cg::coalesced_threads();
+    const auto wait_modifier = wait_modifiers[tid];
+    busy_wait(wait_modifier);
+    data[tid] = active.thread_rank();
+    active.sync();
+    bool valid = true;
+    for (auto i = 0; i < active.size(); ++i) {
+      const auto tile_base_idx = (tid / partition.size()) * partition.size();
+      const auto expected = (active.thread_rank() + i) % active.size();
+      unsigned int active_count = 0;
+      unsigned int offset = -1;
+      while (active_count != (expected + 1)) {
+        offset++;
+        if (active_mask & (static_cast<uint64_t>(1) << offset)) active_count++;
+      }
+      const auto data_idx = tile_base_idx + offset;
+
+      if (data_idx >= cg::this_grid().size()) {
+        continue;
+      }
+
+      if (!(valid &= (data[tile_base_idx + offset] == expected))) {
+        break;
+      }
+    }
+    active.sync();
+    data[tid] = valid;
+    
+    if constexpr (!use_global) {
+      global_data[tid] = data[tid];
+    }
+  }
+}
+
+template <bool global_memory, typename T, size_t warp_size> void CoalescedGroupSyncTest() {
+  const auto randomized_run_count = GENERATE(range(0, 5));
+  const auto threads = GENERATE_COPY(dim3(35, 1, 1));
+  const auto blocks = dim3(1, 1, 1);
+  CPUGrid grid(blocks, threads);
+
+  auto test_case = GENERATE(range(0, 10));
+  uint64_t active_mask = get_active_mask<warp_size>(test_case);
+  unsigned int active_thread_count = get_active_thread_count(active_mask, warp_size);
+
+  const auto alloc_size = grid.thread_count_ * sizeof(T);
+  LinearAllocGuard<T> arr_dev(LinearAllocs::hipMalloc, alloc_size);
+  LinearAllocGuard<T> arr(LinearAllocs::hipHostMalloc, alloc_size);
+
+  LinearAllocGuard<unsigned int> wait_modifiers_dev(LinearAllocs::hipMalloc,
+                                                    grid.thread_count_ * sizeof(unsigned int));
+  LinearAllocGuard<unsigned int> wait_modifiers(LinearAllocs::hipHostMalloc,
+                                                grid.thread_count_ * sizeof(unsigned int));
+  std::generate(wait_modifiers.ptr(), wait_modifiers.ptr() + grid.thread_count_,
+                [] { return GenerateRandomInteger(0u, 1500u); });
+
+  const auto shared_memory_size = global_memory ? 0u : alloc_size;
+  HIP_CHECK(hipMemcpy(wait_modifiers_dev.ptr(), wait_modifiers.ptr(),
+                      grid.thread_count_ * sizeof(unsigned int), hipMemcpyHostToDevice));
+
+  coalesced_group_sync_check<global_memory, warp_size>
+      <<<blocks, threads, shared_memory_size>>>(arr_dev.ptr(), wait_modifiers_dev.ptr(), active_mask);
+  HIP_CHECK(hipGetLastError());
+
+  HIP_CHECK(hipMemcpy(arr.ptr(), arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
+  HIP_CHECK(hipDeviceSynchronize());
+
+  for (int i = 0; i < grid.thread_count_; i++) {
+    const auto rank_in_block = grid.thread_rank_in_block(i).value();
+    const int rank_in_partition = rank_in_block % warp_size;
+    if (active_mask & (static_cast<uint64_t>(1) << rank_in_partition)) {
+      if (arr.ptr()[i] != 1) {
+        REQUIRE(arr.ptr()[i] == 1);
+      }
+    }
+  }
+}
+
+TEMPLATE_TEST_CASE("Unit_Coalesced_Group_Sync_Positive_Basic", "", uint8_t, uint16_t, uint32_t) {
+  SECTION("Global memory") {
+#if HT_AMD
+    CoalescedGroupSyncTest<true, TestType, 64>();
+#else
+    CoalescedGroupSyncTest<true, TestType, 32>();
+#endif
+  }
+  SECTION("Shared memory") {
+#if HT_AMD
+    CoalescedGroupSyncTest<true, TestType, 64>();
+#else
+    CoalescedGroupSyncTest<false, TestType, 32>();
+#endif
+  }
+}

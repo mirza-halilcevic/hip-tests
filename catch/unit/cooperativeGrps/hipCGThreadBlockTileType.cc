@@ -541,7 +541,7 @@ __global__ void coalesced_group_tiled_partition_thread_rank_getter(uint64_t* act
       cg::tiled_partition(cg::coalesced_threads(), tile_size).thread_rank();
 }
 
-TEST_CASE("Blahem") {
+TEST_CASE("Unit_Coalesced_Group_Tiled_Partition_Getters_Positive_Basic") {
   constexpr auto warp_size = 32u;
   const auto tile_size = GENERATE(2u, 4u, 8u, 16u, 32u);
   const auto x = GENERATE(range(1, 65));
@@ -564,7 +564,6 @@ TEST_CASE("Blahem") {
                                           warps_in_grid * sizeof(uint64_t));
 
   std::fill_n(active_masks.ptr(), warps_in_grid, static_cast<uint64_t>(0xFF1F00FF));
-  // active_masks.ptr()[4] = 0x775d3382;
   HIP_CHECK(hipMemcpy(active_masks_dev.ptr(), active_masks.ptr(), warps_in_grid * sizeof(uint64_t),
                       hipMemcpyHostToDevice));
   HIP_CHECK(hipMemsetAsync(uint_arr_dev.ptr(), 0, alloc_size));
@@ -588,7 +587,7 @@ TEST_CASE("Blahem") {
     }
 
     // Reset bits corresponding to threads that are inactive due to launch dimension
-    //   configuration
+    // configuration
     // This only (potentially) applies to the final warp in a block
     const auto shift_amount = tail * (i / warp_size == warps_in_block - 1);
     current_warp_mask = (current_warp_mask << shift_amount) >> shift_amount;
@@ -614,12 +613,93 @@ TEST_CASE("Blahem") {
     if (~current_warp_mask & (1u << i % warp_size)) {
       return 0;
     }
-    // std::cout << "mask: " << std::bitset<sizeof(current_warp_mask) * 8>(current_warp_mask) <<
-    // std::endl; std::cout << "i: " << i << std::endl;
 
     const uint64_t active_up_to = current_warp_mask & ((1u << i % warp_size) - 1);
     const auto active_rank = std::bitset<sizeof(active_up_to) * 8>(active_up_to).count();
 
     return active_rank % tile_size;
   });
+}
+
+template <typename T, size_t warp_size>
+__global__ void coalesced_group_tiled_partition_shfl_up(uint64_t* active_masks, T* const out,
+                                                        const unsigned int tile_size,
+                                                        const unsigned int delta) {
+  if (deactivate_thread<warp_size>(active_masks)) {
+    return;
+  }
+  const auto warp = cg::tiled_partition<warp_size>(cg::this_thread_block());
+  T var = static_cast<T>(warp.thread_rank());
+
+  const auto coalesced = cg::coalesced_threads();
+  const auto tile = cg::tiled_partition(coalesced, tile_size);
+
+  // printf("tid: %llu, var: %u\n", cg::this_grid().thread_rank(), tile.shfl_up(var, delta));
+
+  out[thread_rank_in_grid()] = tile.shfl_up(var, delta);
+}
+
+
+TEST_CASE("Blahem") {
+  constexpr auto warp_size = 32u;
+  const auto tile_size = 8u;
+  auto threads = dim3(31, 1, 1);
+  auto blocks = dim3(1, 1, 1);
+  CPUGrid grid(blocks, threads);
+  const auto delta = 1u;
+  using TestType = uint32_t;
+
+  const auto alloc_size = grid.thread_count_ * sizeof(TestType);
+  LinearAllocGuard<TestType> uint_arr_dev(LinearAllocs::hipMalloc, alloc_size);
+  LinearAllocGuard<TestType> uint_arr(LinearAllocs::hipHostMalloc, alloc_size);
+
+  const auto warps_in_block = (grid.threads_in_block_count_ + warp_size - 1) / warp_size;
+  const auto warps_in_grid = warps_in_block * grid.block_count_;
+  LinearAllocGuard<uint64_t> active_masks_dev(LinearAllocs::hipMalloc,
+                                              warps_in_grid * sizeof(uint64_t));
+  LinearAllocGuard<uint64_t> active_masks(LinearAllocs::hipHostMalloc,
+                                          warps_in_grid * sizeof(uint64_t));
+
+  active_masks.ptr()[0] = 0xFEDCBA98;
+  // active_masks.ptr()[1] = 0x80000002;
+  HIP_CHECK(hipMemcpy(active_masks_dev.ptr(), active_masks.ptr(), warps_in_grid * sizeof(uint64_t),
+                      hipMemcpyHostToDevice));
+  HIP_CHECK(hipMemsetAsync(uint_arr_dev.ptr(), 0, alloc_size));
+  coalesced_group_tiled_partition_shfl_up<TestType, warp_size>
+      <<<1, 32>>>(active_masks_dev.ptr(), uint_arr_dev.ptr(), tile_size, delta);
+  HIP_CHECK(hipGetLastError());
+  HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
+  HIP_CHECK(hipDeviceSynchronize());
+
+  const auto tail = warps_in_block * warp_size - grid.threads_in_block_count_;
+  std::array<unsigned int, warp_size> active_threads;
+
+  for (auto i = 0u; i < warps_in_grid; ++i) {
+    auto active_thread_count = 0u;
+    active_threads.fill(0u);
+
+    auto current_warp_mask = active_masks.ptr()[i];
+    const auto shift_amount =
+        (tail + 32 * TestContext::get().isNvidia()) * !((i + 1) % warps_in_block);
+    current_warp_mask = (current_warp_mask << shift_amount) >> shift_amount;
+    for (auto t = 0u; t < warp_size; ++t) {
+      if (current_warp_mask & (1u << t)) {
+        active_threads[active_thread_count++] = t;
+      }
+    }
+    std::cout << active_thread_count << std::endl;
+
+    // Step tile-sized window over active threads
+    for (auto t = 0u; t < active_thread_count; t += tile_size) {
+      const auto window_start = t + delta;
+      const auto window_end = t + tile_size;
+      // Iterate through window
+      for (auto k = window_start; k < window_end && k < active_thread_count; k++) {
+        const auto global_thread_idx = i * warp_size + active_threads[k];
+        const auto expected_val = active_threads[k - delta];
+        const auto actual_val = uint_arr.ptr()[global_thread_idx];
+        REQUIRE(actual_val == expected_val);
+      }
+    }
+  }
 }

@@ -1,16 +1,13 @@
 /*
-Copyright (c) 2020 - 2021 Advanced Micro Devices, Inc. All rights reserved.
-
+Copyright (c) 2023 Advanced Micro Devices, Inc. All rights reserved.
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
-
 The above copyright notice and this permission notice shall be included in
 all copies or substantial portions of the Software.
-
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
@@ -19,222 +16,563 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-
-
-/* HIT_START
- * BUILD: %t %s ../../test_common.cpp NVCC_OPTIONS --std=c++11 -rdc=true -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80
- * TEST: %t
- * HIT_END
- */
-
 #include <hip_test_common.hh>
 #include <hip/hip_cooperative_groups.h>
 
-#define ASSERT_EQUAL(lhs, rhs) HIPASSERT(lhs == rhs)
-#define ASSERT_LE(lhs, rhs) HIPASSERT(lhs <= rhs)
-#define ASSERT_GE(lhs, rhs) HIPASSERT(lhs >= rhs)
+#include <resource_guards.hh>
+#include <utils.hh>
 
-using namespace cooperative_groups;
-constexpr int MaxGPUs = 8;
+#include "cooperative_groups_common.hh"
+#include "cpu_grid.h"
 
-static __global__
-void kernel_cg_multi_grid_group_type(int* numGridsTestD,
-                                     int* gridRankTestD,
-                                     int *sizeTestD,
-                                     int *thdRankTestD,
-                                     int *isValidTestD,
-                                     int *syncTestD,
-                                     int *syncResultD)
-{
-  multi_grid_group mg = this_multi_grid();
-  int gIdx = (blockIdx.x * blockDim.x) + threadIdx.x;
+/**
+ * @addtogroup multi_grid_group multi_grid_group
+ * @{
+ * @ingroup coopGrpTest
+ */
 
-  // Test num_grids
-  numGridsTestD[gIdx] = mg.num_grids();
+namespace cg = cooperative_groups;
 
-  // Test grid_rank
-  gridRankTestD[gIdx] = mg.grid_rank();
+template <typename BaseType = cg::multi_grid_group>
+static __global__ void multi_grid_group_size_getter(unsigned int* sizes) {
+  const BaseType group = cg::this_multi_grid();
+  sizes[thread_rank_in_grid()] = group.size();
+}
 
-  // Test size
-  sizeTestD[gIdx] = mg.size();
+template <typename BaseType = cg::multi_grid_group>
+static __global__ void multi_grid_group_thread_rank_getter(unsigned int* thread_ranks) {
+  const BaseType group = cg::this_multi_grid();
+  thread_ranks[thread_rank_in_grid()] = group.thread_rank();
+}
 
-  // Test thread_rank
-  thdRankTestD[gIdx] = mg.thread_rank();
+template <typename BaseType = cg::multi_grid_group>
+static __global__ void multi_grid_group_is_valid_getter(unsigned int* is_valid_flags) {
+  const BaseType group = cg::this_multi_grid();
+  is_valid_flags[thread_rank_in_grid()] = cg::this_multi_grid().is_valid();
+}
 
-  // Test is_valid
-  isValidTestD[gIdx] = mg.is_valid();
+static __global__ void multi_grid_group_num_grids_getter(unsigned int* num_grids) {
+  num_grids[thread_rank_in_grid()] = cg::this_multi_grid().num_grids();
+}
 
-  // Test sync
-  //
-  // Eech thread assign 1 to their respective location
-  syncTestD[gIdx] = 1;
-  // Grid level sync
-  this_grid().sync();
-  // Thread 0 from work-group 0 of current grid (gpu) does grid level reduction
-  if (blockIdx.x == 0 && threadIdx.x == 0) {
-    for (uint i = 1; i < gridDim.x * blockDim.x; ++i) {
-      syncTestD[0] += syncTestD[i];
+static __global__ void multi_grid_group_grid_rank_getter(unsigned int* grid_ranks) {
+  grid_ranks[thread_rank_in_grid()] = cg::this_multi_grid().grid_rank();
+}
+
+static __global__ void multi_grid_group_non_member_size_getter(unsigned int* sizes) {
+  sizes[thread_rank_in_grid()] = cg::group_size(cg::this_multi_grid());
+}
+
+static __global__ void multi_grid_group_non_member_thread_rank_getter(unsigned int* thread_ranks) {
+  thread_ranks[thread_rank_in_grid()] = cg::thread_rank(cg::this_multi_grid());
+}
+
+static __global__ void sync_kernel(unsigned int* atomic_val, unsigned int* global_array,
+                                   unsigned int* array, uint32_t loops) {
+  cooperative_groups::grid_group grid = cooperative_groups::this_grid();
+  cooperative_groups::multi_grid_group mgrid = cooperative_groups::this_multi_grid();
+  unsigned rank = grid.thread_rank();
+  unsigned global_rank = mgrid.thread_rank();
+
+  int offset = (blockIdx.z * gridDim.y + blockIdx.y) * gridDim.x + blockIdx.x;
+  for (int i = 0; i < loops; i++) {
+    // Make the last thread run way behind everyone else.
+    // If the sync below fails, then the other threads may hit the
+    // atomicInc instruction many times before the last thread ever gets to it.
+    // If the sync works, then it will likely contain "total number of blocks"*i
+    if (rank == (grid.size() - 1)) {
+      long long time_diff = 0;
+      long long last_clock = clock64();
+      do {
+        long long cur_clock = clock64();
+        if (cur_clock > last_clock) {
+          time_diff += (cur_clock - last_clock);
+        }
+        // If it rolls over, we don't know how much to add to catch up.
+        // So just ignore those slipped cycles.
+        last_clock = cur_clock;
+      } while (time_diff < 1000000);
     }
-    syncResultD[mg.grid_rank() + 1] = syncTestD[0];
-  }
-  // multi-grid level sync
-  mg.sync();
-  // grid (gpu) 0 does final reduction across all grids (gpus)
-  if (mg.grid_rank() == 0 && blockIdx.x == 0 && threadIdx.x == 0) {
-    syncResultD[0] = 0;
-    for (uint i = 1; i <= mg.num_grids(); ++i) {
-      syncResultD[0] += syncResultD[i];
+    if (threadIdx.x == blockDim.x - 1 && threadIdx.y == blockDim.y - 1 &&
+        threadIdx.z == blockDim.z - 1) {
+      array[offset] = atomicInc(atomic_val, UINT_MAX);
     }
+    grid.sync();
+
+    // Make the last thread in the entire multi-grid run way behind
+    // everyone else.
+    if (global_rank == (mgrid.size() - 1)) {
+      long long time_diff = 0;
+      long long last_clock = clock64();
+      do {
+        long long cur_clock = clock64();
+        if (cur_clock > last_clock) {
+          time_diff += (cur_clock - last_clock);
+        }
+        // If it rolls over, we don't know how much to add to catch up.
+        // So just ignore those slipped cycles.
+        last_clock = cur_clock;
+      } while (time_diff < 1000000);
+    }
+    // During even iterations, add into your own array entry
+    // During odd iterations, add into next array entry
+    unsigned grid_rank = mgrid.grid_rank();
+    unsigned inter_gpu_offset = (grid_rank + 1) % mgrid.num_grids();
+    if (rank == (grid.size() - 1)) {
+      if (i % 2 == 0) {
+        global_array[grid_rank] += 2;
+      } else {
+        global_array[inter_gpu_offset] *= 2;
+      }
+    }
+    mgrid.sync();
+    offset += gridDim.x * gridDim.y * gridDim.z;
   }
 }
 
-static void test_cg_multi_grid_group_type(int blockSize, int nGpu)
-{
-  // Create a stream each device
-  hipStream_t stream[MaxGPUs];
-  for (int i = 0; i < nGpu; i++) {
-    HIPCHECK(hipSetDevice(i));
-    HIPCHECK(hipDeviceSynchronize());  // Make sure work is done on this device
-    HIPCHECK(hipStreamCreate(&stream[i]));
+/**
+ * Test Description
+ * ------------------------
+ *  - Launches kernels that write the return values of size, thread_rank, grid_rank, num_grids and
+ * is_valid member functions to an output array that is validated on the host side. The kernels are
+ * run sequentially, reusing the output array, to avoid running out of device memory for large
+ * kernel launches.
+ * Test source
+ * ------------------------
+ *  - catch\unit\cooperativeGrps\hipCGMultiGridGroupType.cc
+ * Test requirements
+ * ------------------------
+ *  - HIP_VERSION >= 5.2
+ */
+TEST_CASE("Unit_Multi_Grid_Group_Getters_Positive_Basic") {
+  int num_devices = 0;
+  HIP_CHECK(hipGetDeviceCount(&num_devices));
+  num_devices = min(num_devices, MaxGPUs);
+  auto threads = GENERATE(dim3(256, 2, 2));
+  auto blocks = GENERATE(dim3(2, 2, 2));
+
+  const CPUGrid grid(blocks, threads);
+
+  // Calculate total thread count and local grid ranks
+  unsigned int multi_grid_thread_count = 0;
+  unsigned int multi_grid_grid_rank_0[MaxGPUs];
+  multi_grid_grid_rank_0[0] = 0;
+  for (int i = 0; i < num_devices; i++) {
+    if (i > 0) {
+      multi_grid_grid_rank_0[i] = multi_grid_thread_count;
+    }
+    multi_grid_thread_count += grid.thread_count_;
   }
 
-  // Allocate host and device memory
-  int nBytes = sizeof(int) * 2 * blockSize;
-  int *numGridsTestD[MaxGPUs], *numGridsTestH[MaxGPUs];
-  int *gridRankTestD[MaxGPUs], *gridRankTestH[MaxGPUs];
-  int *sizeTestD[MaxGPUs], *sizeTestH[MaxGPUs];
-  int *thdRankTestD[MaxGPUs], *thdRankTestH[MaxGPUs];
-  int *isValidTestD[MaxGPUs], *isValidTestH[MaxGPUs];
-  int *syncTestD[MaxGPUs], *syncResultD;
-  for (int i = 0; i < nGpu; i++) {
-    HIPCHECK(hipSetDevice(i));
+  std::vector<StreamGuard> streams;
+  std::vector<LinearAllocGuard<unsigned int>> uint_arr_dev;
+  std::vector<LinearAllocGuard<unsigned int>> uint_arr;
+  unsigned int* uint_arr_dev_ptr[num_devices];
+  for (int i = 0; i < num_devices; i++) {
+    HIP_CHECK(hipSetDevice(i));
+    HIP_CHECK(hipDeviceSynchronize());
+    streams.emplace_back(Streams::created);
 
-    HIPCHECK(hipMalloc(&numGridsTestD[i], nBytes));
-    HIPCHECK(hipMalloc(&gridRankTestD[i], nBytes));
-    HIPCHECK(hipMalloc(&sizeTestD[i], nBytes));
-    HIPCHECK(hipMalloc(&thdRankTestD[i], nBytes));
-    HIPCHECK(hipMalloc(&isValidTestD[i], nBytes));
-    HIPCHECK(hipMalloc(&syncTestD[i], nBytes));
-
-    HIPCHECK(hipHostMalloc(&numGridsTestH[i], nBytes));
-    HIPCHECK(hipHostMalloc(&gridRankTestH[i], nBytes));
-    HIPCHECK(hipHostMalloc(&sizeTestH[i], nBytes));
-    HIPCHECK(hipHostMalloc(&thdRankTestH[i], nBytes));
-    HIPCHECK(hipHostMalloc(&isValidTestH[i], nBytes));
-
-    if (i == 0) {
-      HIPCHECK(hipHostMalloc(&syncResultD, sizeof(int) * (nGpu + 1), hipHostMallocCoherent));
-    }
+    uint_arr_dev.emplace_back(LinearAllocs::hipMalloc, grid.thread_count_ * sizeof(unsigned int));
+    uint_arr_dev_ptr[i] = uint_arr_dev[i].ptr();
+    uint_arr.emplace_back(LinearAllocs::hipHostMalloc, grid.thread_count_ * sizeof(unsigned int));
   }
 
   // Launch Kernel
-  constexpr int NumKernelArgs = 7;
-  hipLaunchParams* launchParamsList = new hipLaunchParams[nGpu];
-  void* args[MaxGPUs * NumKernelArgs];
-  for (int i = 0; i < nGpu; i++) {
-    HIPCHECK(hipSetDevice(i));
+  hipLaunchParams launchParamsList[num_devices];
+  void* args[num_devices];
+  for (int i = 0; i < num_devices; i++) {
+    args[i] = &uint_arr_dev_ptr[i];
 
-    args[i * NumKernelArgs]     = &numGridsTestD[i];
-    args[i * NumKernelArgs + 1] = &gridRankTestD[i];
-    args[i * NumKernelArgs + 2] = &sizeTestD[i];
-    args[i * NumKernelArgs + 3] = &thdRankTestD[i];
-    args[i * NumKernelArgs + 4] = &isValidTestD[i];
-    args[i * NumKernelArgs + 5] = &syncTestD[i];
-    args[i * NumKernelArgs + 6] = &syncResultD;
-
-    launchParamsList[i].func = reinterpret_cast<void*>(kernel_cg_multi_grid_group_type);
-    launchParamsList[i].gridDim = 2;
-    launchParamsList[i].blockDim = blockSize;
+    launchParamsList[i].func =
+        reinterpret_cast<void*>(multi_grid_group_size_getter<cg::multi_grid_group>);
+    launchParamsList[i].gridDim = blocks;
+    launchParamsList[i].blockDim = threads;
     launchParamsList[i].sharedMem = 0;
-    launchParamsList[i].stream = stream[i];
-    launchParamsList[i].args = &args[i * NumKernelArgs];
+    launchParamsList[i].stream = streams[i].stream();
+    launchParamsList[i].args = &args[i];
   }
-  HIPCHECK(hipLaunchCooperativeKernelMultiDevice(launchParamsList, nGpu, 0));
+  HIP_CHECK(hipLaunchCooperativeKernelMultiDevice(launchParamsList, num_devices, 0));
+  for (int i = 0; i < num_devices; i++) {
+    HIP_CHECK(hipSetDevice(i));
+    HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(),
+                        grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
 
-  // Copy result from device to host
-  for (int i = 0; i < nGpu; i++) {
-    HIPCHECK(hipSetDevice(i));
-    HIPCHECK(hipMemcpy(numGridsTestH[i], numGridsTestD[i], nBytes, hipMemcpyDeviceToHost));
-    HIPCHECK(hipMemcpy(gridRankTestH[i], gridRankTestD[i], nBytes, hipMemcpyDeviceToHost));
-    HIPCHECK(hipMemcpy(sizeTestH[i], sizeTestD[i], nBytes, hipMemcpyDeviceToHost));
-    HIPCHECK(hipMemcpy(thdRankTestH[i], thdRankTestD[i], nBytes, hipMemcpyDeviceToHost));
-    HIPCHECK(hipMemcpy(isValidTestH[i], isValidTestD[i], nBytes, hipMemcpyDeviceToHost));
+    launchParamsList[i].func =
+        reinterpret_cast<void*>(multi_grid_group_thread_rank_getter<cg::multi_grid_group>);
+  }
+  HIP_CHECK(hipLaunchCooperativeKernelMultiDevice(launchParamsList, num_devices, 0));
+
+  for (int i = 0; i < num_devices; i++) {
+    HIP_CHECK(hipSetDevice(i));
+    // Verify multi_grid_group.size() values
+    ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_,
+               [size = multi_grid_thread_count](uint32_t) { return size; });
+    HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(),
+                        grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
+
+    launchParamsList[i].func = reinterpret_cast<void*>(multi_grid_group_grid_rank_getter);
+  }
+  HIP_CHECK(hipLaunchCooperativeKernelMultiDevice(launchParamsList, num_devices, 0));
+
+  for (int i = 0; i < num_devices; i++) {
+    HIP_CHECK(hipSetDevice(i));
+    // Verify multi_grid_group.thread_rank() values
+    ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_,
+               [rank_0 = multi_grid_grid_rank_0[i]](uint32_t j) { return rank_0 + j; });
+    HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(),
+                        grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
+
+    launchParamsList[i].func = reinterpret_cast<void*>(multi_grid_group_num_grids_getter);
+  }
+  HIP_CHECK(hipLaunchCooperativeKernelMultiDevice(launchParamsList, num_devices, 0));
+
+  for (int i = 0; i < num_devices; i++) {
+    HIP_CHECK(hipSetDevice(i));
+    // Verify multi_grid_group.grid_rank() values
+    ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_, [rank = i](uint32_t) { return rank; });
+
+    HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(),
+                        grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
+
+    launchParamsList[i].func =
+        reinterpret_cast<void*>(multi_grid_group_is_valid_getter<cg::multi_grid_group>);
   }
 
-  // Validate results
-  int gridsSeen[MaxGPUs];
-  for (int i = 0; i < nGpu; ++i) {
-    for (int j = 0; j < 2 * blockSize; ++j) {
-      ASSERT_EQUAL(numGridsTestH[i][j], nGpu);
-      ASSERT_GE(gridRankTestH[i][j], 0);
-      ASSERT_LE(gridRankTestH[i][j], nGpu-1);
-      ASSERT_EQUAL(gridRankTestH[i][j], gridRankTestH[i][0]);
-      ASSERT_EQUAL(sizeTestH[i][j], nGpu * 2 * blockSize);
-      int gridRank = gridRankTestH[i][j];
-      ASSERT_EQUAL(thdRankTestH[i][j], (gridRank * 2 * blockSize) + j);
-      ASSERT_EQUAL(isValidTestH[i][j], 1);
-    }
-    ASSERT_EQUAL(syncResultD[i+1],  2 * blockSize);
+  for (int i = 0; i < num_devices; i++) {
+    HIP_CHECK(hipSetDevice(i));
+    // Verify multi_grid_group.num_grids() values
+    ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_,
+               [num = num_devices](uint32_t) { return num; });
 
-    // Validate uniqueness property of grid rank
-    gridsSeen[i] = gridRankTestH[i][0];
-    for (int k = 0; k < i; ++k) {
-      if (gridsSeen[k] == gridsSeen[i]) {
-        assert(false && "Grid rank in multi-gpu setup should be unique");
-      }
-    }
-  }
-  ASSERT_EQUAL(syncResultD[0], nGpu * 2 * blockSize);
+    HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(),
+                        grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
 
-  // Free host and device memory
-  delete [] launchParamsList;
-  for (int i = 0; i < nGpu; i++) {
-    HIPCHECK(hipSetDevice(i));
-
-    HIPCHECK(hipFree(numGridsTestD[i]));
-    HIPCHECK(hipFree(gridRankTestD[i]));
-    HIPCHECK(hipFree(sizeTestD[i]));
-    HIPCHECK(hipFree(thdRankTestD[i]));
-    HIPCHECK(hipFree(isValidTestD[i]));
-    HIPCHECK(hipFree(syncTestD[i]));
-
-    if (i == 0) {
-      HIPCHECK(hipHostFree(syncResultD));
-    }
-    HIPCHECK(hipHostFree(numGridsTestH[i]));
-    HIPCHECK(hipHostFree(gridRankTestH[i]));
-    HIPCHECK(hipHostFree(sizeTestH[i]));
-    HIPCHECK(hipHostFree(thdRankTestH[i]));
-    HIPCHECK(hipHostFree(isValidTestH[i]));
+    // Verify multi_grid_group.is_valid() values
+    ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_,
+               [num = num_devices](uint32_t) { return num; });
   }
 }
 
-TEST_CASE("Unit_hipCGMultiGridGroupType") {
-  int nGpu = 0;
-  HIPCHECK(hipGetDeviceCount(&nGpu));
-  nGpu = min(nGpu, MaxGPUs);
+/**
+ * Test Description
+ * ------------------------
+ *  - Launches kernels that write the return values of size, thread_rank and is_valid member
+ * functions to an output array that is validated on the host side, while treating the
+ * multi_grid_group as a thread group. The kernels are run sequentially, reusing the output array,
+ * to avoid running out of device memory for large kernel launches.
+ * Test source
+ * ------------------------
+ *  - catch\unit\cooperativeGrps\hipCGMultiGridGroupType.cc
+ * Test requirements
+ * ------------------------
+ *  - HIP_VERSION >= 5.2
+ */
+TEST_CASE("Unit_Multi_Grid_Group_Getters_Positive_Base_Type") {
+  int num_devices = 0;
+  HIP_CHECK(hipGetDeviceCount(&num_devices));
+  num_devices = min(num_devices, MaxGPUs);
 
-  // Set `maxThreadsPerBlock` by taking minimum among all available devices
-  int maxThreadsPerBlock = INT_MAX;
-  hipDeviceProp_t deviceProperties;
-  for (int i = 0; i < nGpu; i++) {
-    HIPCHECK(hipGetDeviceProperties(&deviceProperties, i));
-    if (!deviceProperties.cooperativeMultiDeviceLaunch) {
+  auto threads = GENERATE(dim3(256, 2, 2));
+  auto blocks = GENERATE(dim3(2, 2, 2));
+
+  const CPUGrid grid(blocks, threads);
+
+  // Calculate total thread count and local grid ranks
+  unsigned int multi_grid_thread_count = 0;
+  unsigned int multi_grid_grid_rank_0[MaxGPUs];
+  multi_grid_grid_rank_0[0] = 0;
+  for (int i = 0; i < num_devices; i++) {
+    if (i > 0) {
+      multi_grid_grid_rank_0[i] = multi_grid_thread_count;
+    }
+    multi_grid_thread_count += grid.thread_count_;
+  }
+
+  std::vector<StreamGuard> streams;
+  std::vector<LinearAllocGuard<unsigned int>> uint_arr_dev;
+  std::vector<LinearAllocGuard<unsigned int>> uint_arr;
+  unsigned int* uint_arr_dev_ptr[num_devices];
+  for (int i = 0; i < num_devices; i++) {
+    HIP_CHECK(hipSetDevice(i));
+    HIP_CHECK(hipDeviceSynchronize());
+    streams.emplace_back(Streams::created);
+
+    uint_arr_dev.emplace_back(LinearAllocs::hipMalloc, grid.thread_count_ * sizeof(unsigned int));
+    uint_arr_dev_ptr[i] = uint_arr_dev[i].ptr();
+    uint_arr.emplace_back(LinearAllocs::hipHostMalloc, grid.thread_count_ * sizeof(unsigned int));
+  }
+
+  // Launch Kernel
+  hipLaunchParams launchParamsList[num_devices];
+  void* args[num_devices];
+  for (int i = 0; i < num_devices; i++) {
+    args[i] = &uint_arr_dev_ptr[i];
+
+    launchParamsList[i].func =
+        reinterpret_cast<void*>(multi_grid_group_size_getter<cg::thread_group>);
+    launchParamsList[i].gridDim = blocks;
+    launchParamsList[i].blockDim = threads;
+    launchParamsList[i].sharedMem = 0;
+    launchParamsList[i].stream = streams[i].stream();
+    launchParamsList[i].args = &args[i];
+  }
+  HIP_CHECK(hipLaunchCooperativeKernelMultiDevice(launchParamsList, num_devices, 0));
+
+  for (int i = 0; i < num_devices; i++) {
+    HIP_CHECK(hipSetDevice(i));
+    HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(),
+                        grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
+
+    launchParamsList[i].func =
+        reinterpret_cast<void*>(multi_grid_group_thread_rank_getter<cg::thread_group>);
+  }
+  HIP_CHECK(hipLaunchCooperativeKernelMultiDevice(launchParamsList, num_devices, 0));
+
+  for (int i = 0; i < num_devices; i++) {
+    HIP_CHECK(hipSetDevice(i));
+    // Verify multi_grid_group.size() values
+    ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_,
+               [size = multi_grid_thread_count](uint32_t) { return size; });
+    HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(),
+                        grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
+
+    launchParamsList[i].func =
+        reinterpret_cast<void*>(multi_grid_group_is_valid_getter<cg::thread_group>);
+  }
+  HIP_CHECK(hipLaunchCooperativeKernelMultiDevice(launchParamsList, num_devices, 0));
+
+  for (int i = 0; i < num_devices; i++) {
+    HIP_CHECK(hipSetDevice(i));
+    // Verify multi_grid_group.thread_rank() values
+    ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_,
+               [rank_0 = multi_grid_grid_rank_0[i]](uint32_t j) { return rank_0 + j; });
+    HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(),
+                        grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
+
+    // Verify multi_grid_group.is_valid() values
+    ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_, [](uint32_t j) { return 1; });
+  }
+}
+
+/**
+ * Test Description
+ * ------------------------
+ *    - Launches kernels that write the return values of size and thread_rank non-member functions
+ * to an output array that is validated on the host side. The kernels are run sequentially, reusing
+ * the output array, to avoid running out of device memory for large kernel launches.
+ * Test source
+ * ------------------------
+ *  - catch\unit\cooperativeGrps\hipCGGridGroupType.cc
+ * Test requirements
+ * ------------------------
+ *  - HIP_VERSION >= 5.2
+ */
+TEST_CASE("Unit_Multi_Grid_Group_Getters_Positive_Non_Member_Functions") {
+  int num_devices = 0;
+  HIP_CHECK(hipGetDeviceCount(&num_devices));
+  num_devices = min(num_devices, MaxGPUs);
+
+  auto threads = GENERATE(dim3(256, 2, 2));
+  auto blocks = GENERATE(dim3(2, 2, 2));
+
+  const CPUGrid grid(blocks, threads);
+
+  // Calculate total thread count and local grid ranks
+  unsigned int multi_grid_thread_count = 0;
+  unsigned int multi_grid_grid_rank_0[MaxGPUs];
+  multi_grid_grid_rank_0[0] = 0;
+  for (int i = 0; i < num_devices; i++) {
+    if (i > 0) {
+      multi_grid_grid_rank_0[i] = multi_grid_thread_count;
+    }
+    multi_grid_thread_count += grid.thread_count_;
+  }
+
+  std::vector<StreamGuard> streams;
+  std::vector<LinearAllocGuard<unsigned int>> uint_arr_dev;
+  std::vector<LinearAllocGuard<unsigned int>> uint_arr;
+  unsigned int* uint_arr_dev_ptr[num_devices];
+  for (int i = 0; i < num_devices; i++) {
+    HIP_CHECK(hipSetDevice(i));
+    HIP_CHECK(hipDeviceSynchronize());
+    streams.emplace_back(Streams::created);
+
+    uint_arr_dev.emplace_back(LinearAllocs::hipMalloc, grid.thread_count_ * sizeof(unsigned int));
+    uint_arr_dev_ptr[i] = uint_arr_dev[i].ptr();
+    uint_arr.emplace_back(LinearAllocs::hipHostMalloc, grid.thread_count_ * sizeof(unsigned int));
+  }
+
+  // Launch Kernel
+  hipLaunchParams launchParamsList[num_devices];
+  void* args[num_devices];
+  for (int i = 0; i < num_devices; i++) {
+    args[i] = &uint_arr_dev_ptr[i];
+
+    launchParamsList[i].func = reinterpret_cast<void*>(multi_grid_group_non_member_size_getter);
+    launchParamsList[i].gridDim = blocks;
+    launchParamsList[i].blockDim = threads;
+    launchParamsList[i].sharedMem = 0;
+    launchParamsList[i].stream = streams[i].stream();
+    launchParamsList[i].args = &args[i];
+  }
+  HIP_CHECK(hipLaunchCooperativeKernelMultiDevice(launchParamsList, num_devices, 0));
+  for (int i = 0; i < num_devices; i++) {
+    HIP_CHECK(hipSetDevice(i));
+    HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(),
+                        grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
+
+    launchParamsList[i].func =
+        reinterpret_cast<void*>(multi_grid_group_non_member_thread_rank_getter);
+  }
+  HIP_CHECK(hipLaunchCooperativeKernelMultiDevice(launchParamsList, num_devices, 0));
+
+  for (int i = 0; i < num_devices; i++) {
+    HIP_CHECK(hipSetDevice(i));
+    // Verify multi_grid_group.size() values
+    ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_,
+               [size = multi_grid_thread_count](uint32_t) { return size; });
+    HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(),
+                        grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
+    // Verify multi_grid_group.thread_rank() values
+    ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_,
+               [rank_0 = multi_grid_grid_rank_0[i]](uint32_t j) { return rank_0 + j; });
+  }
+}
+
+/**
+ * Test Description
+ * ------------------------
+ *  - Test case description:
+ *    - Launches a kernel to multiple gpus which tests sync of separate grids and sync of the entire
+ * multi grid. The last thread in a block in a grid atomically increments a global variable within a
+ * work loop. The value returned from this atomic increment entirely depends on the order the
+ * threads arrive at the atomic instruction. Each thread then stores the result in the global array
+ * based on its block id. A wait loop is inserted into the last thread so that it runs behind all
+ * other threads. If the grid sync doesn't work, the other threads will increment the atomic
+ * variable many times before the last thread gets to it and it will read a very large value. If the
+ * grid sync works, each thread will increment the variable once per loop iteration and the last
+ * thread will contain total number of blocks * loop iteration. In the end of the work loop, a value
+ * is added into grid's own global array entry during even iterations and during odd iterations, a
+ * value of the next grid is multiplied. A wait loop is inserted into the last thread in the entire
+ * multi-grid so that it runs behind all the other threads. If the multi grid sync doesn't work the
+ * two global array entries will end up being out of sync, because the intermingling of adds and
+ * multiplies will not be aligned between the devices.
+ * Test source
+ * ------------------------
+ *  - catch\unit\cooperativeGrps\hipCGGridGroupType.cc
+ * Test requirements
+ * ------------------------
+ *  - HIP_VERSION >= 5.2
+ */
+TEST_CASE("Unit_Multi_Grid_Group_Positive_Sync") {
+  int num_devices = 0;
+  HIP_CHECK(hipGetDeviceCount(&num_devices));
+  num_devices = min(num_devices, MaxGPUs);
+
+  hipDeviceProp_t device_properties[num_devices];
+  for (int i = 0; i < num_devices; i++) {
+    HIP_CHECK(hipGetDeviceProperties(&device_properties[i], i));
+    if (!device_properties[i].cooperativeMultiDeviceLaunch) {
       HipTest::HIP_SKIP_TEST("Device doesn't support cooperative launch!");
       return;
     }
-    maxThreadsPerBlock = min(maxThreadsPerBlock, deviceProperties.maxThreadsPerBlock);
+  }
+  auto loops = GENERATE(2, 4, 8, 16);
+  auto threads = GENERATE(dim3(256, 2, 2));
+  auto blocks = GENERATE(dim3(2, 2, 2));
+
+  const CPUGrid grid(blocks, threads);
+  unsigned int array_len = grid.block_count_ * loops;
+
+  std::vector<StreamGuard> streams;
+  std::vector<LinearAllocGuard<unsigned int>> uint_arr_dev;
+  std::vector<LinearAllocGuard<unsigned int>> uint_arr;
+  std::vector<LinearAllocGuard<unsigned int>> atomic_val;
+  unsigned int* uint_arr_dev_ptr[num_devices];
+  unsigned int* atomic_val_ptr[num_devices];
+  for (int i = 0; i < num_devices; i++) {
+    HIP_CHECK(hipSetDevice(i));
+    HIP_CHECK(hipDeviceSynchronize());
+    streams.emplace_back(Streams::created);
+
+    // Allocate grid sync arrays
+    uint_arr_dev.emplace_back(LinearAllocs::hipMalloc, array_len * sizeof(unsigned int));
+    uint_arr_dev_ptr[i] = uint_arr_dev[i].ptr();
+    uint_arr.emplace_back(LinearAllocs::hipHostMalloc, array_len * sizeof(unsigned int));
+
+    atomic_val.emplace_back(LinearAllocs::hipMalloc, sizeof(unsigned int));
+    HIP_CHECK(hipMemset(atomic_val[i].ptr(), 0, sizeof(unsigned int)));
+    atomic_val_ptr[i] = atomic_val[i].ptr();
+  }
+  // Allocate multi_grid sync array
+  LinearAllocGuard<unsigned int> global_arr(LinearAllocs::hipHostMalloc,
+                                            num_devices * sizeof(unsigned int));
+  HIP_CHECK(hipMemset(global_arr.ptr(), 0, num_devices * sizeof(unsigned int)));
+  unsigned int* global_arr_ptr = global_arr.ptr();
+
+  void* dev_params[num_devices][4];
+  hipLaunchParams md_params[num_devices];
+  for (int i = 0; i < num_devices; i++) {
+    dev_params[i][0] = reinterpret_cast<void*>(&atomic_val_ptr[i]);
+    dev_params[i][1] = reinterpret_cast<void*>(&global_arr_ptr);
+    dev_params[i][2] = reinterpret_cast<void*>(&uint_arr_dev_ptr[i]);
+    dev_params[i][3] = reinterpret_cast<void*>(&loops);
+
+    md_params[i].func = reinterpret_cast<void*>(sync_kernel);
+    md_params[i].gridDim = blocks;
+    md_params[i].blockDim = threads;
+    md_params[i].sharedMem = 0;
+    md_params[i].stream = streams[i].stream();
+    md_params[i].args = dev_params[i];
   }
 
-  // Test for blockSizes in powers of 2
-  for (int blockSize = 2; blockSize <= maxThreadsPerBlock; blockSize = blockSize*2) {
-    test_cg_multi_grid_group_type(blockSize, nGpu);
+  // Launch Kernel
+  HIP_CHECK(hipLaunchCooperativeKernelMultiDevice(md_params, num_devices, 0));
+  HIP_CHECK(hipDeviceSynchronize());
+
+  // Read back the grid sync buffer to host
+  for (int i = 0; i < num_devices; i++) {
+    HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(), array_len * sizeof(unsigned int),
+                        hipMemcpyDeviceToHost));
   }
 
-  // Test for random blockSizes, but the sequence is the same every execution
-  srand(0);
-  for (int i = 0; i < 10; i++) {
-    // Test fails for 0 thread per block
-    test_cg_multi_grid_group_type(max(2, rand() % maxThreadsPerBlock), nGpu);
+  HIP_CHECK(hipDeviceSynchronize());
+
+  // Verify grid sync host array values
+  for (int i = 0; i < num_devices; i++) {
+    unsigned int max_in_this_loop = 0;
+    for (unsigned int j = 0; j < loops; j++) {
+      max_in_this_loop += grid.block_count_;
+      unsigned int k = 0;
+      for (k = 0; k < grid.block_count_ - 1; k++) {
+        REQUIRE(uint_arr[i].ptr()[j * grid.block_count_ + k] < max_in_this_loop);
+      }
+      REQUIRE(uint_arr[i].ptr()[j * grid.block_count_ + k] == max_in_this_loop - 1);
+    }
   }
+
+  // Verify multi_grid sync array values
+  const auto f = [loops](unsigned int i) -> unsigned int {
+    unsigned int desired_val = 0;
+    for (int j = 0; j < loops; j++) {
+      if (j % 2 == 0) {
+        desired_val += 2;
+      } else {
+        desired_val *= 2;
+      }
+    }
+    return desired_val;
+  };
+  ArrayAllOf(global_arr.ptr(), num_devices, f);
 }

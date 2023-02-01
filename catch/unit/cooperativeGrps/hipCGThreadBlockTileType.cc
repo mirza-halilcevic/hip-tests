@@ -511,7 +511,11 @@ TEMPLATE_TEST_CASE("Unit_Tiled_Partition_Sync_Positive_Basic", "", uint8_t, uint
 
 template <size_t warp_size> __device__ bool deactivate_thread(uint64_t* active_masks) {
   const auto warp = cg::tiled_partition<warp_size>(cg::this_thread_block());
-  const auto idx = cg::this_grid().thread_rank() / warp.size();
+  const auto block = cg::this_thread_block();
+  const auto warps_per_block = (block.size() + warp_size - 1) / warp_size;
+  const auto block_rank = (blockIdx.z * gridDim.y + blockIdx.y) * gridDim.x + blockIdx.x;
+  const auto idx = block_rank * warps_per_block + block.thread_rank() / warp.size();
+
   return !(active_masks[idx] & (1u << warp.thread_rank()));
 }
 
@@ -523,6 +527,18 @@ __global__ void coalesced_group_tiled_partition_size_getter(uint64_t* active_mas
     return;
   }
   sizes[thread_rank_in_grid()] = cg::tiled_partition(cg::coalesced_threads(), tile_size).size();
+}
+
+template <size_t warp_size>
+__global__ void coalesced_group_tiled_partition_thread_rank_getter(uint64_t* active_masks,
+                                                                   unsigned int tile_size,
+                                                                   unsigned int* sizes) {
+  if (deactivate_thread<warp_size>(active_masks)) {
+    return;
+  }
+
+  sizes[thread_rank_in_grid()] =
+      cg::tiled_partition(cg::coalesced_threads(), tile_size).thread_rank();
 }
 
 TEST_CASE("Blahem") {
@@ -548,13 +564,18 @@ TEST_CASE("Blahem") {
                                           warps_in_grid * sizeof(uint64_t));
 
   std::fill_n(active_masks.ptr(), warps_in_grid, static_cast<uint64_t>(0xFF1F00FF));
+  // active_masks.ptr()[4] = 0x775d3382;
   HIP_CHECK(hipMemcpy(active_masks_dev.ptr(), active_masks.ptr(), warps_in_grid * sizeof(uint64_t),
                       hipMemcpyHostToDevice));
-  HIP_CHECK(hipMemset(uint_arr_dev.ptr(), 0, alloc_size));
+  HIP_CHECK(hipMemsetAsync(uint_arr_dev.ptr(), 0, alloc_size));
   coalesced_group_tiled_partition_size_getter<32>
       <<<blocks, threads>>>(active_masks_dev.ptr(), tile_size, uint_arr_dev.ptr());
   HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
   HIP_CHECK(hipDeviceSynchronize());
+
+  HIP_CHECK(hipMemsetAsync(uint_arr_dev.ptr(), 0, alloc_size));
+  coalesced_group_tiled_partition_thread_rank_getter<32>
+      <<<blocks, threads>>>(active_masks_dev.ptr(), tile_size, uint_arr_dev.ptr());
 
   const auto tail = warps_in_block * warp_size - grid.threads_in_block_count_ +
       32 * TestContext::get().isNvidia();
@@ -566,7 +587,8 @@ TEST_CASE("Blahem") {
       return 0;
     }
 
-    // Reset bits corresponding to threads that are inactive due to launch dimension configuration
+    // Reset bits corresponding to threads that are inactive due to launch dimension
+    //   configuration
     // This only (potentially) applies to the final warp in a block
     const auto shift_amount = tail * (i / warp_size == warps_in_block - 1);
     current_warp_mask = (current_warp_mask << shift_amount) >> shift_amount;
@@ -581,5 +603,23 @@ TEST_CASE("Blahem") {
     const auto active_tile_rank = active_rank / tile_size;
     const auto active_tail = active_tiles * tile_size - current_active_threads;
     return tile_size - active_tail * (active_tile_rank == active_tiles - 1);
+  });
+
+  HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
+  HIP_CHECK(hipDeviceSynchronize());
+
+  ArrayAllOf(uint_arr.ptr(), grid.thread_count_, [&](unsigned int idx) -> unsigned int {
+    auto current_warp_mask = active_masks.ptr()[idx / warp_size];
+    const auto i = grid.thread_rank_in_block(idx).value();
+    if (~current_warp_mask & (1u << i % warp_size)) {
+      return 0;
+    }
+    // std::cout << "mask: " << std::bitset<sizeof(current_warp_mask) * 8>(current_warp_mask) <<
+    // std::endl; std::cout << "i: " << i << std::endl;
+
+    const uint64_t active_up_to = current_warp_mask & ((1u << i % warp_size) - 1);
+    const auto active_rank = std::bitset<sizeof(active_up_to) * 8>(active_up_to).count();
+
+    return active_rank % tile_size;
   });
 }

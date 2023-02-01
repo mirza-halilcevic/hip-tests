@@ -39,7 +39,9 @@ static __global__ void multi_grid_group_thread_rank_getter(unsigned int* thread_
   thread_ranks[thread_rank_in_grid()] = group.thread_rank();
 }
 
-static __global__ void multi_grid_group_is_valid_getter(bool* is_valid_flags) {
+template <typename BaseType = cg::multi_grid_group>
+static __global__ void multi_grid_group_is_valid_getter(unsigned int* is_valid_flags) {
+  const BaseType group = cg::this_multi_grid();
   is_valid_flags[thread_rank_in_grid()] = cg::this_multi_grid().is_valid();
 }
 
@@ -225,7 +227,21 @@ TEST_CASE("Unit_Multi_Grid_Group_Getters_Positive_Basic") {
     HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(),
                         grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
+
+    launchParamsList[i].func = reinterpret_cast<void*>(multi_grid_group_is_valid_getter<cg::multi_grid_group>);
+  }
+
+  for (int i = 0; i < num_devices; i++) {
+    HIP_CHECK(hipSetDevice(i));
     // Verify multi_grid_group.num_grids() values
+    ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_,
+               [num = num_devices](uint32_t) { return num; });
+
+    HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(),
+                        grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
+
+    // Verify multi_grid_group.is_valid() values
     ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_,
                [num = num_devices](uint32_t) { return num; });
   }
@@ -302,9 +318,23 @@ TEST_CASE("Unit_Multi_Grid_Group_Getters_Positive_Base_Type") {
                         grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
 
+    launchParamsList[i].func =
+        reinterpret_cast<void*>(multi_grid_group_is_valid_getter<cg::thread_group>);
+  }
+  HIP_CHECK(hipLaunchCooperativeKernelMultiDevice(launchParamsList, num_devices, 0));
+
+  for (int i = 0; i < num_devices; i++) {
+    HIP_CHECK(hipSetDevice(i));
     // Verify multi_grid_group.thread_rank() values
     ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_,
                [rank_0 = multi_grid_grid_rank_0[i]](uint32_t j) { return rank_0 + j; });
+    HIP_CHECK(hipMemcpy(uint_arr[i].ptr(), uint_arr_dev[i].ptr(),
+                        grid.thread_count_ * sizeof(*uint_arr[i].ptr()), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
+
+    // Verify multi_grid_group.is_valid() values
+    ArrayAllOf(uint_arr[i].ptr(), grid.thread_count_,
+               [](uint32_t j) { return 1; });
   }
 }
 

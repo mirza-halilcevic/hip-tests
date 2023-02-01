@@ -35,7 +35,7 @@ static __global__ void grid_group_thread_rank_getter(unsigned int* thread_ranks)
   thread_ranks[thread_rank_in_grid()] = cg::this_grid().thread_rank();
 }
 
-static __global__ void grid_group_is_valid_getter(bool* is_valid_flags) {
+static __global__ void grid_group_is_valid_getter(unsigned int* is_valid_flags) {
   is_valid_flags[thread_rank_in_grid()] = cg::this_grid().is_valid();
 }
 
@@ -47,8 +47,7 @@ static __global__ void grid_group_non_member_thread_rank_getter(unsigned int* th
   thread_ranks[thread_rank_in_grid()] = cg::thread_rank(cg::this_grid());
 }
 
-static __global__ void sync_kernel(unsigned int* atomic_val, unsigned int* array,
-                                   unsigned int loops) {
+static __global__ void sync_kernel(unsigned int* atomic_val, unsigned int* array, unsigned int loops) {
   cg::grid_group grid = cg::this_grid();
   unsigned rank = grid.thread_rank();
 
@@ -101,54 +100,42 @@ TEST_CASE("Unit_Grid_Group_Getters_Positive_Basic") {
 
   const CPUGrid grid(blocks, threads);
 
-  {
-    LinearAllocGuard<unsigned int> uint_arr_dev(LinearAllocs::hipMalloc,
-                                                grid.thread_count_ * sizeof(unsigned int));
-    LinearAllocGuard<unsigned int> uint_arr(LinearAllocs::hipHostMalloc,
-                                            grid.thread_count_ * sizeof(unsigned int));
+  LinearAllocGuard<unsigned int> uint_arr_dev(LinearAllocs::hipMalloc,
+                                              grid.thread_count_ * sizeof(unsigned int));
+  LinearAllocGuard<unsigned int> uint_arr(LinearAllocs::hipHostMalloc,
+                                          grid.thread_count_ * sizeof(unsigned int));
 
-    // Launch Kernel
-    unsigned int* uint_arr_dev_ptr = uint_arr_dev.ptr();
-    void* params[1];
-    params[0] = &uint_arr_dev_ptr;
+  // Launch Kernel
+  unsigned int* uint_arr_dev_ptr = uint_arr_dev.ptr();
+  void* params[1];
+  params[0] = &uint_arr_dev_ptr;
 
-    HIP_CHECK(hipLaunchCooperativeKernel(grid_group_size_getter, blocks, threads, params, 0, 0));
+  HIP_CHECK(hipLaunchCooperativeKernel(grid_group_size_getter, blocks, threads, params, 0, 0));
 
-    HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(),
-                        grid.thread_count_ * sizeof(*uint_arr.ptr()), hipMemcpyDeviceToHost));
-    HIP_CHECK(hipDeviceSynchronize());
-    HIP_CHECK(
-        hipLaunchCooperativeKernel(grid_group_thread_rank_getter, blocks, threads, params, 0, 0));
+  HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(),
+                      grid.thread_count_ * sizeof(*uint_arr.ptr()), hipMemcpyDeviceToHost));
+  HIP_CHECK(hipDeviceSynchronize());
+  HIP_CHECK(
+      hipLaunchCooperativeKernel(grid_group_thread_rank_getter, blocks, threads, params, 0, 0));
 
-    // Verify grid_group.size() values
-    ArrayAllOf(uint_arr.ptr(), grid.thread_count_,
-               [size = grid.thread_count_](uint32_t) { return size; });
+  // Verify grid_group.size() values
+  ArrayAllOf(uint_arr.ptr(), grid.thread_count_,
+              [size = grid.thread_count_](uint32_t) { return size; });
 
-    HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(),
-                        grid.thread_count_ * sizeof(*uint_arr.ptr()), hipMemcpyDeviceToHost));
-    HIP_CHECK(hipDeviceSynchronize());
+  HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(),
+                      grid.thread_count_ * sizeof(*uint_arr.ptr()), hipMemcpyDeviceToHost));
+  HIP_CHECK(hipDeviceSynchronize());
+  HIP_CHECK(hipLaunchCooperativeKernel(grid_group_is_valid_getter, blocks, threads, params, 0, 0));
 
-    // Verify grid_group.thread_rank() values
-    ArrayAllOf(uint_arr.ptr(), grid.thread_count_, [](uint32_t i) { return i; });
-  }
+  // Verify grid_group.thread_rank() values
+  ArrayAllOf(uint_arr.ptr(), grid.thread_count_, [](uint32_t i) { return i; });
 
-  {
-    LinearAllocGuard<bool> bool_arr_dev(LinearAllocs::hipMalloc, grid.thread_count_ * sizeof(bool));
-    LinearAllocGuard<bool> bool_arr(LinearAllocs::hipHostMalloc, grid.thread_count_ * sizeof(bool));
+  HIP_CHECK(hipMemcpy(uint_arr.ptr(), uint_arr_dev.ptr(),
+                      grid.thread_count_ * sizeof(*uint_arr.ptr()), hipMemcpyDeviceToHost));
+  HIP_CHECK(hipDeviceSynchronize());
 
-    bool* bool_arr_dev_ptr = bool_arr_dev.ptr();
-    void* params[1];
-    params[0] = &bool_arr_dev_ptr;
-    HIP_CHECK(
-        hipLaunchCooperativeKernel(grid_group_is_valid_getter, blocks, threads, params, 0, 0));
-
-    HIP_CHECK(hipMemcpy(bool_arr.ptr(), bool_arr_dev.ptr(),
-                        grid.thread_count_ * sizeof(*bool_arr.ptr()), hipMemcpyDeviceToHost));
-    HIP_CHECK(hipDeviceSynchronize());
-
-    // Verify grid_group.is_valid() values
-    ArrayAllOf(bool_arr.ptr(), grid.thread_count_, [](uint32_t i) { return 1; });
-  }
+  // Verify grid_group.is_valid() values
+  ArrayAllOf(uint_arr.ptr(), grid.thread_count_, [](uint32_t i) { return 1; });
 }
 
 TEST_CASE("Unit_Grid_Group_Getters_Positive_Non_Member_Functions") {

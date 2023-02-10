@@ -59,20 +59,19 @@ static uint64_t get_active_predicate(uint64_t predicate, size_t partition_size) 
 }
 
 static bool check_if_all(uint64_t predicate_mask, size_t partition_size) {
-
   for (int i = 0; i < partition_size; i++) {
     if (!(predicate_mask & (static_cast<uint64_t>(1) << i))) return false;
   }
   return true;
 }
 
-__global__ void  kernel_ballot(uint64_t* const out, uint64_t predicate, size_t warp_size) {
+__global__ void kernel_ballot(uint64_t* const out, uint64_t predicate, size_t warp_size) {
   const auto block_size = blockDim.x * blockDim.y * blockDim.z;
   const auto block_rank_in_grid = (blockIdx.z * gridDim.y + blockIdx.y) * gridDim.x + blockIdx.x;
   const auto thread_rank_in_block =
       (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;
   const auto warps_per_block = (block_size + warp_size - 1) / warp_size;
-  const auto warp_id = thread_rank_in_block % warp_size; 
+  const auto warp_id = thread_rank_in_block % warp_size;
   const auto warp_rank = block_rank_in_grid * warps_per_block + thread_rank_in_block / warp_size;
 
   out[warp_rank] = __ballot((predicate & (static_cast<uint64_t>(1) << warp_id)));
@@ -107,19 +106,20 @@ TEST_CASE("Unit_Ballot_Positive_Basic") {
   LinearAllocGuard<uint64_t> arr(LinearAllocs::hipHostMalloc, warps_in_grid * sizeof(uint64_t));
 
   kernel_ballot<<<blocks, threads>>>(arr_dev.ptr(), predicate, warp_size);
-  HIP_CHECK(hipMemcpy(arr.ptr(), arr_dev.ptr(), warps_in_grid * sizeof(uint64_t), hipMemcpyDeviceToHost));
+  HIP_CHECK(
+      hipMemcpy(arr.ptr(), arr_dev.ptr(), warps_in_grid * sizeof(uint64_t), hipMemcpyDeviceToHost));
   HIP_CHECK(hipDeviceSynchronize());
 
   for (int i = 0; i < grid.block_count_; i++) {
     size_t partition_size = warp_size;
     auto active_predicate = get_active_predicate(predicate, partition_size);
     for (int j = 0; j < warps_in_block; j++) {
-      if ( j == warps_in_block - 1) {
+      if (j == warps_in_block - 1) {
         partition_size = grid.threads_in_block_count_ - (warps_in_block - 1) * warp_size;
         active_predicate = get_active_predicate(predicate, partition_size);
       }
-      if (arr.ptr()[i*warps_in_block + j] != active_predicate) {
-        REQUIRE(arr.ptr()[i*warps_in_block + j] == active_predicate);
+      if (arr.ptr()[i * warps_in_block + j] != active_predicate) {
+        REQUIRE(arr.ptr()[i * warps_in_block + j] == active_predicate);
       }
     }
   }
@@ -131,7 +131,7 @@ __global__ void kernel_any(uint64_t* const out, uint64_t predicate, size_t warp_
   const auto thread_rank_in_block =
       (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;
   const auto warps_per_block = (block_size + warp_size - 1) / warp_size;
-  const auto warp_id = thread_rank_in_block % warp_size; 
+  const auto warp_id = thread_rank_in_block % warp_size;
   const auto warp_rank = block_rank_in_grid * warps_per_block + thread_rank_in_block / warp_size;
 
   out[warp_rank] = __any((predicate & (static_cast<uint64_t>(1) << warp_id)));
@@ -167,22 +167,23 @@ TEST_CASE("Unit_Any_Positive_Basic") {
   LinearAllocGuard<uint64_t> arr(LinearAllocs::hipHostMalloc, warps_in_grid * sizeof(uint64_t));
 
   kernel_any<<<blocks, threads>>>(arr_dev.ptr(), predicate, warp_size);
-  HIP_CHECK(hipMemcpy(arr.ptr(), arr_dev.ptr(), warps_in_grid * sizeof(uint64_t), hipMemcpyDeviceToHost));
+  HIP_CHECK(
+      hipMemcpy(arr.ptr(), arr_dev.ptr(), warps_in_grid * sizeof(uint64_t), hipMemcpyDeviceToHost));
   HIP_CHECK(hipDeviceSynchronize());
-  
+
 
   for (int i = 0; i < grid.block_count_; i++) {
     size_t partition_size = warp_size;
     auto active_predicate = get_active_predicate(predicate, partition_size);
     unsigned int expected = active_predicate != 0 ? 1 : 0;
     for (int j = 0; j < warps_in_block; j++) {
-      if ( j == warps_in_block - 1) {
-        partition_size = grid.threads_in_block_count_ - (warps_in_block - 1) * kWarpSize;
+      if (j == warps_in_block - 1) {
+        partition_size = grid.threads_in_block_count_ - (warps_in_block - 1) * warp_size;
         active_predicate = get_active_predicate(predicate, partition_size);
         expected = active_predicate != 0 ? 1 : 0;
       }
-      if (arr.ptr()[i*warps_in_block + j] != expected) {
-        REQUIRE(arr.ptr()[i*warps_in_block + j] == expected);
+      if (arr.ptr()[i * warps_in_block + j] != expected) {
+        REQUIRE(arr.ptr()[i * warps_in_block + j] == expected);
       }
     }
   }
@@ -194,7 +195,7 @@ __global__ void kernel_all(uint64_t* const out, uint64_t predicate, size_t warp_
   const auto thread_rank_in_block =
       (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;
   const auto warps_per_block = (block_size + warp_size - 1) / warp_size;
-  const auto warp_id = thread_rank_in_block % warp_size; 
+  const auto warp_id = thread_rank_in_block % warp_size;
   const auto warp_rank = block_rank_in_grid * warps_per_block + thread_rank_in_block / warp_size;
 
   out[warp_rank] = __all((predicate & (static_cast<uint64_t>(1) << warp_id)));
@@ -220,7 +221,7 @@ TEST_CASE("Unit_All_Positive_Basic") {
 
   CPUGrid grid(blocks, threads);
 
-  const auto warps_in_block = (grid.threads_in_block_count_ + kWarpSize - 1) / kWarpSize;
+  const auto warps_in_block = (grid.threads_in_block_count_ + warp_size - 1) / warp_size;
   const auto warps_in_grid = warps_in_block * grid.block_count_;
 
   auto test_case = GENERATE(range(0, 4));
@@ -230,22 +231,23 @@ TEST_CASE("Unit_All_Positive_Basic") {
   LinearAllocGuard<uint64_t> arr(LinearAllocs::hipHostMalloc, warps_in_grid * sizeof(uint64_t));
 
   kernel_all<<<blocks, threads>>>(arr_dev.ptr(), predicate, warp_size);
-  HIP_CHECK(hipMemcpy(arr.ptr(), arr_dev.ptr(), warps_in_grid * sizeof(uint64_t), hipMemcpyDeviceToHost));
+  HIP_CHECK(
+      hipMemcpy(arr.ptr(), arr_dev.ptr(), warps_in_grid * sizeof(uint64_t), hipMemcpyDeviceToHost));
   HIP_CHECK(hipDeviceSynchronize());
-  
+
 
   for (int i = 0; i < grid.block_count_; i++) {
     size_t partition_size = warp_size;
     auto active_predicate = get_active_predicate(predicate, partition_size);
-    unsigned int expected =  check_if_all(active_predicate, partition_size) ? 1 : 0;
+    unsigned int expected = check_if_all(active_predicate, partition_size) ? 1 : 0;
     for (int j = 0; j < warps_in_block; j++) {
-      if ( j == warps_in_block - 1) {
+      if (j == warps_in_block - 1) {
         partition_size = grid.threads_in_block_count_ - (warps_in_block - 1) * warp_size;
         active_predicate = get_active_predicate(predicate, partition_size);
-        expected =  check_if_all(active_predicate, partition_size) ? 1 : 0;
+        expected = check_if_all(active_predicate, partition_size) ? 1 : 0;
       }
-      if (arr.ptr()[i*warps_in_block + j] != expected) {
-        REQUIRE(arr.ptr()[i*warps_in_block + j] == expected);
+      if (arr.ptr()[i * warps_in_block + j] != expected) {
+        REQUIRE(arr.ptr()[i * warps_in_block + j] == expected);
       }
     }
   }

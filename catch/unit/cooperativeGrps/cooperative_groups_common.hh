@@ -19,6 +19,8 @@ THE SOFTWARE.
 
 #pragma once
 
+#include <optional>
+
 #include <hip_test_common.hh>
 #include <hip/hip_cooperative_groups.h>
 

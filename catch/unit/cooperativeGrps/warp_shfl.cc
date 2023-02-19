@@ -32,23 +32,27 @@ template <typename Derived, typename T> class Foo {
   Foo() : warp_size_{get_warp_size()} {}
 
   void run() {
-    // Generate blocks
-    blocks_ = GenerateBlockDimensionsForShuffle();
-    INFO("Grid dimensions: x " << blocks_.x << ", y " << blocks_.y << ", z " << blocks_.z);
-    // Generate threads
-    threads_ = GenerateThreadDimensionsForShuffle();
-    INFO("Block dimensions: x " << threads_.x << ", y " << threads_.y << ", z " << threads_.z);
-    // Generate width
+    const auto blocks = GenerateBlockDimensionsForShuffle();
+    INFO("Grid dimensions: x " << blocks.x << ", y " << blocks.y << ", z " << blocks.z);
+    const auto threads = GenerateThreadDimensionsForShuffle();
+    INFO("Block dimensions: x " << threads.x << ", y " << threads.y << ", z " << threads.z);
+    grid_ = CPUGrid(blocks, threads);
     width_ = generate_width();
     INFO("Width: " << width_);
 
-    // Create CPU grid
-    // Allocate output arr of type T on host and device
+    const auto alloc_size = grid_.thread_count_ * sizeof(T);
+    LinearAllocGuard<T> arr_dev(LinearAllocs::hipMalloc, alloc_size);
+    LinearAllocGuard<T> arr(LinearAllocs::hipHostMalloc, alloc_size);
+
     // Allocate active mask array on host and device
     // Generate active masks
-    cast_to_derived().launch_kernel(/*Pass in dev mask array and dev output array*/);
-    // Copy output arr from dev to host
-    cast_to_derived().validate(/*Pass in host output arr*/);
+
+    cast_to_derived().launch_kernel(arr_dev.ptr());
+    HIP_CHECK(hipGetLastError());
+    HIP_CHECK(hipMemcpy(arr.ptr(), arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
+
+    cast_to_derived().validate(arr.ptr());
   }
 
  private:
@@ -74,21 +78,102 @@ template <typename Derived, typename T> class Foo {
 
  protected:
   const int warp_size_;
-  dim3 blocks_;
-  dim3 threads_;
+  CPUGrid grid_;
   int width_;
 };
 
-template <typename T> class Bar : public Foo<Bar<T>, T> {
- public:
-  void launch_kernel() { std::cout << this->width_ << std::endl; }
+namespace cg = cooperative_groups;
 
-  void validate() {};
+template <typename T>
+__global__ void shfl_up(T* const out, const unsigned int delta, const int width) {
+  const auto grid = cg::this_grid();
+  T var = static_cast<T>(grid.thread_rank() % 32);
+  out[grid.thread_rank()] = __shfl_up(var, delta, width);
+}
+
+template <typename T> class ShflUp : public Foo<ShflUp<T>, T> {
+ public:
+  void launch_kernel(T* const arr_dev) {
+    delta_ = GENERATE_COPY(range(0, this->width_));
+    INFO("Delta: " << delta_);
+    shfl_up<<<this->grid_.grid_dim_, this->grid_.block_dim_>>>(arr_dev, delta_, this->width_);
+  }
+
+  void validate(const T* const arr) {
+    ArrayAllOf(arr, this->grid_.thread_count_, [this](unsigned int i) -> T {
+      const int rank_in_partition = this->grid_.thread_rank_in_block(i).value() % this->width_;
+      const int target = rank_in_partition - delta_;
+      return (target < 0 ? i : i - delta_) % 32;
+    });
+  };
 
  private:
+  unsigned int delta_;
 };
 
-TEST_CASE("Blahem") {
-  Bar<int> b;
-  b.run();
+TEMPLATE_TEST_CASE("ShflUp", "", int, float) { ShflUp<TestType>().run(); }
+
+
+template <typename T>
+__global__ void shfl_down(T* const out, const unsigned int delta, const int width) {
+  const auto grid = cg::this_grid();
+  T var = static_cast<T>(grid.thread_rank() % 32);
+  out[grid.thread_rank()] = __shfl_down(var, delta, width);
 }
+
+template <typename T> class ShflDown : public Foo<ShflDown<T>, T> {
+ public:
+  void launch_kernel(T* const arr_dev) {
+    delta_ = GENERATE_COPY(range(0, this->width_));
+    INFO("Delta: " << delta_);
+    shfl_down<<<this->grid_.grid_dim_, this->grid_.block_dim_>>>(arr_dev, delta_, this->width_);
+  }
+
+  void validate(const T* const arr) {
+    ArrayAllOf(arr, this->grid_.thread_count_, [this](unsigned int i) -> std::optional<T> {
+      const int rank_in_block = this->grid_.thread_rank_in_block(i).value();
+      if (rank_in_block + this->width_ >= this->grid_.threads_in_block_count_) {
+        return std::nullopt;
+      }
+
+      const int rank_in_partition = rank_in_block % this->width_;
+      const int target = rank_in_partition + delta_;
+      return (target >= this->width_ ? i : i + delta_) % 32;
+    });
+  };
+
+ private:
+  unsigned int delta_;
+};
+
+TEMPLATE_TEST_CASE("ShflDown", "", int, float) { ShflDown<TestType>().run(); }
+
+
+template <typename T> __global__ void shfl_xor(T* const out, const int lane_mask, const int width) {
+  const auto grid = cg::this_grid();
+  T var = static_cast<T>(grid.thread_rank() % 32);
+  out[grid.thread_rank()] = __shfl_xor(var, lane_mask, width);
+}
+
+template <typename T> class ShflXor : public Foo<ShflXor<T>, T> {
+ public:
+  void launch_kernel(T* const arr_dev) {
+    // TODO Reconsider how mask is generated
+    lane_mask_ = GENERATE_COPY(range(0, this->width_));
+    INFO("Lane mask: " << lane_mask_);
+    shfl_xor<<<this->grid_.grid_dim_, this->grid_.block_dim_>>>(arr_dev, delta_, this->width_);
+  }
+
+  void validate(const T* const arr) {
+    ArrayAllOf(arr, this->grid_.thread_count_, [this](unsigned int i) -> std::optional<T> {
+      const auto rank_in_block = this->grid_.thread_rank_in_block(i).value();
+      const auto rank_in_partition = rank_in_block % this->width_;
+      const int target_offset = rank_in_partition ^ lane_mask_ - rank_in_partition;
+    });
+  };
+
+ private:
+  int lane_mask_;
+};
+
+TEMPLATE_TEST_CASE("ShflXor", "", int, float) { ShflXor<TestType>().run(); }

@@ -33,14 +33,11 @@ template <typename Derived, typename T> class Foo {
 
   void run() {
     const auto blocks = GenerateBlockDimensionsForShuffle();
-    // const auto blocks = dim3(2, 1, 1);
     INFO("Grid dimensions: x " << blocks.x << ", y " << blocks.y << ", z " << blocks.z);
     const auto threads = GenerateThreadDimensionsForShuffle();
-    // const auto threads = dim3(40);
     INFO("Block dimensions: x " << threads.x << ", y " << threads.y << ", z " << threads.z);
     grid_ = CPUGrid(blocks, threads);
     width_ = generate_width();
-    // width_ = 4;
     INFO("Width: " << width_);
 
     const auto alloc_size = grid_.thread_count_ * sizeof(T);
@@ -152,42 +149,83 @@ template <typename T> class ShflDown : public Foo<ShflDown<T>, T> {
 TEMPLATE_TEST_CASE("ShflDown", "", int, float) { ShflDown<TestType>().run(); }
 
 
-template <typename T>
-__global__ void shfl(T* const out, const uint8_t* const src_lanes, const int width) {
+template <typename T> __global__ void shfl_xor(T* const out, const int lane_mask, const int width) {
   const auto grid = cg::this_grid();
   T var = static_cast<T>(grid.thread_rank() % 32);
-  out[grid.thread_rank()] = __shfl(var, src_lanes[cg::this_thread_block() % width], width);
+  out[grid.thread_rank()] = __shfl_xor(var, lane_mask, width);
 }
 
-template <typename T> class Shfl : public Foo<Shfl<T>, T> {
+template <typename T> class ShflXOR : public Foo<ShflXOR<T>, T> {
  public:
   void launch_kernel(T* const arr_dev) {
-    // TODO Reconsider how mask is generated
     lane_mask_ = GENERATE_COPY(range(0, this->warp_size_));
-    // lane_mask_ = 1;
-    // std::cout << "Lane mask: " << lane_mask_ << std::endl;
     INFO("Lane mask: " << lane_mask_);
     shfl_xor<<<this->grid_.grid_dim_, this->grid_.block_dim_>>>(arr_dev, lane_mask_, this->width_);
   }
 
   void validate(const T* const arr) {
     ArrayAllOf(arr, this->grid_.thread_count_, [this](unsigned int i) -> std::optional<T> {
-      const auto rank_in_warp = this->grid_.thread_rank_in_block(i).value() % this->warp_size_;
+      const auto rank_in_block = this->grid_.thread_rank_in_block(i).value();
+      const auto rank_in_warp = rank_in_block % this->warp_size_;
       const int warp_target = rank_in_warp ^ this->lane_mask_;
-      const auto target = i + warp_target - rank_in_warp;
+      const int target_offset = warp_target - rank_in_warp;
 
-      if (target >= this->grid_.threads_in_block_count_) {
+      if (rank_in_block + target_offset >= this->grid_.threads_in_block_count_) {
         return std::nullopt;
       }
 
       const auto target_partition = warp_target / this->width_;
       const auto partition_rank = rank_in_warp / this->width_;
-      return (target_partition > partition_rank ? i : target) % 32;
+      return (target_partition > partition_rank ? i : i + target_offset) % 32;
     });
   };
 
  private:
   int lane_mask_;
+};
+
+TEMPLATE_TEST_CASE("ShflXOR", "", int, float) { ShflXOR<TestType>().run(); }
+
+
+template <typename T>
+__global__ void shfl(T* const out, const uint8_t* const src_lanes, const int width) {
+  const auto grid = cg::this_grid();
+  const auto block = cg::this_thread_block();
+  T var = static_cast<T>(grid.thread_rank() % 32);
+  out[grid.thread_rank()] = __shfl(var, src_lanes[block.thread_rank() % width], width);
+}
+
+template <typename T> class Shfl : public Foo<Shfl<T>, T> {
+ public:
+  void launch_kernel(T* const arr_dev) {
+    const auto alloc_size = this->width_ * sizeof(uint8_t);
+    LinearAllocGuard<uint8_t> src_lanes_dev(LinearAllocs::hipMalloc, alloc_size);
+    src_lanes_.resize(this->width_);
+    // TODO generate lanes
+    std::iota(src_lanes_.begin(), src_lanes_.end(), 5);
+
+    HIP_CHECK(hipMemcpy(src_lanes_dev.ptr(), src_lanes_.data(), alloc_size, hipMemcpyHostToDevice));
+    shfl<<<this->grid_.grid_dim_, this->grid_.block_dim_>>>(arr_dev, src_lanes_dev.ptr(),
+                                                            this->width_);
+  }
+
+  void validate(const T* const arr) {
+    ArrayAllOf(arr, this->grid_.thread_count_, [this](unsigned int i) -> std::optional<T> {
+      const auto rank_in_block = this->grid_.thread_rank_in_block(i).value();
+      const auto rank_in_partition = rank_in_block % this->width_;
+      const int src_lane = src_lanes_[rank_in_partition] % this->width_;
+      const int src_offset = src_lane - rank_in_partition;
+
+      if (rank_in_block + src_offset >= this->grid_.threads_in_block_count_) {
+        return std::nullopt;
+      }
+
+      return (i + src_offset) % 32;
+    });
+  };
+
+ private:
+  std::vector<uint8_t> src_lanes_;
 };
 
 TEMPLATE_TEST_CASE("Shfl", "", int, float) { Shfl<TestType>().run(); }

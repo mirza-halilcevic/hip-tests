@@ -44,10 +44,17 @@ template <typename Derived, typename T> class Foo {
     LinearAllocGuard<T> arr_dev(LinearAllocs::hipMalloc, alloc_size);
     LinearAllocGuard<T> arr(LinearAllocs::hipHostMalloc, alloc_size);
 
-    // Allocate active mask array on host and device
-    // Generate active masks
+    const auto warps_in_block = (grid_.threads_in_block_count_ + kWarpSize - 1) / kWarpSize;
+    const auto warps_in_grid = warps_in_block * grid_.block_count_;
+    LinearAllocGuard<uint64_t> active_masks_dev(LinearAllocs::hipMalloc,
+                                                warps_in_grid * sizeof(uint64_t));
+    active_masks_.resize(warps_in_grid);
+    // TODO Generate active masks
+    std::iota(active_masks_.begin(), active_masks_.end(), 0xAAAAAAAAu);
 
-    cast_to_derived().launch_kernel(arr_dev.ptr());
+    HIP_CHECK(hipMemcpy(active_masks_dev.ptr(), active_masks_.data(),
+                        warps_in_grid * sizeof(uint64_t), hipMemcpyHostToDevice));
+    cast_to_derived().launch_kernel(arr_dev.ptr(), active_masks_dev.ptr());
     HIP_CHECK(hipGetLastError());
     HIP_CHECK(hipMemcpy(arr.ptr(), arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
@@ -80,12 +87,14 @@ template <typename Derived, typename T> class Foo {
   const int warp_size_;
   CPUGrid grid_;
   int width_;
+  std::vector<uint64_t> active_masks_;
 };
 
 namespace cg = cooperative_groups;
 
 template <typename T>
-__global__ void shfl_up(T* const out, const unsigned int delta, const int width) {
+__global__ void shfl_up(T* const out, const uint64_t* const active_masks, const unsigned int delta,
+                        const int width) {
   const auto grid = cg::this_grid();
   T var = static_cast<T>(grid.thread_rank() % 32);
   out[grid.thread_rank()] = __shfl_up(var, delta, width);
@@ -93,10 +102,11 @@ __global__ void shfl_up(T* const out, const unsigned int delta, const int width)
 
 template <typename T> class ShflUp : public Foo<ShflUp<T>, T> {
  public:
-  void launch_kernel(T* const arr_dev) {
+  void launch_kernel(T* const arr_dev, const uint64_t* const active_masks) {
     delta_ = GENERATE_COPY(range(0, this->width_));
     INFO("Delta: " << delta_);
-    shfl_up<<<this->grid_.grid_dim_, this->grid_.block_dim_>>>(arr_dev, delta_, this->width_);
+    shfl_up<<<this->grid_.grid_dim_, this->grid_.block_dim_>>>(arr_dev, active_masks, delta_,
+                                                               this->width_);
   }
 
   void validate(const T* const arr) {
@@ -115,7 +125,8 @@ TEMPLATE_TEST_CASE("ShflUp", "", int, float) { ShflUp<TestType>().run(); }
 
 
 template <typename T>
-__global__ void shfl_down(T* const out, const unsigned int delta, const int width) {
+__global__ void shfl_down(T* const out, const uint64_t* const active_masks,
+                          const unsigned int delta, const int width) {
   const auto grid = cg::this_grid();
   T var = static_cast<T>(grid.thread_rank() % 32);
   out[grid.thread_rank()] = __shfl_down(var, delta, width);
@@ -123,16 +134,17 @@ __global__ void shfl_down(T* const out, const unsigned int delta, const int widt
 
 template <typename T> class ShflDown : public Foo<ShflDown<T>, T> {
  public:
-  void launch_kernel(T* const arr_dev) {
+  void launch_kernel(T* const arr_dev, const uint64_t* const active_masks) {
     delta_ = GENERATE_COPY(range(0, this->width_));
     INFO("Delta: " << delta_);
-    shfl_down<<<this->grid_.grid_dim_, this->grid_.block_dim_>>>(arr_dev, delta_, this->width_);
+    shfl_down<<<this->grid_.grid_dim_, this->grid_.block_dim_>>>(arr_dev, active_masks, delta_,
+                                                                 this->width_);
   }
 
   void validate(const T* const arr) {
     ArrayAllOf(arr, this->grid_.thread_count_, [this](unsigned int i) -> std::optional<T> {
       const int rank_in_block = this->grid_.thread_rank_in_block(i).value();
-      if (rank_in_block + this->width_ >= this->grid_.threads_in_block_count_) {
+      if (rank_in_block + delta_ >= this->grid_.threads_in_block_count_) {
         return std::nullopt;
       }
 
@@ -149,7 +161,9 @@ template <typename T> class ShflDown : public Foo<ShflDown<T>, T> {
 TEMPLATE_TEST_CASE("ShflDown", "", int, float) { ShflDown<TestType>().run(); }
 
 
-template <typename T> __global__ void shfl_xor(T* const out, const int lane_mask, const int width) {
+template <typename T>
+__global__ void shfl_xor(T* const out, const uint64_t* const active_masks, const int lane_mask,
+                         const int width) {
   const auto grid = cg::this_grid();
   T var = static_cast<T>(grid.thread_rank() % 32);
   out[grid.thread_rank()] = __shfl_xor(var, lane_mask, width);
@@ -157,10 +171,11 @@ template <typename T> __global__ void shfl_xor(T* const out, const int lane_mask
 
 template <typename T> class ShflXOR : public Foo<ShflXOR<T>, T> {
  public:
-  void launch_kernel(T* const arr_dev) {
+  void launch_kernel(T* const arr_dev, const uint64_t* const active_masks) {
     lane_mask_ = GENERATE_COPY(range(0, this->warp_size_));
     INFO("Lane mask: " << lane_mask_);
-    shfl_xor<<<this->grid_.grid_dim_, this->grid_.block_dim_>>>(arr_dev, lane_mask_, this->width_);
+    shfl_xor<<<this->grid_.grid_dim_, this->grid_.block_dim_>>>(arr_dev, active_masks, lane_mask_,
+                                                                this->width_);
   }
 
   void validate(const T* const arr) {
@@ -188,7 +203,8 @@ TEMPLATE_TEST_CASE("ShflXOR", "", int, float) { ShflXOR<TestType>().run(); }
 
 
 template <typename T>
-__global__ void shfl(T* const out, const uint8_t* const src_lanes, const int width) {
+__global__ void shfl(T* const out, const uint64_t* const active_masks,
+                     const uint8_t* const src_lanes, const int width) {
   const auto grid = cg::this_grid();
   const auto block = cg::this_thread_block();
   T var = static_cast<T>(grid.thread_rank() % 32);
@@ -197,7 +213,7 @@ __global__ void shfl(T* const out, const uint8_t* const src_lanes, const int wid
 
 template <typename T> class Shfl : public Foo<Shfl<T>, T> {
  public:
-  void launch_kernel(T* const arr_dev) {
+  void launch_kernel(T* const arr_dev, const uint64_t* const active_masks) {
     const auto alloc_size = this->width_ * sizeof(uint8_t);
     LinearAllocGuard<uint8_t> src_lanes_dev(LinearAllocs::hipMalloc, alloc_size);
     src_lanes_.resize(this->width_);
@@ -205,8 +221,8 @@ template <typename T> class Shfl : public Foo<Shfl<T>, T> {
     std::iota(src_lanes_.begin(), src_lanes_.end(), 5);
 
     HIP_CHECK(hipMemcpy(src_lanes_dev.ptr(), src_lanes_.data(), alloc_size, hipMemcpyHostToDevice));
-    shfl<<<this->grid_.grid_dim_, this->grid_.block_dim_>>>(arr_dev, src_lanes_dev.ptr(),
-                                                            this->width_);
+    shfl<<<this->grid_.grid_dim_, this->grid_.block_dim_>>>(arr_dev, active_masks,
+                                                            src_lanes_dev.ptr(), this->width_);
   }
 
   void validate(const T* const arr) {

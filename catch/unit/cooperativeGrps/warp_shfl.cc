@@ -27,6 +27,18 @@ THE SOFTWARE.
 #include <hip/hip_cooperative_groups.h>
 #include <resource_guards.hh>
 
+namespace cg = cooperative_groups;
+
+__device__ bool deactivate_thread(const uint64_t* const active_masks) {
+  const auto warp = cg::tiled_partition(cg::this_thread_block(), warpSize);
+  const auto block = cg::this_thread_block();
+  const auto warps_per_block = (block.size() + warpSize - 1) / warpSize;
+  const auto block_rank = (blockIdx.z * gridDim.y + blockIdx.y) * gridDim.x + blockIdx.x;
+  const auto idx = block_rank * warps_per_block + block.thread_rank() / warpSize;
+
+  return !(active_masks[idx] & (1u << warp.thread_rank()));
+}
+
 template <typename Derived, typename T> class Foo {
  public:
   Foo() : warp_size_{get_warp_size()} {}
@@ -44,8 +56,8 @@ template <typename Derived, typename T> class Foo {
     LinearAllocGuard<T> arr_dev(LinearAllocs::hipMalloc, alloc_size);
     LinearAllocGuard<T> arr(LinearAllocs::hipHostMalloc, alloc_size);
 
-    const auto warps_in_block = (grid_.threads_in_block_count_ + kWarpSize - 1) / kWarpSize;
-    const auto warps_in_grid = warps_in_block * grid_.block_count_;
+    warps_in_block_ = (grid_.threads_in_block_count_ + kWarpSize - 1) / kWarpSize;
+    const auto warps_in_grid = warps_in_block_ * grid_.block_count_;
     LinearAllocGuard<uint64_t> active_masks_dev(LinearAllocs::hipMalloc,
                                                 warps_in_grid * sizeof(uint64_t));
     active_masks_.resize(warps_in_grid);
@@ -86,6 +98,7 @@ template <typename Derived, typename T> class Foo {
  protected:
   const int warp_size_;
   CPUGrid grid_;
+  unsigned int warps_in_block_;
   int width_;
   std::vector<uint64_t> active_masks_;
 };
@@ -95,6 +108,10 @@ namespace cg = cooperative_groups;
 template <typename T>
 __global__ void shfl_up(T* const out, const uint64_t* const active_masks, const unsigned int delta,
                         const int width) {
+  if (deactivate_thread(active_masks)) {
+    return;
+  }
+
   const auto grid = cg::this_grid();
   T var = static_cast<T>(grid.thread_rank() % 32);
   out[grid.thread_rank()] = __shfl_up(var, delta, width);
@@ -110,9 +127,19 @@ template <typename T> class ShflUp : public Foo<ShflUp<T>, T> {
   }
 
   void validate(const T* const arr) {
-    ArrayAllOf(arr, this->grid_.thread_count_, [this](unsigned int i) -> T {
-      const int rank_in_partition = this->grid_.thread_rank_in_block(i).value() % this->width_;
-      const int target = rank_in_partition - delta_;
+    ArrayAllOf(arr, this->grid_.thread_count_, [this](unsigned int i) -> std::optional<T> {
+      const auto rank_in_block = this->grid_.thread_rank_in_block(i).value();
+      const auto rank_in_warp = rank_in_block % 32;
+      const auto mask_idx = this->warps_in_block_ * (i / this->grid_.threads_in_block_count_) +
+          rank_in_block / this->warp_size_;
+      const std::bitset<sizeof(uint64_t) * 8> active_mask(this->active_masks_[mask_idx]);
+
+      const int target = rank_in_block % this->width_ - delta_;
+      if (!active_mask.test(rank_in_warp) ||
+          (target >= 0 && !active_mask.test(rank_in_warp - delta_))) {
+        return std::nullopt;
+      }
+
       return (target < 0 ? i : i - delta_) % 32;
     });
   };

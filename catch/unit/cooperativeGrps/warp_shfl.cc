@@ -36,7 +36,7 @@ __device__ bool deactivate_thread(const uint64_t* const active_masks) {
   const auto block_rank = (blockIdx.z * gridDim.y + blockIdx.y) * gridDim.x + blockIdx.x;
   const auto idx = block_rank * warps_per_block + block.thread_rank() / warpSize;
 
-  return !(active_masks[idx] & (1u << warp.thread_rank()));
+  return !(active_masks[idx] & (static_cast<uint64_t>(1) << warp.thread_rank()));
 }
 
 static inline std::mt19937& GetRandomGenerator() {
@@ -72,7 +72,7 @@ template <typename Derived, typename T> class Foo {
                                                 warps_in_grid * sizeof(uint64_t));
     active_masks_.resize(warps_in_grid);
     std::generate(active_masks_.begin(), active_masks_.end(),
-                [] { return GenerateRandomInteger(0u, std::numeric_limits<uint32_t>().max()); });
+                  [] { return GenerateRandomInteger(0ul, std::numeric_limits<uint64_t>().max()); });
 
     HIP_CHECK(hipMemcpy(active_masks_dev.ptr(), active_masks_.data(),
                         warps_in_grid * sizeof(uint64_t), hipMemcpyHostToDevice));
@@ -158,7 +158,20 @@ template <typename T> class ShflUp : public Foo<ShflUp<T>, T> {
   unsigned int delta_;
 };
 
-TEMPLATE_TEST_CASE("ShflUp", "", int) { ShflUp<TestType>().run(); }
+TEMPLATE_TEST_CASE("ShflUp", "", int, unsigned int, long, unsigned long, long long,
+                   unsigned long long, float, double) {
+  int device;
+  hipDeviceProp_t device_properties;
+  HIP_CHECK(hipGetDevice(&device));
+  HIP_CHECK(hipGetDeviceProperties(&device_properties, device));
+
+  if (!device_properties.arch.hasWarpShuffle) {
+    HipTest::HIP_SKIP_TEST("Device doesn't support Warp Shuffle!");
+    return;
+  }
+
+  ShflUp<TestType>().run();
+}
 
 
 template <typename T>
@@ -206,7 +219,20 @@ template <typename T> class ShflDown : public Foo<ShflDown<T>, T> {
   unsigned int delta_;
 };
 
-TEMPLATE_TEST_CASE("ShflDown", "", int, float) { ShflDown<TestType>().run(); }
+TEMPLATE_TEST_CASE("ShflDown", "", int, unsigned int, long, unsigned long, long long,
+                   unsigned long long, float, double) {
+  int device;
+  hipDeviceProp_t device_properties;
+  HIP_CHECK(hipGetDevice(&device));
+  HIP_CHECK(hipGetDeviceProperties(&device_properties, device));
+
+  if (!device_properties.arch.hasWarpShuffle) {
+    HipTest::HIP_SKIP_TEST("Device doesn't support Warp Shuffle!");
+    return;
+  }
+
+  ShflDown<TestType>().run();
+}
 
 
 template <typename T>
@@ -256,7 +282,20 @@ template <typename T> class ShflXOR : public Foo<ShflXOR<T>, T> {
   int lane_mask_;
 };
 
-TEMPLATE_TEST_CASE("ShflXOR", "", int, float) { ShflXOR<TestType>().run(); }
+TEMPLATE_TEST_CASE("ShflXOR", "", int, unsigned int, long, unsigned long, long long,
+                   unsigned long long, float, double) {
+  int device;
+  hipDeviceProp_t device_properties;
+  HIP_CHECK(hipGetDevice(&device));
+  HIP_CHECK(hipGetDeviceProperties(&device_properties, device));
+
+  if (!device_properties.arch.hasWarpShuffle) {
+    HipTest::HIP_SKIP_TEST("Device doesn't support Warp Shuffle!");
+    return;
+  }
+
+  ShflXOR<TestType>().run();
+}
 
 
 template <typename T>
@@ -278,7 +317,7 @@ template <typename T> class Shfl : public Foo<Shfl<T>, T> {
     LinearAllocGuard<uint8_t> src_lanes_dev(LinearAllocs::hipMalloc, alloc_size);
     src_lanes_.resize(this->width_);
     std::generate(src_lanes_.begin(), src_lanes_.end(),
-                [this] { return GenerateRandomInteger(0, static_cast<int>(2 * this->width_)); });
+                  [this] { return GenerateRandomInteger(0, static_cast<int>(2 * this->width_)); });
 
     HIP_CHECK(hipMemcpy(src_lanes_dev.ptr(), src_lanes_.data(), alloc_size, hipMemcpyHostToDevice));
     shfl<<<this->grid_.grid_dim_, this->grid_.block_dim_>>>(arr_dev, active_masks,
@@ -297,7 +336,8 @@ template <typename T> class Shfl : public Foo<Shfl<T>, T> {
           rank_in_block / this->warp_size_;
       const std::bitset<sizeof(uint64_t) * 8> active_mask(this->active_masks_[mask_idx]);
 
-      if (!active_mask.test(rank_in_warp) || (!active_mask.test((rank_in_warp + src_offset) % this->warp_size_)) ||
+      if (!active_mask.test(rank_in_warp) ||
+          (!active_mask.test((rank_in_warp + src_offset) % this->warp_size_)) ||
           (rank_in_block + src_offset >= this->grid_.threads_in_block_count_)) {
         return std::nullopt;
       }
@@ -310,4 +350,17 @@ template <typename T> class Shfl : public Foo<Shfl<T>, T> {
   std::vector<uint8_t> src_lanes_;
 };
 
-TEMPLATE_TEST_CASE("Shfl", "", int, float) { Shfl<TestType>().run(); }
+TEMPLATE_TEST_CASE("Shfl", "", int, unsigned int, long, unsigned long, long long,
+                   unsigned long long, float, double) {
+  int device;
+  hipDeviceProp_t device_properties;
+  HIP_CHECK(hipGetDevice(&device));
+  HIP_CHECK(hipGetDeviceProperties(&device_properties, device));
+
+  if (!device_properties.arch.hasWarpShuffle) {
+    HipTest::HIP_SKIP_TEST("Device doesn't support Warp Shuffle!");
+    return;
+  }
+
+  Shfl<TestType>().run();
+}

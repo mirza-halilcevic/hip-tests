@@ -19,10 +19,13 @@ THE SOFTWARE.
 
 #pragma once
 
+#include "cpu_grid.h"
+
 #include <optional>
 
 #include <hip_test_common.hh>
 #include <hip/hip_cooperative_groups.h>
+#include <resource_guards.hh>
 
 namespace {
 #if HT_AMD
@@ -103,6 +106,26 @@ static __device__ void busy_wait(unsigned long long wait_period) {
   }
 }
 
+static __device__ bool deactivate_thread(const uint64_t* const active_masks) {
+  const auto warp = cooperative_groups::tiled_partition(cooperative_groups::this_thread_block(), warpSize);
+  const auto block = cooperative_groups::this_thread_block();
+  const auto warps_per_block = (block.size() + warpSize - 1) / warpSize;
+  const auto block_rank = (blockIdx.z * gridDim.y + blockIdx.y) * gridDim.x + blockIdx.x;
+  const auto idx = block_rank * warps_per_block + block.thread_rank() / warpSize;
+
+  return !(active_masks[idx] & (static_cast<uint64_t>(1) << warp.thread_rank()));
+}
+
+static inline std::mt19937& GetRandomGenerator() {
+  static std::mt19937 mt(11);
+  return mt;
+}
+
+template <typename T> static inline T GenerateRandomInteger(const T min, const T max) {
+  std::uniform_int_distribution<T> dist(min, max);
+  return dist(GetRandomGenerator());
+}
+
 inline dim3 GenerateThreadDimensions() {
   hipDeviceProp_t props;
   HIP_CHECK(hipGetDeviceProperties(&props, 0));
@@ -111,17 +134,17 @@ inline dim3 GenerateThreadDimensions() {
   return GENERATE_COPY(
       dim3(1, 1, 1), dim3(props.maxThreadsDim[0], 1, 1), dim3(1, props.maxThreadsDim[1], 1),
       dim3(1, 1, props.maxThreadsDim[2]),
-      map([max = props.maxThreadsDim[0]](
-              double i) { return dim3(std::min(static_cast<int>(i * kWarpSize), max), 1, 1); },
+      map([max = props.maxThreadsDim[0], warp_size = props.warpSize](
+              double i) { return dim3(std::min(static_cast<int>(i * warp_size), max), 1, 1); },
           values(multipliers)),
-      map([max = props.maxThreadsDim[1]](
-              double i) { return dim3(1, std::min(static_cast<int>(i * kWarpSize), max), 1); },
+      map([max = props.maxThreadsDim[1], warp_size = props.warpSize](
+              double i) { return dim3(1, std::min(static_cast<int>(i * warp_size), max), 1); },
           values(multipliers)),
-      map([max = props.maxThreadsDim[2]](
-              double i) { return dim3(1, 1, std::min(static_cast<int>(i * kWarpSize), max)); },
+      map([max = props.maxThreadsDim[2], warp_size = props.warpSize](
+              double i) { return dim3(1, 1, std::min(static_cast<int>(i * warp_size), max)); },
           values(multipliers)),
-      dim3(16, 8, 8), dim3(32, 32, 1), dim3(64, 8, 2), dim3(16, 16, 3), dim3(kWarpSize - 1, 3, 3),
-      dim3(kWarpSize + 1, 3, 3));
+      dim3(16, 8, 8), dim3(32, 32, 1), dim3(64, 8, 2), dim3(16, 16, 3), dim3(props.warpSize - 1, 3, 3),
+      dim3(props.warpSize + 1, 3, 3));
 }
 
 inline dim3 GenerateBlockDimensions() {
@@ -148,17 +171,17 @@ inline dim3 GenerateThreadDimensionsForShuffle() {
   return GENERATE_COPY(
       dim3(1, 1, 1), dim3(props.maxThreadsDim[0], 1, 1), dim3(1, props.maxThreadsDim[1], 1),
       dim3(1, 1, props.maxThreadsDim[2]),
-      map([max = props.maxThreadsDim[0]](
-              double i) { return dim3(std::min(static_cast<int>(i * kWarpSize), max), 1, 1); },
+      map([max = props.maxThreadsDim[0], warp_size = props.warpSize](
+              double i) { return dim3(std::min(static_cast<int>(i * warp_size), max), 1, 1); },
           values(multipliers)),
-      map([max = props.maxThreadsDim[1]](
-              double i) { return dim3(1, std::min(static_cast<int>(i * kWarpSize), max), 1); },
+      map([max = props.maxThreadsDim[1], warp_size = props.warpSize](
+              double i) { return dim3(1, std::min(static_cast<int>(i * warp_size), max), 1); },
           values(multipliers)),
-      map([max = props.maxThreadsDim[2]](
-              double i) { return dim3(1, 1, std::min(static_cast<int>(i * kWarpSize), max)); },
+      map([max = props.maxThreadsDim[2], warp_size = props.warpSize](
+              double i) { return dim3(1, 1, std::min(static_cast<int>(i * warp_size), max)); },
           values(multipliers)),
-      dim3(16, 8, 8), dim3(32, 32, 1), dim3(64, 8, 2), dim3(16, 16, 3), dim3(kWarpSize - 1, 3, 3),
-      dim3(kWarpSize + 1, 3, 3));
+      dim3(16, 8, 8), dim3(32, 32, 1), dim3(64, 8, 2), dim3(16, 16, 3), dim3(props.warpSize - 1, 3, 3),
+      dim3(props.warpSize + 1, 3, 3));
 }
 
 inline dim3 GenerateBlockDimensionsForShuffle() {
@@ -177,3 +200,54 @@ inline dim3 GenerateBlockDimensionsForShuffle() {
                            values(multipliers)),
                        dim3(5, 5, 5));
 }
+
+template <typename Derived, typename T> class WarpTest {
+ public:
+  WarpTest() : warp_size_{get_warp_size()} {}
+
+  void run() {
+    const auto blocks = GenerateBlockDimensionsForShuffle();
+    INFO("Grid dimensions: x " << blocks.x << ", y " << blocks.y << ", z " << blocks.z);
+    const auto threads = GenerateThreadDimensionsForShuffle();
+    INFO("Block dimensions: x " << threads.x << ", y " << threads.y << ", z " << threads.z);
+    grid_ = CPUGrid(blocks, threads);
+
+    const auto alloc_size = grid_.thread_count_ * sizeof(T);
+    LinearAllocGuard<T> arr_dev(LinearAllocs::hipMalloc, alloc_size);
+    LinearAllocGuard<T> arr(LinearAllocs::hipHostMalloc, alloc_size);
+
+    warps_in_block_ = (grid_.threads_in_block_count_ + warp_size_ - 1) / warp_size_;
+    const auto warps_in_grid = warps_in_block_ * grid_.block_count_;
+    LinearAllocGuard<uint64_t> active_masks_dev(LinearAllocs::hipMalloc,
+                                                warps_in_grid * sizeof(uint64_t));
+    active_masks_.resize(warps_in_grid);
+    std::generate(active_masks_.begin(), active_masks_.end(),
+                  [] { return GenerateRandomInteger(0ul, std::numeric_limits<uint64_t>().max()); });
+
+    HIP_CHECK(hipMemcpy(active_masks_dev.ptr(), active_masks_.data(),
+                        warps_in_grid * sizeof(uint64_t), hipMemcpyHostToDevice));
+    cast_to_derived().launch_kernel(arr_dev.ptr(), active_masks_dev.ptr());
+    HIP_CHECK(hipGetLastError());
+    HIP_CHECK(hipMemcpy(arr.ptr(), arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
+
+    cast_to_derived().validate(arr.ptr());
+  }
+
+ private:
+  int get_warp_size() const {
+    int current_dev = -1;
+    HIP_CHECK(hipGetDevice(&current_dev));
+    int warp_size = 0u;
+    HIP_CHECK(hipDeviceGetAttribute(&warp_size, hipDeviceAttributeWarpSize, 0));
+    return warp_size;
+  }
+
+  Derived& cast_to_derived() { return reinterpret_cast<Derived&>(*this); }
+
+ protected:
+  const int warp_size_;
+  CPUGrid grid_;
+  unsigned int warps_in_block_;
+  std::vector<uint64_t> active_masks_;
+};

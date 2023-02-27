@@ -18,23 +18,33 @@ THE SOFTWARE.
 */
 
 #include "cooperative_groups_common.hh"
-#include "cpu_grid.h"
 
 #include <bitset>
-#include <array>
 
 #include <hip_test_common.hh>
 #include <hip/hip_cooperative_groups.h>
-#include <resource_guards.hh>
 
-static inline std::mt19937& GetRandomGenerator() {
-  static std::mt19937 mt(11);
-  return mt;
-}
-
-template <typename T> static inline T GenerateRandomInteger(const T min, const T max) {
-  std::uniform_int_distribution<T> dist(min, max);
-  return dist(GetRandomGenerator());
+static  uint64_t get_predicate_mask(unsigned int test_case, unsigned int warp_size) {
+  uint64_t predicate_mask = 0;
+  switch (test_case) {
+    case 0:  // no thread
+      predicate_mask = 0;
+      break;
+    case 1:  // 1st thread
+      predicate_mask = 1;
+      break;
+    case 2:  // last thread
+      predicate_mask = static_cast<uint64_t>(1) << (warp_size - 1);
+      break;
+    case 3:  // all threads
+      predicate_mask = 0xFFFFFFFFFFFFFFFF;
+      break;
+    default:  // random
+      static std::mt19937_64 mt(test_case);
+      std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
+      predicate_mask = dist(mt);
+  }
+  return predicate_mask;
 }
 
 static uint64_t get_active_predicate(uint64_t predicate, size_t partition_size) {
@@ -55,124 +65,58 @@ static bool check_if_all(uint64_t predicate_mask, uint64_t active_mask, size_t p
   return true;
 }
 
-template <typename Derived> class WarpVote {
- public:
-  WarpVote() : warp_size_{get_warp_size()} {}
-
-  void run() {
-    const auto blocks = GenerateBlockDimensions();
-    INFO("Grid dimensions: x " << blocks.x << ", y " << blocks.y << ", z " << blocks.z);
-    const auto threads = GenerateThreadDimensions();
-    INFO("Block dimensions: x " << threads.x << ", y " << threads.y << ", z " << threads.z);
-    grid_ = CPUGrid(blocks, threads);
-
-    auto test_case = GENERATE(range(0, 5));
-    predicate_mask_ = get_predicate_mask(test_case);
-    INFO("Predicate mask: " << predicate_mask_);
-
-    warps_in_block_ = (grid_.threads_in_block_count_ + warp_size_ - 1) / warp_size_;
-    warps_in_grid_ = warps_in_block_ * grid_.block_count_;
-    const auto alloc_size = warps_in_grid_ * sizeof(uint64_t);
-
-    LinearAllocGuard<uint64_t> arr_dev(LinearAllocs::hipMalloc, alloc_size);
-    LinearAllocGuard<uint64_t> arr(LinearAllocs::hipHostMalloc, alloc_size);
-    HIP_CHECK(hipMemset(arr_dev.ptr(), 0, alloc_size));
-
-    LinearAllocGuard<uint64_t> active_masks_dev(LinearAllocs::hipMalloc, alloc_size);
-    active_masks_.resize(warps_in_grid_);
-    std::generate(active_masks_.begin(), active_masks_.end(),
-                  [] { return GenerateRandomInteger(0ul, std::numeric_limits<uint64_t>().max()); });
-
-    HIP_CHECK(
-        hipMemcpy(active_masks_dev.ptr(), active_masks_.data(), alloc_size, hipMemcpyHostToDevice));
-    cast_to_derived().launch_kernel(arr_dev.ptr(), active_masks_dev.ptr());
-    HIP_CHECK(hipGetLastError());
-    HIP_CHECK(hipMemcpy(arr.ptr(), arr_dev.ptr(), alloc_size, hipMemcpyDeviceToHost));
-    HIP_CHECK(hipDeviceSynchronize());
-
-    cast_to_derived().validate(arr.ptr());
-  }
-
- private:
-  int get_warp_size() const {
-    int current_dev = -1;
-    HIP_CHECK(hipGetDevice(&current_dev));
-    int warp_size = 0u;
-    HIP_CHECK(hipDeviceGetAttribute(&warp_size, hipDeviceAttributeWarpSize, 0));
-    return warp_size;
-  }
-
-  uint64_t get_predicate_mask(unsigned int test_case) const {
-    uint64_t predicate_mask = 0;
-    switch (test_case) {
-      case 0:  // no thread
-        predicate_mask = 0;
-        break;
-      case 1:  // 1st thread
-        predicate_mask = 1;
-        break;
-      case 2:  // last thread
-        predicate_mask = static_cast<uint64_t>(1) << (warp_size_ - 1);
-        break;
-      case 3:  // all threads
-        predicate_mask = 0xFFFFFFFFFFFFFFFF;
-        break;
-      default:  // random
-        static std::mt19937_64 mt(test_case);
-        std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
-        predicate_mask = dist(mt);
-    }
-    return predicate_mask;
-  }
-
-  Derived& cast_to_derived() { return reinterpret_cast<Derived&>(*this); }
-
- protected:
-  const int warp_size_;
-  CPUGrid grid_;
-  unsigned int warps_in_block_;
-  unsigned int warps_in_grid_;
-  std::vector<uint64_t> active_masks_;
-  uint64_t predicate_mask_;
-};
-
 namespace cg = cooperative_groups;
 
 __global__ void kernel_ballot(uint64_t* const out, const uint64_t* const active_masks,
                               uint64_t predicate) {
-  const auto warp = cg::tiled_partition(cg::this_thread_block(), warpSize);
-  const auto block = cg::this_thread_block();
-  const auto warps_per_block = (block.size() + warpSize - 1) / warpSize;
-  const auto block_rank = (blockIdx.z * gridDim.y + blockIdx.y) * gridDim.x + blockIdx.x;
-  const auto idx = block_rank * warps_per_block + block.thread_rank() / warpSize;
-
-  if (active_masks[idx] & (static_cast<uint64_t>(1) << warp.thread_rank())) {
-    out[idx] = __ballot((predicate & (static_cast<uint64_t>(1) << warp.thread_rank())));
+  if (deactivate_thread(active_masks)) {
+    return;
   }
+
+  const auto grid = cg::this_grid();
+  const auto warp = cg::tiled_partition(cg::this_thread_block(), warpSize);
+
+  out[grid.thread_rank()] = __ballot((predicate & (static_cast<uint64_t>(1) << warp.thread_rank())));
 }
 
-class WarpBallot : public WarpVote<WarpBallot> {
+class WarpBallot : public WarpTest<WarpBallot, uint64_t> {
  public:
   void launch_kernel(uint64_t* const arr_dev, const uint64_t* const active_masks) {
+    auto test_case = GENERATE(range(0, 5));
+    predicate_mask_ = get_predicate_mask(test_case, this->warp_size_);
+    INFO("Predicate mask: " << predicate_mask_);
     kernel_ballot<<<this->grid_.grid_dim_, this->grid_.block_dim_>>>(arr_dev, active_masks,
-                                                                     this->predicate_mask_);
+                                                                     predicate_mask_);
   }
 
   void validate(const uint64_t* const arr) {
-    ArrayAllOf(arr, this->warps_in_grid_, [this](unsigned int i) -> uint64_t {
-      const auto block_rank = i / this->warps_in_block_;
-      auto active_predicate = get_active_predicate(this->predicate_mask_, this->warp_size_);
-      if (i == this->warps_in_block_ * (block_rank + 1) - 1) {
-        auto partition_size =
+    ArrayAllOf(arr, this->grid_.thread_count_, [this](unsigned int i) -> std::optional<uint64_t> {
+      const auto rank_in_block = this->grid_.thread_rank_in_block(i).value();
+      const auto rank_in_warp = rank_in_block % this->warp_size_;
+      const auto warp_idx = this->warps_in_block_ * (i / this->grid_.threads_in_block_count_) +
+          rank_in_block / this->warp_size_;
+      const auto block_rank = warp_idx / this->warps_in_block_;
+      const std::bitset<sizeof(uint64_t) * 8> active_mask(this->active_masks_[warp_idx]);
+
+      auto partition_size = this->warp_size_;
+      if (warp_idx == this->warps_in_block_ * (block_rank + 1) - 1) {
+        partition_size =
             this->grid_.threads_in_block_count_ - (this->warps_in_block_ - 1) * this->warp_size_;
-        active_predicate = get_active_predicate(this->predicate_mask_, partition_size);
       }
-      return (active_predicate & this->active_masks_[i]);
+
+      if (!active_mask.test(rank_in_warp))
+        return std::nullopt;
+      else {
+        auto active_predicate = get_active_predicate(predicate_mask_, partition_size);
+        return (active_predicate & this->active_masks_[warp_idx]);
+      }
     });
   }
+ private:
+  uint64_t predicate_mask_;
 };
 
-TEST_CASE("Unit_Ballot") {
+TEST_CASE("Unit_Warp_Ballot_Positive_Basic") {
   int device;
   hipDeviceProp_t device_properties;
   HIP_CHECK(hipGetDevice(&device));
@@ -186,41 +130,56 @@ TEST_CASE("Unit_Ballot") {
   WarpBallot().run();
 }
 
-__global__ void kernel_any(uint64_t* const out, const uint64_t* const active_masks,
+__global__ void kernel_any(int* const out, const uint64_t* const active_masks,
                            uint64_t predicate) {
-  const auto warp = cg::tiled_partition(cg::this_thread_block(), warpSize);
-  const auto block = cg::this_thread_block();
-  const auto warps_per_block = (block.size() + warpSize - 1) / warpSize;
-  const auto block_rank = (blockIdx.z * gridDim.y + blockIdx.y) * gridDim.x + blockIdx.x;
-  const auto idx = block_rank * warps_per_block + block.thread_rank() / warpSize;
-
-  if (active_masks[idx] & (static_cast<uint64_t>(1) << warp.thread_rank())) {
-    out[idx] = __any((predicate & (static_cast<uint64_t>(1) << warp.thread_rank())));
+  if (deactivate_thread(active_masks)) {
+    return;
   }
+
+  const auto grid = cg::this_grid();
+  const auto warp = cg::tiled_partition(cg::this_thread_block(), warpSize);
+
+  out[grid.thread_rank()] = __any((predicate & (static_cast<uint64_t>(1) << warp.thread_rank())));
 }
 
-class WarpAny : public WarpVote<WarpAny> {
+class WarpAny : public WarpTest<WarpAny, int> {
  public:
-  void launch_kernel(uint64_t* const arr_dev, const uint64_t* const active_masks) {
+  void launch_kernel(int* const arr_dev, const uint64_t* const active_masks) {
+    auto test_case = GENERATE(range(0, 5));
+    predicate_mask_ = get_predicate_mask(test_case, this->warp_size_);
+    INFO("Predicate mask: " << predicate_mask_);
     kernel_any<<<this->grid_.grid_dim_, this->grid_.block_dim_>>>(arr_dev, active_masks,
-                                                                  this->predicate_mask_);
+                                                                  predicate_mask_);
   }
 
-  void validate(const uint64_t* const arr) {
-    ArrayAllOf(arr, this->warps_in_grid_, [this](unsigned int i) -> uint64_t {
-      const auto block_rank = i / this->warps_in_block_;
-      auto active_predicate = get_active_predicate(this->predicate_mask_, this->warp_size_);
-      if (i == this->warps_in_block_ * (block_rank + 1) - 1) {
-        auto partition_size =
+  void validate(const int* const arr) {
+    ArrayAllOf(arr, this->grid_.thread_count_, [this](unsigned int i) -> std::optional<int> {
+      const auto rank_in_block = this->grid_.thread_rank_in_block(i).value();
+      const auto rank_in_warp = rank_in_block % this->warp_size_;
+      const auto warp_idx = this->warps_in_block_ * (i / this->grid_.threads_in_block_count_) +
+          rank_in_block / this->warp_size_;
+      const auto block_rank = warp_idx / this->warps_in_block_;
+      const std::bitset<sizeof(uint64_t) * 8> active_mask(this->active_masks_[warp_idx]);
+
+      auto partition_size = this->warp_size_;
+      if (warp_idx == this->warps_in_block_ * (block_rank + 1) - 1) {
+        partition_size =
             this->grid_.threads_in_block_count_ - (this->warps_in_block_ - 1) * this->warp_size_;
-        active_predicate = get_active_predicate(this->predicate_mask_, partition_size);
       }
-      return ((active_predicate & this->active_masks_[i]) != 0);
+
+      if (!active_mask.test(rank_in_warp))
+        return std::nullopt;
+      else {
+        auto active_predicate = get_active_predicate(predicate_mask_, partition_size);
+        return ((active_predicate & this->active_masks_[warp_idx]) != 0);
+      }
     });
   }
+ private:
+  uint64_t predicate_mask_;
 };
 
-TEST_CASE("Unit_Any") {
+TEST_CASE("Unit_Warp_Vote_Any_Positive_Basic") {
   int device;
   hipDeviceProp_t device_properties;
   HIP_CHECK(hipGetDevice(&device));
@@ -234,42 +193,56 @@ TEST_CASE("Unit_Any") {
   WarpAny().run();
 }
 
-__global__ void kernel_all(uint64_t* const out, const uint64_t* const active_masks,
+__global__ void kernel_all(int* const out, const uint64_t* const active_masks,
                            uint64_t predicate) {
-  const auto warp = cg::tiled_partition(cg::this_thread_block(), warpSize);
-  const auto block = cg::this_thread_block();
-  const auto warps_per_block = (block.size() + warpSize - 1) / warpSize;
-  const auto block_rank = (blockIdx.z * gridDim.y + blockIdx.y) * gridDim.x + blockIdx.x;
-  const auto idx = block_rank * warps_per_block + block.thread_rank() / warpSize;
-
-  if (active_masks[idx] & (static_cast<uint64_t>(1) << warp.thread_rank())) {
-    out[idx] = __all((predicate & (static_cast<uint64_t>(1) << warp.thread_rank())));
+  if (deactivate_thread(active_masks)) {
+    return;
   }
+
+  const auto grid = cg::this_grid();
+  const auto warp = cg::tiled_partition(cg::this_thread_block(), warpSize);
+
+  out[grid.thread_rank()] = __all((predicate & (static_cast<uint64_t>(1) << warp.thread_rank())));
 }
 
-class WarpAll : public WarpVote<WarpAll> {
+class WarpAll : public WarpTest<WarpAll, int> {
  public:
-  void launch_kernel(uint64_t* const arr_dev, const uint64_t* const active_masks) {
+  void launch_kernel(int* const arr_dev, const uint64_t* const active_masks) {
+    auto test_case = GENERATE(range(0, 5));
+    predicate_mask_ = get_predicate_mask(test_case, this->warp_size_);
+    INFO("Predicate mask: " << predicate_mask_);
     kernel_all<<<this->grid_.grid_dim_, this->grid_.block_dim_>>>(arr_dev, active_masks,
-                                                                  this->predicate_mask_);
+                                                                  predicate_mask_);
   }
 
-  void validate(const uint64_t* const arr) {
-    ArrayAllOf(arr, this->warps_in_grid_, [this](unsigned int i) -> uint64_t {
-      const auto block_rank = i / this->warps_in_block_;
+  void validate(const int* const arr) {
+    ArrayAllOf(arr, this->grid_.thread_count_, [this](unsigned int i) -> std::optional<int> {
+      const auto rank_in_block = this->grid_.thread_rank_in_block(i).value();
+      const auto rank_in_warp = rank_in_block % this->warp_size_;
+      const auto warp_idx = this->warps_in_block_ * (i / this->grid_.threads_in_block_count_) +
+          rank_in_block / this->warp_size_;
+      const auto block_rank = warp_idx / this->warps_in_block_;
+      const std::bitset<sizeof(uint64_t) * 8> active_mask(this->active_masks_[warp_idx]);
+
       auto partition_size = this->warp_size_;
-      auto active_predicate = get_active_predicate(this->predicate_mask_, partition_size);
-      if (i == this->warps_in_block_ * (block_rank + 1) - 1) {
+      if (warp_idx == this->warps_in_block_ * (block_rank + 1) - 1) {
         partition_size =
             this->grid_.threads_in_block_count_ - (this->warps_in_block_ - 1) * this->warp_size_;
-        active_predicate = get_active_predicate(this->predicate_mask_, partition_size);
       }
-      return check_if_all(active_predicate, this->active_masks_[i], partition_size);
+
+      if (!active_mask.test(rank_in_warp))
+        return std::nullopt;
+      else {
+        auto active_predicate = get_active_predicate(predicate_mask_, partition_size);
+        return check_if_all(active_predicate, this->active_masks_[warp_idx], partition_size);
+      }
     });
   }
+ private:
+  uint64_t predicate_mask_;
 };
 
-TEST_CASE("Unit_All") {
+TEST_CASE("Unit_Warp_Vote_All_Positive_Basic") {
   int device;
   hipDeviceProp_t device_properties;
   HIP_CHECK(hipGetDevice(&device));

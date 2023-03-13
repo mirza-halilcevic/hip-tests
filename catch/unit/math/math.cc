@@ -25,69 +25,83 @@ THE SOFTWARE.
 
 namespace cg = cooperative_groups;
 
-template <typename T> class LAWrapper {
- public:
-  LAWrapper(const size_t size, T* const init_vals) : la_{LinearAllocs::hipMalloc, size, 0u} {
-    HIP_CHECK(hipMemcpy(la_.ptr(), init_vals, size, hipMemcpyHostToDevice));
-  }
-
-  T* ptr() { return la_.ptr(); }
-
- private:
-  LinearAllocGuard<T> la_;
-};
-
-// void Foo(void (*kernel)(T*, const size_t, Ts*...), T (*reference_func)(Ts...), size_t num_args,
-//          Ts*... args) {
-//   std::array<LAWrapper<T>, sizeof...(Ts)> xs_dev{LAWrapper(num_args * sizeof(T), args)...};
-//   // head(xs) could be reused for output, reducing memory usage
-//   LinearAllocGuard<T> y_dev(LinearAllocs::hipMalloc, num_args * sizeof(T));
-//   // LinearAllocGuards xs_dev(LinearAllocs::hipMalloc, num_args * sizeof(T));
-//   // LinearAllocGuards results_dev(LinearAllocs::hipMalloc, num_args*sizeof(T));
-//   // HIP_CHECK(hipMemcpy(xs_dev.ptr(), ))
-// }
-
-
 template <typename T, typename... Ts> class MathTest {
   static_assert(std::conjunction_v<std::is_same<T, Ts>...>, "Message");
   using kernel_sig = void (*)(T*, const size_t, Ts*...);
   using reference_sig = T (*)(Ts...);
 
+  class LAWrapper {
+   public:
+    LAWrapper(const size_t size, T* const init_vals) : la_{LinearAllocs::hipMalloc, size, 0u} {
+      HIP_CHECK(hipMemcpy(la_.ptr(), init_vals, size, hipMemcpyHostToDevice));
+    }
+
+    T* ptr() { return la_.ptr(); }
+
+   private:
+    LinearAllocGuard<T> la_;
+  };
+
  public:
-  MathTest(kernel_sig kernel, reference_sig ref_func, size_t num_args, Ts*... args)
+  MathTest(kernel_sig kernel, reference_sig ref_func, size_t num_args, Ts*... xss)
       : kernel_{kernel},
         ref_func_{ref_func},
         num_args_{num_args},
-        xs_dev_{LAWrapper(num_args * sizeof(T), args)...},
-        y_dev_{LinearAllocs::hipMalloc, num_args * sizeof(T)} {}
+        xss_{xss...},
+        xss_dev_{LAWrapper(num_args * sizeof(T), xss)...} {}
 
-  void Run() { 
-    LaunchKernel(std::index_sequence_for<Ts...>{}); 
-    std::vector<T> y(num_args_);
-    HIP_CHECK(hipMemcpy(y.data(), y_dev_.ptr(), num_args_ * sizeof(T), hipMemcpyDeviceToHost));
-  }
+  void Run(const int64_t ulps) { RunImpl(ulps, std::index_sequence_for<Ts...>{}); }
 
 
  private:
-  template <size_t... I> void LaunchKernel(std::index_sequence<I...>) {
-    kernel_<<<1, num_args_>>>(y_dev_.ptr(), num_args_, xs_dev_[I].ptr()...);
+  template <size_t... I> void RunImpl(const int64_t ulps, std::index_sequence<I...>) {
+    // An input dev array could be used to store the results to reduce memory usage
+    LinearAllocGuard<T> y_dev{LinearAllocs::hipMalloc, num_args_ * sizeof(T)};
+    kernel_<<<1, num_args_>>>(y_dev.ptr(), num_args_, xss_dev_[I].ptr()...);
     HIP_CHECK(hipGetLastError());
+
+    // An input array could be reused to store the results to reduce memory usage
+    std::vector<T> y(num_args_);
+    HIP_CHECK(hipMemcpy(y.data(), y_dev.ptr(), num_args_ * sizeof(T), hipMemcpyDeviceToHost));
+
+    // The host could calculate reference values after the kernel is launched, even in parallel on
+    // several threads, to accelerate test execution. This would require allocating another array,
+    // but if the above specified memory reuse is performed, the footprint would remain unchanged.
+    for (auto i = 0u; i < num_args_; ++i) {
+      const auto ref_val = ref_func_(xss_[I][i]...);
+      REQUIRE_THAT(y[i], Catch::WithinULP(ref_val, ulps));
+    }
   }
 
   kernel_sig kernel_;
   reference_sig ref_func_;
   size_t num_args_;
-  std::array<LAWrapper<T>, sizeof...(Ts)> xs_dev_;
-  LinearAllocGuard<T> y_dev_;
+  std::array<T*, sizeof...(Ts)> xss_;
+  std::array<LAWrapper, sizeof...(Ts)> xss_dev_;
 };
 
 __global__ void sin_kernel(double* const results, const size_t num_xs, double* const xs) {
   const auto tid = cg::this_grid().thread_rank();
-  printf("Hello\n");
-  results[tid] = sin(xs[tid]);
+  if (tid < num_xs) {
+    results[tid] = sin(xs[tid]);
+  }
 }
 
-TEST_CASE("Foo") {
-  double arg = 0;
-  MathTest(sin_kernel, sin, 1, &arg).Run();
+TEST_CASE("Sin") {
+  double xs[] = {0., 1., 2., 3.14159};
+  MathTest(sin_kernel, sin, 4, xs).Run(2);
+}
+
+__global__ void atan2_kernel(double* const results, const size_t num_xs, double* const x1s,
+                             double* const x2s) {
+  const auto tid = cg::this_grid().thread_rank();
+  if (tid < num_xs) {
+    results[tid] = atan2(x1s[tid], x2s[tid]);
+  }
+}
+
+TEST_CASE("Atan2") {
+  double x1s[] = {0., 1., 2., 3.14159};
+  double x2s[] = {0., 1., 2., 3.14159};
+  MathTest(atan2_kernel, atan2, 4, x1s, x2s).Run(2);
 }

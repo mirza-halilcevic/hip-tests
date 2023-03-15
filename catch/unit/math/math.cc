@@ -25,7 +25,7 @@ THE SOFTWARE.
 
 namespace cg = cooperative_groups;
 
-template <typename T, typename... Ts> class MathTest {
+template <typename Validator, typename T, typename... Ts> class MathTest {
   static_assert(std::conjunction_v<std::is_same<T, Ts>...>, "Message");
   using kernel_sig = void (*)(T*, const size_t, Ts*...);
   using reference_sig = T (*)(Ts...);
@@ -43,21 +43,25 @@ template <typename T, typename... Ts> class MathTest {
   };
 
  public:
-  MathTest(kernel_sig kernel, reference_sig ref_func, size_t num_args, Ts*... xss)
-      : kernel_{kernel},
+  MathTest(Validator validator, kernel_sig kernel, reference_sig ref_func, size_t num_args,
+           Ts*... xss)
+      : validator_{validator},
+        kernel_{kernel},
         ref_func_{ref_func},
         num_args_{num_args},
         xss_{xss...},
         xss_dev_{LAWrapper(num_args * sizeof(T), xss)...} {}
 
-  void Run(const int64_t ulps) { RunImpl(ulps, std::index_sequence_for<Ts...>{}); }
-
+  void Run(const size_t grid_dim, const size_t block_dim) {
+    RunImpl(grid_dim, block_dim, std::index_sequence_for<Ts...>{});
+  }
 
  private:
-  template <size_t... I> void RunImpl(const int64_t ulps, std::index_sequence<I...>) {
+  template <size_t... I>
+  void RunImpl(const size_t grid_dim, const size_t block_dim, std::index_sequence<I...>) {
     // An input dev array could be used to store the results to reduce memory usage
     LinearAllocGuard<T> y_dev{LinearAllocs::hipMalloc, num_args_ * sizeof(T)};
-    kernel_<<<1, num_args_>>>(y_dev.ptr(), num_args_, xss_dev_[I].ptr()...);
+    kernel_<<<grid_dim, block_dim>>>(y_dev.ptr(), num_args_, xss_dev_[I].ptr()...);
     HIP_CHECK(hipGetLastError());
 
     // An input array could be reused to store the results to reduce memory usage
@@ -68,16 +72,47 @@ template <typename T, typename... Ts> class MathTest {
     // several threads, to accelerate test execution. This would require allocating another array,
     // but if the above specified memory reuse is performed, the footprint would remain unchanged.
     for (auto i = 0u; i < num_args_; ++i) {
-      const auto ref_val = ref_func_(xss_[I][i]...);
-      REQUIRE_THAT(y[i], Catch::WithinULP(ref_val, ulps));
+      validator_.validate(y[i], ref_func_(xss_[I][i]...));
     }
   }
 
+  Validator validator_;
   kernel_sig kernel_;
   reference_sig ref_func_;
   size_t num_args_;
   std::array<T*, sizeof...(Ts)> xss_;
   std::array<LAWrapper, sizeof...(Ts)> xss_dev_;
+};
+
+struct ULPValidator {
+  template <typename T> void validate(const T actual_val, const T ref_val) const {
+    REQUIRE_THAT(actual_val, Catch::WithinULP(ref_val, ulps));
+  }
+
+  const int64_t ulps;
+};
+
+struct AbsValidator {
+  template <typename T> void validate(const T actual_val, const T ref_val) const {
+    REQUIRE_THAT(actual_val, Catch::WithinAbs(ref_val, margin));
+  }
+
+  const double margin;
+};
+
+template <typename T> struct RelValidator {
+  void validate(const T actual_val, const T ref_val) const {
+    REQUIRE_THAT(actual_val, Catch::WithinRel(ref_val, margin));
+  }
+
+  const T margin;
+};
+
+// Can be used for integer functions as well 
+struct EqValidator {
+  template <typename T> void validate(const T actual_val, const T ref_val) const {
+    REQUIRE(actual_val == ref_val);
+  }
 };
 
 __global__ void sin_kernel(double* const results, const size_t num_xs, double* const xs) {
@@ -89,7 +124,7 @@ __global__ void sin_kernel(double* const results, const size_t num_xs, double* c
 
 TEST_CASE("Sin") {
   double xs[] = {0., 1., 2., 3.14159};
-  MathTest(sin_kernel, sin, 4, xs).Run(2);
+  MathTest(ULPValidator{2}, sin_kernel, sin, 4, xs).Run(1u, 4u);
 }
 
 __global__ void atan2_kernel(double* const results, const size_t num_xs, double* const x1s,
@@ -103,5 +138,5 @@ __global__ void atan2_kernel(double* const results, const size_t num_xs, double*
 TEST_CASE("Atan2") {
   double x1s[] = {0., 1., 2., 3.14159};
   double x2s[] = {0., 1., 2., 3.14159};
-  MathTest(atan2_kernel, atan2, 4, x1s, x2s).Run(2);
+  MathTest(ULPValidator{2}, atan2_kernel, atan2, 4, x1s, x2s).Run(1u, 4u);
 }

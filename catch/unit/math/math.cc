@@ -99,7 +99,7 @@ void Foo(void (*kernel)(T*, size_t, T*), RT (*ref_func)(RT), size_t num_args, T*
   HIP_CHECK(hipMemcpy(ys.data(), ys_dev.ptr(), num_args * sizeof(T), hipMemcpyDeviceToHost));
 
   for (auto i = 0u; i < num_args; ++i) {
-    validator.validate(static_cast<RT>(ys[i]), ref_func(static_cast<RT>(xs[i])));
+    validator.validate(ys[i], static_cast<T>(ref_func(static_cast<RT>(xs[i]))));
   }
 }
 
@@ -119,8 +119,8 @@ void Foo(void (*kernel)(T*, size_t, T*, T*), RT (*ref_func)(RT, RT), size_t num_
   HIP_CHECK(hipMemcpy(ys.data(), ys_dev.ptr(), num_args * sizeof(T), hipMemcpyDeviceToHost));
 
   for (auto i = 0u; i < num_args; ++i) {
-    validator.validate(static_cast<RT>(ys[i]),
-                       ref_func(static_cast<RT>(x1s[i], static_cast<RT>(x2s[i]))));
+    validator.validate(ys[i],
+                       static_cast<T>(ref_func(static_cast<RT>(x1s[i]), static_cast<RT>(x2s[i]))));
   }
 }
 
@@ -163,21 +163,22 @@ __global__ void sin_kernel(float* const results, const size_t num_xs, float* con
 }
 
 TEST_CASE("Sin") {
-  float xs[] = {0., 1., 2., 3.14159};
+  float xs[] = {0.f, 1.f, 2.f, 3.14159f};
   Foo<float, double>(sin_kernel, sin, 4, xs, ULPValidator{2}, 1u, 4u);
   // MathTest(ULPValidator{2}, sin_kernel, sin, 4, xs).Run(1u, 4u);
 }
 
-__global__ void atan2_kernel(double* const results, const size_t num_xs, double* const x1s,
-                             double* const x2s) {
+__global__ void atan2_kernel(float* const results, const size_t num_xs, float* const x1s,
+                             float* const x2s) {
   const auto tid = cg::this_grid().thread_rank();
   if (tid < num_xs) {
-    results[tid] = atan2(x1s[tid], x2s[tid]);
+    results[tid] = atan2f(x1s[tid], x2s[tid]);
   }
 }
 
 TEST_CASE("Atan2") {
-  double x1s[] = {0., 1., 2., 3.14159};
-  double x2s[] = {0., 1., 2., 3.14159};
-  MathTest(ULPValidator{2}, atan2_kernel, atan2, 4, x1s, x2s).Run(1u, 4u);
+  float x1s[] = {0.f, 1.f, 2.f, 3.14159f};
+  float x2s[] = {0.f, 1.f, 2.f, 3.14159f};
+  Foo<float, double>(atan2_kernel, atan2, 4, x1s, x2s, ULPValidator{2}, 1u, 4u);
+  // MathTest(ULPValidator{2}, atan2_kernel, atan2, 4, x1s, x2s).Run(1u, 4u);
 }

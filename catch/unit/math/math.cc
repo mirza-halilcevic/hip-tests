@@ -84,6 +84,46 @@ template <typename Validator, typename T, typename... Ts> class MathTest {
   std::array<LAWrapper, sizeof...(Ts)> xss_dev_;
 };
 
+
+template <typename T, typename RT, typename V>
+void Foo(void (*kernel)(T*, size_t, T*), RT (*ref_func)(RT), size_t num_args, T* xs, V validator,
+         size_t grid_dim, size_t block_dim) {
+  LinearAllocGuard<T> xs_dev{LinearAllocs::hipMalloc, num_args * sizeof(T)};
+  HIP_CHECK(hipMemcpy(xs_dev.ptr(), xs, num_args * sizeof(T), hipMemcpyHostToDevice));
+
+  LinearAllocGuard<T> ys_dev{LinearAllocs::hipMalloc, num_args * sizeof(T)};
+  kernel<<<grid_dim, block_dim>>>(ys_dev.ptr(), num_args, xs_dev.ptr());
+  HIP_CHECK(hipGetLastError());
+
+  std::vector<T> ys(num_args);
+  HIP_CHECK(hipMemcpy(ys.data(), ys_dev.ptr(), num_args * sizeof(T), hipMemcpyDeviceToHost));
+
+  for (auto i = 0u; i < num_args; ++i) {
+    validator.validate(static_cast<RT>(ys[i]), ref_func(static_cast<RT>(xs[i])));
+  }
+}
+
+template <typename T, typename RT, typename V>
+void Foo(void (*kernel)(T*, size_t, T*, T*), RT (*ref_func)(RT, RT), size_t num_args, T* x1s,
+         T* x2s, V validator, size_t grid_dim, size_t block_dim) {
+  LinearAllocGuard<T> x1s_dev{LinearAllocs::hipMalloc, num_args * sizeof(T)};
+  HIP_CHECK(hipMemcpy(x1s_dev.ptr(), x1s, num_args * sizeof(T), hipMemcpyHostToDevice));
+  LinearAllocGuard<T> x2s_dev{LinearAllocs::hipMalloc, num_args * sizeof(T)};
+  HIP_CHECK(hipMemcpy(x2s_dev.ptr(), x2s, num_args * sizeof(T), hipMemcpyHostToDevice));
+
+  LinearAllocGuard<T> ys_dev{LinearAllocs::hipMalloc, num_args * sizeof(T)};
+  kernel<<<grid_dim, block_dim>>>(ys_dev.ptr(), num_args, x1s_dev.ptr(), x2s_dev.ptr());
+  HIP_CHECK(hipGetLastError());
+
+  std::vector<T> ys(num_args);
+  HIP_CHECK(hipMemcpy(ys.data(), ys_dev.ptr(), num_args * sizeof(T), hipMemcpyDeviceToHost));
+
+  for (auto i = 0u; i < num_args; ++i) {
+    validator.validate(static_cast<RT>(ys[i]),
+                       ref_func(static_cast<RT>(x1s[i], static_cast<RT>(x2s[i]))));
+  }
+}
+
 struct ULPValidator {
   template <typename T> void validate(const T actual_val, const T ref_val) const {
     REQUIRE_THAT(actual_val, Catch::WithinULP(ref_val, ulps));
@@ -108,23 +148,24 @@ template <typename T> struct RelValidator {
   const T margin;
 };
 
-// Can be used for integer functions as well 
+// Can be used for integer functions as well
 struct EqValidator {
   template <typename T> void validate(const T actual_val, const T ref_val) const {
     REQUIRE(actual_val == ref_val);
   }
 };
 
-__global__ void sin_kernel(double* const results, const size_t num_xs, double* const xs) {
+__global__ void sin_kernel(float* const results, const size_t num_xs, float* const xs) {
   const auto tid = cg::this_grid().thread_rank();
   if (tid < num_xs) {
-    results[tid] = sin(xs[tid]);
+    results[tid] = sinf(xs[tid]);
   }
 }
 
 TEST_CASE("Sin") {
-  double xs[] = {0., 1., 2., 3.14159};
-  MathTest(ULPValidator{2}, sin_kernel, sin, 4, xs).Run(1u, 4u);
+  float xs[] = {0., 1., 2., 3.14159};
+  Foo<float, double>(sin_kernel, sin, 4, xs, ULPValidator{2}, 1u, 4u);
+  // MathTest(ULPValidator{2}, sin_kernel, sin, 4, xs).Run(1u, 4u);
 }
 
 __global__ void atan2_kernel(double* const results, const size_t num_xs, double* const x1s,

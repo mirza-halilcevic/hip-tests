@@ -99,7 +99,7 @@ void Foo(void (*kernel)(T*, size_t, T*), RT (*ref_func)(RT), size_t num_args, T*
   HIP_CHECK(hipMemcpy(ys.data(), ys_dev.ptr(), num_args * sizeof(T), hipMemcpyDeviceToHost));
 
   for (auto i = 0u; i < num_args; ++i) {
-    validator.validate(ys[i], static_cast<T>(ref_func(static_cast<RT>(xs[i]))));
+    validator(ys[i], static_cast<T>(ref_func(static_cast<RT>(xs[i]))));
   }
 }
 
@@ -119,13 +119,12 @@ void Foo(void (*kernel)(T*, size_t, T*, T*), RT (*ref_func)(RT, RT), size_t num_
   HIP_CHECK(hipMemcpy(ys.data(), ys_dev.ptr(), num_args * sizeof(T), hipMemcpyDeviceToHost));
 
   for (auto i = 0u; i < num_args; ++i) {
-    validator.validate(ys[i],
-                       static_cast<T>(ref_func(static_cast<RT>(x1s[i]), static_cast<RT>(x2s[i]))));
+    validator(ys[i], static_cast<T>(ref_func(static_cast<RT>(x1s[i]), static_cast<RT>(x2s[i]))));
   }
 }
 
 struct ULPValidator {
-  template <typename T> void validate(const T actual_val, const T ref_val) const {
+  template <typename T> void operator()(const T actual_val, const T ref_val) const {
     REQUIRE_THAT(actual_val, Catch::WithinULP(ref_val, ulps));
   }
 
@@ -133,7 +132,7 @@ struct ULPValidator {
 };
 
 struct AbsValidator {
-  template <typename T> void validate(const T actual_val, const T ref_val) const {
+  template <typename T> void operator()(const T actual_val, const T ref_val) const {
     REQUIRE_THAT(actual_val, Catch::WithinAbs(ref_val, margin));
   }
 
@@ -141,7 +140,7 @@ struct AbsValidator {
 };
 
 template <typename T> struct RelValidator {
-  void validate(const T actual_val, const T ref_val) const {
+  void operator()(const T actual_val, const T ref_val) const {
     REQUIRE_THAT(actual_val, Catch::WithinRel(ref_val, margin));
   }
 
@@ -150,7 +149,7 @@ template <typename T> struct RelValidator {
 
 // Can be used for integer functions as well
 struct EqValidator {
-  template <typename T> void validate(const T actual_val, const T ref_val) const {
+  template <typename T> void operator()(const T actual_val, const T ref_val) const {
     REQUIRE(actual_val == ref_val);
   }
 };

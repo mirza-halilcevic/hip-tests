@@ -119,6 +119,7 @@ include_directories(
     "./kernels"
     ${HIP_PATH}/include
     ${JSON_PARSER}
+    "${CMAKE_CURRENT_LIST_DIR}/external/asio"
 )
 
 option(RTC_TESTING "Run tests using HIP RTC to compile the kernels" OFF)

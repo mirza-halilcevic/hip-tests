@@ -30,10 +30,6 @@ THE SOFTWARE.
 
 namespace cg = cooperative_groups;
 
-#define THREAD_COUNT 28
-
-inline ThreadPool thread_pool(THREAD_COUNT);
-
 #define MATH_SINGLE_ARG_KERNEL_DEF(func_name)                                                      \
   template <typename T>                                                                            \
   __global__ void func_name##_kernel(T* const ys, const size_t num_xs, T* const xs) {              \
@@ -94,8 +90,6 @@ inline ThreadPool thread_pool(THREAD_COUNT);
   }
 
 
-std::atomic<uint64_t> counter{1};
-
 template <bool parallel = true, typename T, typename RT, typename ValidatorBuilder, typename... Ts,
           typename... RTs, size_t... I>
 void MathTestImpl(const ValidatorBuilder& validator_builder, const size_t grid_dim,
@@ -124,34 +118,29 @@ void MathTestImpl(const ValidatorBuilder& validator_builder, const size_t grid_d
 
   if constexpr (!parallel) {
     for (auto i = 0u; i < num_args; ++i) {
-      if (!validator_builder(static_cast<T>(ref_func(static_cast<RT>(xss[i])...))).match(y[i])) {
-        REQUIRE(false);
+      const auto ref_val = static_cast<T>(ref_func(static_cast<RT>(xss[i])...));
+      if (!validator_builder(ref_val).match(y[i])) {
+        // REQUIRE on every iteration leads to a noticeable slowdown. Only REQUIRE when it is known
+        // that the REQUIRE will fail.
+        REQUIRE_THAT(y[i], validator_builder(ref_val));
       }
-      // REQUIRE_THAT(y[i],
-      // validator_builder(static_cast<T>(ref_func(static_cast<RT>(xss[i])...))));
     }
     return;
   }
 
   std::atomic<bool> fail_flag{false};
   std::mutex ss_mtx;
-  std::mutex cout_mtx;
   std::stringstream ss;
 
-  auto tf = [&, validator_builder](size_t iters, size_t base_idx) mutable {
-    for (auto i = 0; i < iters; ++i) {
-      // std::cout << i << std::endl;
-      if (fail_flag.load(std::memory_order_relaxed)) {
-        // std::cout << "Failed" << std::endl;
-        return;
-      }
+  const auto task = [&](size_t iters, size_t base_idx) {
+    for (auto i = 0u; i < iters; ++i) {
+      if (fail_flag.load(std::memory_order_relaxed)) return;
 
       const auto actual_val = y[base_idx + i];
       const auto ref_val = static_cast<T>(ref_func(static_cast<RT>(xss[base_idx + i])...));
-      // std::cout << ref_val << " " << actual_val << std::endl;
       const auto validator = validator_builder(ref_val);
+
       if (!validator.match(actual_val)) {
-        // std::cout << "ZZZZ" << std::endl;
         fail_flag.store(true, std::memory_order_relaxed);
         // Several threads might have passed the first check, but failed validation. On the chance
         // of this happening, access to the string stream must be serialized.
@@ -160,37 +149,22 @@ void MathTestImpl(const ValidatorBuilder& validator_builder, const size_t grid_d
           ss << std::to_string(actual_val) << ' ' << validator.describe() << '\n';
         }
         return;
-      } else {
-        // std::cout << "Passed" << std::endl;
       }
     }
-    // std::cout << "exiting" << std::endl;
   };
 
-  // This will be replaced by a proper thread-pool implementation
-  // std::vector<std::thread> threads;
-  // const auto core_count = std::thread::hardware_concurrency();
-  const auto core_count = THREAD_COUNT;
-  const auto chunk_size = num_args / core_count;
-  const auto tail = num_args % core_count;
+  const auto task_count = thread_pool.thread_count();
+  const auto chunk_size = num_args / task_count;
+  const auto tail = num_args % task_count;
+
   auto base_idx = 0u;
-  // std::cout << "Called" <<std::endl;
-  for (auto i = 0u; i < core_count; ++i) {
+  for (auto i = 0u; i < task_count; ++i) {
     const auto iters = i < tail ? chunk_size + 1 : chunk_size;
-    // std::cout << iters << std::endl;
-    // threads.emplace_back(tf, iters, base_idx);
-    thread_pool.Post([iters, base_idx, tf]() mutable { tf(iters, base_idx); });
+    thread_pool.Post([=, &task] { task(iters, base_idx); });
     base_idx += iters;
   }
 
   thread_pool.Wait();
-  // std::cout << "Finished: " << counter++ << std::endl;
-
-  // plool.wait();
-
-  // for (auto& t : threads) {
-  //   t.join();
-  // }
 
   INFO(ss.str());
   REQUIRE(!fail_flag);
@@ -232,7 +206,7 @@ template <typename T, typename Matcher> class ValidatorBase : public Catch::Matc
   bool nan = false;
 };
 
-template <typename T> auto ULPValidatorGenerator(int64_t ulps) {
+template <typename T> auto ULPValidatorBuilderFactory(int64_t ulps) {
   return [=](T target) {
     return ValidatorBase<T, Catch::Matchers::Floating::WithinUlpsMatcher>{
         target, Catch::WithinULP(target, ulps)};
@@ -260,3 +234,9 @@ template <> struct RefType<float> { using type = double; };
 template <> struct RefType<double> { using type = long double; };
 
 template <typename T> using RefType_t = typename RefType<T>::type;
+
+template <typename F> auto GetOccupancyMaxPotentialBlockSize(F kernel) {
+  int grid_size = 0, block_size = 0;
+  HIP_CHECK(hipOccupancyMaxPotentialBlockSize(&grid_size, &block_size, kernel, 0, 0));
+  return std::make_tuple(grid_size, block_size);
+}

@@ -30,15 +30,15 @@ THE SOFTWARE.
 class ThreadPool {
  public:
   ThreadPool(size_t thread_count = std::thread::hardware_concurrency())
-      : thread_pool_(thread_count) {}
+      : thread_count_(thread_count) {}
 
   ~ThreadPool() { thread_pool_.join(); }
 
   template <typename T> void Post(T&& task) {
-    active_tasks_.fetch_add(1, std::memory_order_relaxed);
+    ++active_tasks_;
     auto&& task_wrapper = [&task, this] {
       task();
-      active_tasks_.fetch_sub(1, std::memory_order_relaxed);
+      --active_tasks_;
     };
     boost::asio::post(thread_pool_, task_wrapper);
   }
@@ -47,7 +47,12 @@ class ThreadPool {
     while (active_tasks_.load(std::memory_order_relaxed)) __builtin_ia32_pause();
   }
 
+  size_t thread_count() const { return thread_count_; }
+
  private:
-  boost::asio::thread_pool thread_pool_;
-  std::atomic<int> active_tasks_;
+  const size_t thread_count_;
+  boost::asio::thread_pool thread_pool_{thread_count_};
+  std::atomic<size_t> active_tasks_;
 };
+
+inline ThreadPool thread_pool{};

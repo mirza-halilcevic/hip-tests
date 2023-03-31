@@ -30,24 +30,19 @@ TEMPLATE_TEST_CASE("Sin", "", float, double) {
 
   SECTION("Special values") {
     const auto& special_vals = std::get<SpecialVals<TestType>>(kSpecialValRegistry);
-    MathTest<false>(ULPValidatorGenerator<TestType>(2), 1u, special_vals.size, sin_kernel<TestType>,
-                    ref, special_vals.size, special_vals.data);
+    MathTest<false>(ULPValidatorBuilderFactory<TestType>(2), 1u, special_vals.size,
+                    sin_kernel<TestType>, ref, special_vals.size, special_vals.data);
   }
 
   SECTION("Brute force") {
-    // int sm_count = 0;
-    // HIP_CHECK(hipDeviceGetAttribute(&sm_count, hipDeviceAttributeMultiprocessorCount, 0));
+    const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(sin_kernel<TestType>);
 
-    int grid_size = 0, block_size = 0;
-    HIP_CHECK(
-        hipOccupancyMaxPotentialBlockSize(&grid_size, &block_size, sin_kernel<TestType>, 0, 0));
-    std::cout << grid_size << " " << block_size << std::endl;
     std::vector<TestType> values(grid_size * block_size);
     size_t inserted = 0u;
     constexpr TestType pi = M_PI;
     constexpr TestType delta = 1.;
 
-    const auto validator = ULPValidatorGenerator<TestType>(2);
+    const auto validator = ULPValidatorBuilderFactory<TestType>(2);
     for (TestType v = 0; v <= 1'000'000'000.f; v += delta) {
       values[inserted++] = v;
       if (inserted < values.size()) continue;

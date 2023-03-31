@@ -20,7 +20,7 @@
 
 add_subdirectory(rtc)
 add_subdirectory(deviceLib)
-add_subdirectory(graph)
+#add_subdirectory(graph)
 add_subdirectory(memory)
 add_subdirectory(stream)
 add_subdirectory(event)

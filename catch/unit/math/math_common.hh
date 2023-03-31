@@ -21,17 +21,18 @@ THE SOFTWARE.
 
 #pragma once
 
-#include <boost/asio/thread_pool.hpp>
-#include <boost/asio/post.hpp>
-
 #include <hip_test_common.hh>
 #include <resource_guards.hh>
 
 #include <hip/hip_cooperative_groups.h>
 
+#include "thread_pool.hh"
+
 namespace cg = cooperative_groups;
 
-inline boost::asio::thread_pool pool(56);
+#define THREAD_COUNT 28
+
+inline ThreadPool thread_pool(THREAD_COUNT);
 
 #define MATH_SINGLE_ARG_KERNEL_DEF(func_name)                                                      \
   template <typename T>                                                                            \
@@ -169,27 +170,20 @@ void MathTestImpl(const ValidatorBuilder& validator_builder, const size_t grid_d
   // This will be replaced by a proper thread-pool implementation
   // std::vector<std::thread> threads;
   // const auto core_count = std::thread::hardware_concurrency();
-  const auto core_count = 32;
+  const auto core_count = THREAD_COUNT;
   const auto chunk_size = num_args / core_count;
   const auto tail = num_args % core_count;
   auto base_idx = 0u;
   // std::cout << "Called" <<std::endl;
-  std::atomic<size_t> finished_tasks{core_count};
   for (auto i = 0u; i < core_count; ++i) {
     const auto iters = i < tail ? chunk_size + 1 : chunk_size;
     // std::cout << iters << std::endl;
     // threads.emplace_back(tf, iters, base_idx);
-    boost::asio::post(pool, [iters, base_idx, tf, &finished_tasks]() mutable {
-      tf(iters, base_idx);
-      --finished_tasks;
-    });
-    // boost::asio::post(pool, [] {});
+    thread_pool.Post([iters, base_idx, tf]() mutable { tf(iters, base_idx); });
     base_idx += iters;
   }
 
-  while (finished_tasks.load(std::memory_order_relaxed)) {
-    __builtin_ia32_pause();
-  }
+  thread_pool.Wait();
   // std::cout << "Finished: " << counter++ << std::endl;
 
   // plool.wait();

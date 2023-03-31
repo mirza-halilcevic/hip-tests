@@ -21,12 +21,17 @@ THE SOFTWARE.
 
 #pragma once
 
-#include <hip/hip_cooperative_groups.h>
+#include <boost/asio/thread_pool.hpp>
+#include <boost/asio/post.hpp>
 
 #include <hip_test_common.hh>
 #include <resource_guards.hh>
 
+#include <hip/hip_cooperative_groups.h>
+
 namespace cg = cooperative_groups;
+
+inline boost::asio::thread_pool pool(56);
 
 #define MATH_SINGLE_ARG_KERNEL_DEF(func_name)                                                      \
   template <typename T>                                                                            \
@@ -87,6 +92,9 @@ namespace cg = cooperative_groups;
     }                                                                                              \
   }
 
+
+std::atomic<uint64_t> counter{1};
+
 template <bool parallel = true, typename T, typename RT, typename ValidatorBuilder, typename... Ts,
           typename... RTs, size_t... I>
 void MathTestImpl(const ValidatorBuilder& validator_builder, const size_t grid_dim,
@@ -115,25 +123,34 @@ void MathTestImpl(const ValidatorBuilder& validator_builder, const size_t grid_d
 
   if constexpr (!parallel) {
     for (auto i = 0u; i < num_args; ++i) {
-      REQUIRE_THAT(y[i], validator_builder(static_cast<T>(ref_func(static_cast<RT>(xss[i])...))));
+      if (!validator_builder(static_cast<T>(ref_func(static_cast<RT>(xss[i])...))).match(y[i])) {
+        REQUIRE(false);
+      }
+      // REQUIRE_THAT(y[i],
+      // validator_builder(static_cast<T>(ref_func(static_cast<RT>(xss[i])...))));
     }
     return;
   }
 
   std::atomic<bool> fail_flag{false};
   std::mutex ss_mtx;
+  std::mutex cout_mtx;
   std::stringstream ss;
 
-  const auto tf = [&, validator_builder](size_t iters, size_t base_idx) mutable {
+  auto tf = [&, validator_builder](size_t iters, size_t base_idx) mutable {
     for (auto i = 0; i < iters; ++i) {
+      // std::cout << i << std::endl;
       if (fail_flag.load(std::memory_order_relaxed)) {
+        // std::cout << "Failed" << std::endl;
         return;
       }
 
       const auto actual_val = y[base_idx + i];
       const auto ref_val = static_cast<T>(ref_func(static_cast<RT>(xss[base_idx + i])...));
+      // std::cout << ref_val << " " << actual_val << std::endl;
       const auto validator = validator_builder(ref_val);
       if (!validator.match(actual_val)) {
+        // std::cout << "ZZZZ" << std::endl;
         fail_flag.store(true, std::memory_order_relaxed);
         // Several threads might have passed the first check, but failed validation. On the chance
         // of this happening, access to the string stream must be serialized.
@@ -142,25 +159,44 @@ void MathTestImpl(const ValidatorBuilder& validator_builder, const size_t grid_d
           ss << std::to_string(actual_val) << ' ' << validator.describe() << '\n';
         }
         return;
+      } else {
+        // std::cout << "Passed" << std::endl;
       }
     }
+    // std::cout << "exiting" << std::endl;
   };
 
   // This will be replaced by a proper thread-pool implementation
-  std::vector<std::thread> threads;
-  const auto core_count = std::thread::hardware_concurrency();
+  // std::vector<std::thread> threads;
+  // const auto core_count = std::thread::hardware_concurrency();
+  const auto core_count = 32;
   const auto chunk_size = num_args / core_count;
   const auto tail = num_args % core_count;
   auto base_idx = 0u;
+  // std::cout << "Called" <<std::endl;
+  std::atomic<size_t> finished_tasks{core_count};
   for (auto i = 0u; i < core_count; ++i) {
     const auto iters = i < tail ? chunk_size + 1 : chunk_size;
-    threads.emplace_back(tf, iters, base_idx);
+    // std::cout << iters << std::endl;
+    // threads.emplace_back(tf, iters, base_idx);
+    boost::asio::post(pool, [iters, base_idx, tf, &finished_tasks]() mutable {
+      tf(iters, base_idx);
+      --finished_tasks;
+    });
+    // boost::asio::post(pool, [] {});
     base_idx += iters;
   }
 
-  for (auto& t : threads) {
-    t.join();
+  while (finished_tasks.load(std::memory_order_relaxed)) {
+    __builtin_ia32_pause();
   }
+  // std::cout << "Finished: " << counter++ << std::endl;
+
+  // plool.wait();
+
+  // for (auto& t : threads) {
+  //   t.join();
+  // }
 
   INFO(ss.str());
   REQUIRE(!fail_flag);

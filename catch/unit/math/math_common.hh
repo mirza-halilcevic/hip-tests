@@ -90,94 +90,99 @@ namespace cg = cooperative_groups;
   }
 
 
-template <bool parallel = true, typename T, typename RT, typename ValidatorBuilder, typename... Ts,
-          typename... RTs, size_t... I>
-void MathTestImpl(const ValidatorBuilder& validator_builder, const size_t grid_dim,
-                  const size_t block_dim, void (*const kernel)(T*, const size_t, Ts*...),
-                  RT (*const ref_func)(RTs...), const size_t num_args, std::index_sequence<I...> is,
-                  const Ts*... xss) {
-  struct LAWrapper {
-    LAWrapper(const size_t size, const T* const init_vals)
-        : la_{LinearAllocs::hipMalloc, size, 0u} {
-      HIP_CHECK(hipMemcpy(ptr(), init_vals, size, hipMemcpyHostToDevice));
-    }
+template <typename T, typename RT, size_t N> class MathTest {
+ public:
+  MathTest(const size_t max_num_args)
+      : xss_dev_(CreateArray(max_num_args * sizeof(T))),
+        y_dev_{LinearAllocs::hipMalloc, max_num_args * sizeof(T)},
+        y_(max_num_args) {}
 
-    T* ptr() { return la_.ptr(); }
 
-    LinearAllocGuard<T> la_;
-  };
-
-  std::array xss_dev{LAWrapper(num_args * sizeof(T), xss)...};
-
-  LinearAllocGuard<T> y_dev{LinearAllocs::hipMalloc, num_args * sizeof(T)};
-  kernel<<<grid_dim, block_dim>>>(y_dev.ptr(), num_args, xss_dev[I].ptr()...);
-  HIP_CHECK(hipGetLastError());
-
-  std::vector<T> y(num_args);
-  HIP_CHECK(hipMemcpy(y.data(), y_dev.ptr(), num_args * sizeof(T), hipMemcpyDeviceToHost));
-
-  if constexpr (!parallel) {
-    for (auto i = 0u; i < num_args; ++i) {
-      const auto ref_val = static_cast<T>(ref_func(static_cast<RT>(xss[i])...));
-      if (!validator_builder(ref_val).match(y[i])) {
-        // REQUIRE on every iteration leads to a noticeable slowdown. Only REQUIRE when it is known
-        // that the REQUIRE will fail.
-        REQUIRE_THAT(y[i], validator_builder(ref_val));
-      }
-    }
-    return;
+  template <typename ValidatorBuilder, typename... Ts, typename... RTs>
+  void Run(const ValidatorBuilder& validator_builder, const size_t grid_dims,
+           const size_t block_dims, void (*const kernel)(T*, const size_t, Ts*...),
+           RT (*const ref_func)(RTs...), const size_t num_args, const Ts*... xss) {
+    fail_flag_.store(false);
+    error_info_.clear();
+    RunImpl(validator_builder, grid_dims, block_dims, kernel, ref_func, num_args,
+            std::index_sequence_for<Ts...>{}, xss...);
   }
 
-  std::atomic<bool> fail_flag{false};
-  std::mutex ss_mtx;
-  std::stringstream ss;
+ private:
+  std::array<LinearAllocGuard<T>, N> xss_dev_;
+  LinearAllocGuard<T> y_dev_;
+  std::vector<T> y_;
+  std::atomic<bool> fail_flag_{false};
+  std::mutex mtx_;
+  std::string error_info_;
 
-  const auto task = [&](size_t iters, size_t base_idx) {
-    for (auto i = 0u; i < iters; ++i) {
-      if (fail_flag.load(std::memory_order_relaxed)) return;
+  template <typename ValidatorBuilder, typename... Ts, typename... RTs, size_t... I>
+  void RunImpl(const ValidatorBuilder& validator_builder, const size_t grid_dim,
+               const size_t block_dim, void (*const kernel)(T*, const size_t, Ts*...),
+               RT (*const ref_func)(RTs...), const size_t num_args, std::index_sequence<I...> is,
+               const Ts*... xss) {
+    const std::array<const T*, N> xss_arr{xss...};
 
-      const auto actual_val = y[base_idx + i];
-      const auto ref_val = static_cast<T>(ref_func(static_cast<RT>(xss[base_idx + i])...));
-      const auto validator = validator_builder(ref_val);
+    auto f = [&, this](int i) {
+      HIP_CHECK(
+          hipMemcpy(xss_dev_[i].ptr(), xss_arr[i], num_args * sizeof(T), hipMemcpyHostToDevice));
+    };
 
-      if (!validator.match(actual_val)) {
-        fail_flag.store(true, std::memory_order_relaxed);
-        // Several threads might have passed the first check, but failed validation. On the chance
-        // of this happening, access to the string stream must be serialized.
-        {
-          std::lock_guard lg{ss_mtx};
-          ss << std::to_string(actual_val) << ' ' << validator.describe() << '\n';
+    ((f(I)), ...);
+
+    kernel<<<grid_dim, block_dim>>>(y_dev_.ptr(), num_args, xss_dev_[I].ptr()...);
+    HIP_CHECK(hipGetLastError());
+
+    HIP_CHECK(hipMemcpy(y_.data(), y_dev_.ptr(), num_args * sizeof(T), hipMemcpyDeviceToHost));
+
+    const auto task = [&, this](size_t iters, size_t base_idx) {
+      for (auto i = 0u; i < iters; ++i) {
+        if (fail_flag_.load(std::memory_order_relaxed)) return;
+
+        const auto actual_val = y_[base_idx + i];
+        const auto ref_val = static_cast<T>(ref_func(static_cast<RT>(xss[base_idx + i])...));
+        const auto validator = validator_builder(ref_val);
+
+        if (!validator.match(actual_val)) {
+          fail_flag_.store(true, std::memory_order_relaxed);
+          // Several threads might have passed the first check, but failed validation. On the chance
+          // of this happening, access to the string stream must be serialized.
+          {
+            std::lock_guard lg{mtx_};
+            error_info_ += std::to_string(actual_val) + " " + validator.describe() + "\n";
+          }
+          return;
         }
-        return;
       }
+    };
+
+    const auto task_count = thread_pool.thread_count();
+    const auto chunk_size = num_args / task_count;
+    const auto tail = num_args % task_count;
+
+    auto base_idx = 0u;
+    for (auto i = 0u; i < task_count; ++i) {
+      const auto iters = i < tail ? chunk_size + 1 : chunk_size;
+      thread_pool.Post([=, &task] { task(iters, base_idx); });
+      base_idx += iters;
     }
-  };
 
-  const auto task_count = thread_pool.thread_count();
-  const auto chunk_size = num_args / task_count;
-  const auto tail = num_args % task_count;
+    thread_pool.Wait();
 
-  auto base_idx = 0u;
-  for (auto i = 0u; i < task_count; ++i) {
-    const auto iters = i < tail ? chunk_size + 1 : chunk_size;
-    thread_pool.Post([=, &task] { task(iters, base_idx); });
-    base_idx += iters;
+    INFO(error_info_);
+    REQUIRE(!fail_flag_);
   }
 
-  thread_pool.Wait();
+  template <std::size_t... Is>
+  constexpr std::array<LinearAllocGuard<T>, N> CreateArrayImpl(std::size_t size,
+                                                               std::index_sequence<Is...>) {
+    return {{(static_cast<void>(Is), LinearAllocGuard<T>{LinearAllocs::hipMalloc, size})...}};
+  }
 
-  INFO(ss.str());
-  REQUIRE(!fail_flag);
-}
-
-template <bool parallel = true, typename T, typename RT, typename ValidatorBuilder, typename... Ts,
-          typename... RTs>
-void MathTest(const ValidatorBuilder& validator_builder, const size_t grid_dims,
-              const size_t block_dims, void (*const kernel)(T*, const size_t, Ts*...),
-              RT (*const ref_func)(RTs...), const size_t num_args, const Ts*... xss) {
-  MathTestImpl<parallel>(validator_builder, grid_dims, block_dims, kernel, ref_func, num_args,
-                         std::index_sequence_for<Ts...>{}, xss...);
-}
+  constexpr std::array<LinearAllocGuard<T>, N> CreateArray(std::size_t size) {
+    return CreateArrayImpl(size, std::make_index_sequence<N>());
+  }
+};
 
 template <typename T, typename Matcher> class ValidatorBase : public Catch::MatcherBase<T> {
  public:

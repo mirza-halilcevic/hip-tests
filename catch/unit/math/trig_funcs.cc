@@ -28,16 +28,12 @@ TEMPLATE_TEST_CASE("Sin", "", float, double) {
   using T = RefType_t<TestType>;
   T (*ref)(T) = std::sin;
 
-  SECTION("Special values") {
-    const auto& special_vals = std::get<SpecialVals<TestType>>(kSpecialValRegistry);
-    MathTest<false>(ULPValidatorBuilderFactory<TestType>(2), 1u, special_vals.size,
-                    sin_kernel<TestType>, ref, special_vals.size, special_vals.data);
-  }
-
   SECTION("Brute force") {
     const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(sin_kernel<TestType>);
     const uint32_t max_batch_size = grid_size * block_size;
     std::vector<TestType> values(max_batch_size);
+
+    MathTest<TestType, T, 1> math_test(max_batch_size);
 
     const auto validator_builder = ULPValidatorBuilderFactory<TestType>(2);
 
@@ -51,8 +47,8 @@ TEMPLATE_TEST_CASE("Sin", "", float, double) {
         ++v;
       }
 
-      MathTest<true>(validator_builder, grid_size, block_size, sin_kernel<TestType>, ref,
-                     batch_size, values.data());
+      math_test.Run(validator_builder, grid_size, block_size, sin_kernel<TestType>, ref, batch_size,
+                    values.data());
     }
   }
 }

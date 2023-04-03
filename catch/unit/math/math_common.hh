@@ -145,7 +145,7 @@ void MathTestImpl(const ValidatorBuilder& validator_builder, const size_t grid_d
         // Several threads might have passed the first check, but failed validation. On the chance
         // of this happening, access to the string stream must be serialized.
         {
-          std::lock_guard{ss_mtx};
+          std::lock_guard lg{ss_mtx};
           ss << std::to_string(actual_val) << ' ' << validator.describe() << '\n';
         }
         return;

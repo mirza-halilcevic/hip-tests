@@ -36,24 +36,23 @@ TEMPLATE_TEST_CASE("Sin", "", float, double) {
 
   SECTION("Brute force") {
     const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(sin_kernel<TestType>);
+    const uint32_t max_batch_size = grid_size * block_size;
+    std::vector<TestType> values(max_batch_size);
 
-    std::vector<TestType> values(grid_size * block_size);
-    size_t inserted = 0u;
-    constexpr TestType pi = M_PI;
-    constexpr TestType delta = 1.;
+    const auto validator_builder = ULPValidatorBuilderFactory<TestType>(2);
 
-    const auto validator = ULPValidatorBuilderFactory<TestType>(2);
-    for (TestType v = 0; v <= 1'000'000'000.f; v += delta) {
-      values[inserted++] = v;
-      if (inserted < values.size()) continue;
-      MathTest<true>(validator, grid_size, block_size, sin_kernel<TestType>, ref, inserted,
-                     values.data());
-      inserted = 0u;
-    }
+    uint32_t stop = std::numeric_limits<uint32_t>::max();
+    uint32_t batch_size = max_batch_size;
+    for (uint32_t v = 0u; v != stop;) {
+      batch_size = std::min(max_batch_size, stop - v);
 
-    if (inserted != 0) {
-      MathTest<true>(validator, grid_size, block_size, sin_kernel<TestType>, ref, inserted,
-                     values.data());
+      for (uint32_t i = 0u; i < batch_size; ++i) {
+        values[i] = *reinterpret_cast<float*>(&v);
+        ++v;
+      }
+
+      MathTest<true>(validator_builder, grid_size, block_size, sin_kernel<TestType>, ref,
+                     batch_size, values.data());
     }
   }
 }

@@ -36,7 +36,7 @@ class ThreadPool {
 
   template <typename T> void Post(T&& task) {
     ++active_tasks_;
-    auto&& task_wrapper = [&task, this] {
+    auto&& task_wrapper = [task, this] {
       task();
       --active_tasks_;
     };

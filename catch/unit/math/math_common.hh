@@ -139,17 +139,25 @@ template <typename T, typename RT, size_t N> class MathTest {
       for (auto i = 0u; i < iters; ++i) {
         if (fail_flag_.load(std::memory_order_relaxed)) return;
 
-        const auto actual_val = y_[base_idx + i];
+        auto actual_val = y_[base_idx + i];
         const auto ref_val = static_cast<T>(ref_func(static_cast<RT>(xss[base_idx + i])...));
+        if (i == 10) {
+          actual_val = 17;
+        }
         const auto validator = validator_builder(ref_val);
 
         if (!validator.match(actual_val)) {
           fail_flag_.store(true, std::memory_order_relaxed);
           // Several threads might have passed the first check, but failed validation. On the chance
           // of this happening, access to the string stream must be serialized.
+          std::stringstream ss;
+          ss << "Input value(s): " << std::scientific
+             << std::setprecision(std::numeric_limits<T>::max_digits10 - 1);
+          ((ss << " " << xss_arr[I][base_idx + i]), ...) << "\n" << actual_val << " ";
+          std::string log = ss.str() + validator.describe() + "\n";
           {
             std::lock_guard lg{mtx_};
-            error_info_ += std::to_string(actual_val) + " " + validator.describe() + "\n";
+            error_info_ += log;
           }
           return;
         }
@@ -162,7 +170,7 @@ template <typename T, typename RT, size_t N> class MathTest {
 
     auto base_idx = 0u;
     for (auto i = 0u; i < task_count; ++i) {
-      const auto iters = i < tail ? chunk_size + 1 : chunk_size;
+      const auto iters = chunk_size + (i < tail);
       thread_pool.Post([=, &task] { task(iters, base_idx); });
       base_idx += iters;
     }

@@ -37,13 +37,15 @@ TEMPLATE_TEST_CASE("Sin", "", float, double) {
 
     const auto validator_builder = ULPValidatorBuilderFactory<TestType>(2);
 
-    uint32_t stop = std::numeric_limits<uint32_t>::max();
+    uint64_t stop = std::numeric_limits<uint32_t>::max() + 1ul;
     uint32_t batch_size = max_batch_size;
-    for (uint32_t v = 0u; v != stop;) {
-      batch_size = std::min(max_batch_size, stop - v);
+    uint32_t val = 0u;
+    for (uint64_t v = 0u; v < stop;) {
+      batch_size = std::min<uint64_t>(max_batch_size, stop - v);
 
       for (uint32_t i = 0u; i < batch_size; ++i) {
-        values[i] = *reinterpret_cast<float*>(&v);
+        val = static_cast<uint32_t>(v);
+        values[i] = *reinterpret_cast<TestType*>(&val);
         ++v;
       }
 

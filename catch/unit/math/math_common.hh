@@ -98,14 +98,14 @@ template <typename T, typename RT, size_t N> class MathTest {
         y_(max_num_args) {}
 
 
-  template <typename ValidatorBuilder, typename... Ts, typename... RTs>
+  template <bool parallel = true, typename ValidatorBuilder, typename... Ts, typename... RTs>
   void Run(const ValidatorBuilder& validator_builder, const size_t grid_dims,
            const size_t block_dims, void (*const kernel)(T*, const size_t, Ts*...),
            RT (*const ref_func)(RTs...), const size_t num_args, const Ts*... xss) {
     fail_flag_.store(false);
     error_info_.clear();
-    RunImpl(validator_builder, grid_dims, block_dims, kernel, ref_func, num_args,
-            std::index_sequence_for<Ts...>{}, xss...);
+    RunImpl<parallel>(validator_builder, grid_dims, block_dims, kernel, ref_func, num_args,
+                      std::index_sequence_for<Ts...>{}, xss...);
   }
 
  private:
@@ -116,7 +116,7 @@ template <typename T, typename RT, size_t N> class MathTest {
   std::mutex mtx_;
   std::string error_info_;
 
-  template <typename ValidatorBuilder, typename... Ts, typename... RTs, size_t... I>
+  template <bool parallel, typename ValidatorBuilder, typename... Ts, typename... RTs, size_t... I>
   void RunImpl(const ValidatorBuilder& validator_builder, const size_t grid_dim,
                const size_t block_dim, void (*const kernel)(T*, const size_t, Ts*...),
                RT (*const ref_func)(RTs...), const size_t num_args, std::index_sequence<I...> is,
@@ -135,26 +135,36 @@ template <typename T, typename RT, size_t N> class MathTest {
 
     HIP_CHECK(hipMemcpy(y_.data(), y_dev_.ptr(), num_args * sizeof(T), hipMemcpyDeviceToHost));
 
+    if constexpr (!parallel) {
+      for (auto i = 0u; i < num_args; ++i) {
+        const auto actual_val = y_[i];
+        const auto ref_val = static_cast<T>(ref_func(static_cast<RT>(xss[i])...));
+        const auto validator = validator_builder(ref_val);
+
+        if (!validator.match(actual_val)) {
+          const auto log = MakeLogMessage(actual_val, xss[i]...) + validator.describe() + "\n";
+          INFO(log);
+          REQUIRE(false);
+        }
+      }
+
+      return;
+    }
+
     const auto task = [&, this](size_t iters, size_t base_idx) {
       for (auto i = 0u; i < iters; ++i) {
         if (fail_flag_.load(std::memory_order_relaxed)) return;
 
-        auto actual_val = y_[base_idx + i];
+        const auto actual_val = y_[base_idx + i];
         const auto ref_val = static_cast<T>(ref_func(static_cast<RT>(xss[base_idx + i])...));
-        if (i == 10) {
-          actual_val = 17;
-        }
         const auto validator = validator_builder(ref_val);
 
         if (!validator.match(actual_val)) {
           fail_flag_.store(true, std::memory_order_relaxed);
           // Several threads might have passed the first check, but failed validation. On the chance
           // of this happening, access to the string stream must be serialized.
-          std::stringstream ss;
-          ss << "Input value(s): " << std::scientific
-             << std::setprecision(std::numeric_limits<T>::max_digits10 - 1);
-          ((ss << " " << xss_arr[I][base_idx + i]), ...) << "\n" << actual_val << " ";
-          std::string log = ss.str() + validator.describe() + "\n";
+          const auto log =
+              MakeLogMessage(actual_val, xss[base_idx + i]...) + validator.describe() + "\n";
           {
             std::lock_guard lg{mtx_};
             error_info_ += log;
@@ -179,6 +189,15 @@ template <typename T, typename RT, size_t N> class MathTest {
 
     INFO(error_info_);
     REQUIRE(!fail_flag_);
+  }
+
+  template <typename... Args> std::string MakeLogMessage(T actual_val, Args... args) {
+    std::stringstream ss;
+    ss << "Input value(s): " << std::scientific
+       << std::setprecision(std::numeric_limits<T>::max_digits10 - 1);
+    ((ss << " " << args), ...) << "\n" << actual_val << " ";
+
+    return ss.str();
   }
 
   template <std::size_t... Is>

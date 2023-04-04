@@ -24,34 +24,104 @@ THE SOFTWARE.
 
 MATH_SINGLE_ARG_KERNEL_DEF(sin)
 
+template <typename F, typename RF, typename ValidatorBuilder>
+void UnarySinglePrecisionBruteForceTest(F kernel, RF ref_func,
+                                        const ValidatorBuilder& validator_builder) {
+  const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(kernel);
+  const auto max_batch_size = grid_size * block_size;
+  std::vector<float> values(max_batch_size);
+
+  MathTest<float, double, 1> math_test(max_batch_size);
+
+  uint64_t stop = std::numeric_limits<uint32_t>::max() + 1ul;
+  auto batch_size = max_batch_size;
+  uint32_t val = 0u;
+  for (uint64_t v = 0u; v < stop;) {
+    batch_size = std::min<uint64_t>(max_batch_size, stop - v);
+
+    for (auto i = 0u; i < batch_size; ++i) {
+      val = static_cast<uint32_t>(v);
+      values[i] = *reinterpret_cast<float*>(&val);
+      ++v;
+    }
+
+    math_test.Run(validator_builder, grid_size, block_size, kernel, ref_func, batch_size,
+                  values.data());
+  }
+}
+
+template <typename F, typename RF, typename ValidatorBuilder>
+void UnaryDoublePrecisionTest(F kernel, RF ref_func, const ValidatorBuilder& validator_builder) {
+  const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(kernel);
+  const auto max_batch_size = grid_size * block_size;
+  std::vector<double> values(max_batch_size);
+
+  MathTest<double, long double, 1> math_test(max_batch_size);
+
+  const uint64_t num_args = std::numeric_limits<uint32_t>::max();
+  auto batch_size = max_batch_size;
+  const auto num_threads = thread_pool.thread_count();
+  for (uint64_t i = 0ul; i < num_args; i += batch_size) {
+    batch_size = std::min<uint64_t>(max_batch_size, num_args - i);
+
+    const auto min_sub_batch_size = batch_size / num_threads;
+    const auto tail = batch_size % num_threads;
+
+    auto base_idx = 0u;
+    for (auto i = 0u; i < num_threads; ++i) {
+      const auto sub_batch_size = min_sub_batch_size + (i < tail);
+      thread_pool.Post([=, &values] {
+        const auto generator = [] {
+          static thread_local std::default_random_engine rng(std::random_device{}());
+          std::uniform_real_distribution<double> unif_dist(std::numeric_limits<double>::lowest(),
+                                                           std::numeric_limits<double>::max());
+          return unif_dist(rng);
+        };
+        std::generate(values.begin() + base_idx, values.begin() + base_idx + sub_batch_size,
+                      generator);
+      });
+      base_idx += sub_batch_size;
+    }
+
+    thread_pool.Wait();
+
+    math_test.Run(validator_builder, grid_size, block_size, kernel, ref_func, batch_size,
+                  values.data());
+  }
+}
+
+template <typename T, typename F, typename RF, typename ValidatorBuilder>
+void UnarySpecialValuesTest(F kernel, RF ref_func, const ValidatorBuilder& validator_builder) {
+  const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(kernel);
+  const auto max_batch_size = grid_size * block_size;
+
+  const auto values = std::get<SpecialVals<T>>(kSpecialValRegistry);
+
+  MathTest<T, RefType_t<T>, 1> math_test(max_batch_size);
+
+  auto batch_size = max_batch_size;
+  for (uint64_t i = 0u; i < values.size; i += batch_size) {
+    batch_size = std::min<uint64_t>(max_batch_size, values.size - i);
+    math_test.Run(validator_builder, grid_size, block_size, kernel, ref_func, batch_size,
+                  values.data);
+  }
+}
+
 TEMPLATE_TEST_CASE("Sin", "", float, double) {
   using T = RefType_t<TestType>;
   T (*ref)(T) = std::sin;
+  const auto validator_builder = ULPValidatorBuilderFactory<TestType>(2);
 
   SECTION("Brute force") {
-    const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(sin_kernel<TestType>);
-    const uint32_t max_batch_size = grid_size * block_size;
-    std::vector<TestType> values(max_batch_size);
-
-    MathTest<TestType, T, 1> math_test(max_batch_size);
-
-    const auto validator_builder = ULPValidatorBuilderFactory<TestType>(2);
-
-    uint64_t stop = std::numeric_limits<uint32_t>::max() + 1ul;
-    uint32_t batch_size = max_batch_size;
-    uint32_t val = 0u;
-    for (uint64_t v = 0u; v < stop;) {
-      batch_size = std::min<uint64_t>(max_batch_size, stop - v);
-
-      for (uint32_t i = 0u; i < batch_size; ++i) {
-        val = static_cast<uint32_t>(v);
-        values[i] = *reinterpret_cast<TestType*>(&val);
-        ++v;
-      }
-
-      math_test.Run(validator_builder, grid_size, block_size, sin_kernel<TestType>, ref, batch_size,
-                    values.data());
+    if constexpr (std::is_same_v<float, TestType>) {
+      UnarySinglePrecisionBruteForceTest(sin_kernel<TestType>, ref, validator_builder);
+    } else {
+      UnaryDoublePrecisionTest(sin_kernel<double>, ref, validator_builder);
     }
+  }
+
+  SECTION("Special values") {
+    UnarySpecialValuesTest<TestType>(sin_kernel<TestType>, ref, validator_builder);
   }
 }
 

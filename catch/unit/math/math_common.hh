@@ -30,62 +30,50 @@ THE SOFTWARE.
 
 namespace cg = cooperative_groups;
 
-#define MATH_SINGLE_ARG_KERNEL_DEF(func_name)                                                      \
+#define MATH_BINARY_KERNEL_DEF(func_name)                                                          \
   template <typename T>                                                                            \
-  __global__ void func_name##_kernel(T* const ys, const size_t num_xs, T* const xs) {              \
+  __global__ void func_name##_kernel(T* const ys, const size_t num_xs, T* const x1s,               \
+                                     T* const x2s) {                                               \
     const auto tid = cg::this_grid().thread_rank();                                                \
     const auto stride = cg::this_grid().size();                                                    \
                                                                                                    \
     for (auto i = tid; i < num_xs; i += stride) {                                                  \
       if constexpr (std::is_same_v<float, T>) {                                                    \
-        ys[i] = func_name##f(xs[i]);                                                               \
+        ys[i] = func_name##f(x1s[i], x2s[i]);                                                      \
       } else if constexpr (std::is_same_v<double, T>) {                                            \
-        ys[i] = func_name(xs[i]);                                                                  \
+        ys[i] = func_name(x1s[i], x2s[i]);                                                         \
       }                                                                                            \
     }                                                                                              \
   }
 
-#define MATH_DOUBLE_ARG_KERNEL_DEF(func_name)                                                      \
-  template <typename T>                                                                            \
-  __global__ void func_name##_kernel(T* const ys, const size_t num_xs, T* const x1s,               \
-                                     T* const x2s) {                                               \
-    const auto tid = cg::this_grid().thread_rank();                                                \
-                                                                                                   \
-    if (tid < num_xs) {                                                                            \
-      if constexpr (std::is_same_v<float, T>) {                                                    \
-        ys[tid] = func_name##f(x1s[tid], x2s[tid]);                                                \
-      } else if constexpr (std::is_same_v<double, T>) {                                            \
-        ys[tid] = func_name(x1s[tid], x2s[tid]);                                                   \
-      }                                                                                            \
-    }                                                                                              \
-  }
-
-#define MATH_TRIPLE_ARG_KERNEL_DEF(func_name)                                                      \
+#define MATH_TERNARY_KERNEL_DEF(func_name)                                                         \
   template <typename T>                                                                            \
   __global__ void func_name##_kernel(T* const ys, const size_t num_xs, T* const x1s, T* const x2s, \
                                      T* const x3s) {                                               \
     const auto tid = cg::this_grid().thread_rank();                                                \
+    const auto stride = cg::this_grid().size();                                                    \
                                                                                                    \
-    if (tid < num_xs) {                                                                            \
+    for (auto i = tid; i < num_xs; i += stride) {                                                  \
       if constexpr (std::is_same_v<float, T>) {                                                    \
-        ys[tid] = func_name##f(x1s[tid], x2s[tid], x3s[tid]);                                      \
+        ys[i] = func_name##f(x1s[i], x2s[i], x3s[i]);                                              \
       } else if constexpr (std::is_same_v<double, T>) {                                            \
-        ys[tid] = func_name(x1s[tid], x2s[tid], x3s[tid]);                                         \
+        ys[i] = func_name(x1s[i], x2s[i], x3s[i]);                                                 \
       }                                                                                            \
     }                                                                                              \
   }
 
-#define MATH_QUADRUPLE_ARG_KERNEL_DEF(func_name)                                                   \
+#define MATH_QUATERNARY_KERNEL_DEF(func_name)                                                      \
   template <typename T>                                                                            \
   __global__ void func_name##_kernel(T* const ys, const size_t num_xs, T* const x1s, T* const x2s, \
                                      T* const x3s, T* const x4s) {                                 \
     const auto tid = cg::this_grid().thread_rank();                                                \
+    const auto stride = cg::this_grid().size();                                                    \
                                                                                                    \
-    if (tid < num_xs) {                                                                            \
+    for (auto i = tid; i < num_xs; i += stride) {                                                  \
       if constexpr (std::is_same_v<float, T>) {                                                    \
-        ys[tid] = func_name##f(x1s[tid], x2s[tid], x3s[tid], x4s[tid]);                            \
+        ys[i] = func_name##f(x1s[i], x2s[i], x3s[i], x4s[i]);                                      \
       } else if constexpr (std::is_same_v<double, T>) {                                            \
-        ys[tid] = func_name(x1s[tid], x2s[tid], x3s[tid], x4s[tid]);                               \
+        ys[i] = func_name(x1s[i], x2s[i], x3s[i], x4s[i]);                                         \
       }                                                                                            \
     }                                                                                              \
   }
@@ -273,4 +261,17 @@ template <typename F> auto GetOccupancyMaxPotentialBlockSize(F kernel) {
   int grid_size = 0, block_size = 0;
   HIP_CHECK(hipOccupancyMaxPotentialBlockSize(&grid_size, &block_size, kernel, 0, 0));
   return std::make_tuple(grid_size, block_size);
+}
+
+size_t GetMaxAllowedDeviceMemoryUsage() {
+  // TODO - Add setting of allowed memory from the command line
+  // If the cmd option is set, return that, otherwise return 80% of available
+  hipDeviceProp_t props;
+  HIP_CHECK(hipGetDeviceProperties(&props, 0));
+  return props.totalGlobalMem * 0.8;
+}
+
+uint64_t GetTestIterationCount() {
+  // TODO - Add setting of iteration count from the command line
+  return std::numeric_limits<uint32_t>::max() + 1ul;
 }

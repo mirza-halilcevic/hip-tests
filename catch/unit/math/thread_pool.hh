@@ -55,4 +55,4 @@ class ThreadPool {
   std::atomic<size_t> active_tasks_;
 };
 
-inline ThreadPool thread_pool{};
+inline ThreadPool thread_pool{28};

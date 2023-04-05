@@ -36,14 +36,37 @@ void UnarySinglePrecisionBruteForceTest(F kernel, RF ref_func,
   uint64_t stop = std::numeric_limits<uint32_t>::max() + 1ul;
   auto batch_size = max_batch_size;
   uint32_t val = 0u;
+  const auto num_threads = thread_pool.thread_count();
   for (uint64_t v = 0u; v < stop;) {
     batch_size = std::min<uint64_t>(max_batch_size, stop - v);
 
-    for (auto i = 0u; i < batch_size; ++i) {
-      val = static_cast<uint32_t>(v);
-      values[i] = *reinterpret_cast<float*>(&val);
-      ++v;
+    const auto min_sub_batch_size = batch_size / num_threads;
+    const auto tail = batch_size % num_threads;
+
+    auto base_idx = 0u;
+    for (auto i = 0u; i < num_threads; ++i) {
+      const auto sub_batch_size = min_sub_batch_size + (i < tail);
+
+      thread_pool.Post([=, &values] {
+        auto t = v;
+        uint32_t val;
+        for (auto j = 0u; j < sub_batch_size; ++j) {
+          val = static_cast<uint32_t>(t++);
+          values[base_idx + j] = *reinterpret_cast<float*>(&val);
+        }
+      });
+
+      v += sub_batch_size;
+      base_idx += sub_batch_size;
     }
+
+    thread_pool.Wait();
+
+    // for (auto i = 0u; i < batch_size; ++i) {
+    //   val = static_cast<uint32_t>(v);
+    //   values[i] = *reinterpret_cast<float*>(&val);
+    //   ++v;
+    // }
 
     math_test.Run(validator_builder, grid_size, block_size, kernel, ref_func, batch_size,
                   values.data());

@@ -20,13 +20,42 @@ THE SOFTWARE.
 */
 
 #include "unary_common.hh"
+#include <math.h>
 
-MATH_UNARY_KERNEL_DEF(sin)
 
-TEST_CASE("Unit_Device_sinf_Accuracy_Positive") {
-  UnarySinglePrecisionTest(sin_kernel<float>, std::sin, ULPValidatorBuilderFactory<float>(2));
-}
+#define UNARY_TRIG_TEST_DEF(func_name, sp_ulp, dp_ulp)                                             \
+  MATH_UNARY_KERNEL_DEF(func_name)                                                                 \
+                                                                                                   \
+  TEST_CASE("Unit_Device_" #func_name "f_Accuracy_Positive") {                                     \
+    UnarySinglePrecisionTest(func_name##_kernel<float>, std::func_name,                            \
+                             ULPValidatorBuilderFactory<float>(sp_ulp));                           \
+  }                                                                                                \
+                                                                                                   \
+  TEST_CASE("Unit_Device_" #func_name "_Accuracy_Positive") {                                      \
+    UnaryDoublePrecisionTest(func_name##_kernel<double>, std::func_name,                           \
+                             ULPValidatorBuilderFactory<double>(dp_ulp));                          \
+  }
 
-TEST_CASE("Unit_Device_sin_Accuracy_Positive") {
-  UnaryDoublePrecisionTest(sin_kernel<double>, std::sin, ULPValidatorBuilderFactory<double>(2));
-}
+UNARY_TRIG_TEST_DEF(sin, 2, 2)
+
+UNARY_TRIG_TEST_DEF(cos, 2, 2)
+
+UNARY_TRIG_TEST_DEF(tan, 4, 2)
+
+UNARY_TRIG_TEST_DEF(asin, 2, 2)
+
+UNARY_TRIG_TEST_DEF(acos, 2, 2)
+
+UNARY_TRIG_TEST_DEF(atan, 2, 2)
+
+UNARY_TRIG_TEST_DEF(sinh, 3, 2)
+
+UNARY_TRIG_TEST_DEF(cosh, 2, 1)
+
+UNARY_TRIG_TEST_DEF(tanh, 2, 1)
+
+UNARY_TRIG_TEST_DEF(asinh, 3, 2)
+
+UNARY_TRIG_TEST_DEF(acosh, 4, 2)
+
+UNARY_TRIG_TEST_DEF(atanh, 3, 2)

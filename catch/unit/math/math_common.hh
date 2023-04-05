@@ -34,12 +34,13 @@ namespace cg = cooperative_groups;
   template <typename T>                                                                            \
   __global__ void func_name##_kernel(T* const ys, const size_t num_xs, T* const xs) {              \
     const auto tid = cg::this_grid().thread_rank();                                                \
+    const auto stride = cg::this_grid().size();                                                    \
                                                                                                    \
-    if (tid < num_xs) {                                                                            \
+    for (auto i = tid; tid < num_xs; i += stride) {                                                \
       if constexpr (std::is_same_v<float, T>) {                                                    \
-        ys[tid] = func_name##f(xs[tid]);                                                           \
+        ys[i] = func_name##f(xs[i]);                                                               \
       } else if constexpr (std::is_same_v<double, T>) {                                            \
-        ys[tid] = func_name(xs[tid]);                                                              \
+        ys[i] = func_name(xs[i]);                                                                  \
       }                                                                                            \
     }                                                                                              \
   }
@@ -95,7 +96,8 @@ template <typename T, typename RT, size_t N> class MathTest {
   MathTest(const size_t max_num_args)
       : xss_dev_(CreateArray(max_num_args * sizeof(T))),
         y_dev_{LinearAllocs::hipMalloc, max_num_args * sizeof(T)},
-        y_(max_num_args) {}
+        // y_(max_num_args) {}
+        y_{LinearAllocs::hipHostMalloc, max_num_args * sizeof(T)} {}
 
 
   template <bool parallel = true, typename ValidatorBuilder, typename... Ts, typename... RTs>
@@ -111,7 +113,8 @@ template <typename T, typename RT, size_t N> class MathTest {
  private:
   std::array<LinearAllocGuard<T>, N> xss_dev_;
   LinearAllocGuard<T> y_dev_;
-  std::vector<T> y_;
+  // std::vector<T> y_;
+  LinearAllocGuard<T> y_;
   std::atomic<bool> fail_flag_{false};
   std::mutex mtx_;
   std::string error_info_;
@@ -133,7 +136,9 @@ template <typename T, typename RT, size_t N> class MathTest {
     kernel<<<grid_dim, block_dim>>>(y_dev_.ptr(), num_args, xss_dev_[I].ptr()...);
     HIP_CHECK(hipGetLastError());
 
-    HIP_CHECK(hipMemcpy(y_.data(), y_dev_.ptr(), num_args * sizeof(T), hipMemcpyDeviceToHost));
+    // HIP_CHECK(hipMemcpy(y_.data(), y_dev_.ptr(), num_args * sizeof(T), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(y_.ptr(), y_dev_.ptr(), num_args * sizeof(T), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipStreamSynchronize(nullptr));
 
     if constexpr (!parallel) {
       for (auto i = 0u; i < num_args; ++i) {
@@ -155,7 +160,8 @@ template <typename T, typename RT, size_t N> class MathTest {
       for (auto i = 0u; i < iters; ++i) {
         if (fail_flag_.load(std::memory_order_relaxed)) return;
 
-        const auto actual_val = y_[base_idx + i];
+        // const auto actual_val = y_[base_idx + i];
+        const auto actual_val = y_.ptr()[base_idx + i];
         const auto ref_val = static_cast<T>(ref_func(static_cast<RT>(xss[base_idx + i])...));
         const auto validator = validator_builder(ref_val);
 

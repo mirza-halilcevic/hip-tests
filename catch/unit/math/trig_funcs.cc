@@ -29,8 +29,7 @@ void UnarySinglePrecisionBruteForceTest(F kernel, RF ref_func,
                                         const ValidatorBuilder& validator_builder) {
   const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(kernel);
   const auto max_batch_size = grid_size * block_size;
-  // std::vector<float> values(max_batch_size);
-  LinearAllocGuard<float> values(LinearAllocs::hipHostMalloc, max_batch_size * sizeof(float));
+  std::vector<float> values(max_batch_size);
 
   MathTest<float, double, 1> math_test(max_batch_size);
 
@@ -42,22 +41,19 @@ void UnarySinglePrecisionBruteForceTest(F kernel, RF ref_func,
 
     for (auto i = 0u; i < batch_size; ++i) {
       val = static_cast<uint32_t>(v);
-      // values[i] = *reinterpret_cast<float*>(&val);
-      values.ptr()[i] = *reinterpret_cast<float*>(&val);
+      values[i] = *reinterpret_cast<float*>(&val);
       ++v;
     }
 
-    // math_test.Run(validator_builder, grid_size, block_size, kernel, ref_func, batch_size,
-    //               values.data());
     math_test.Run(validator_builder, grid_size, block_size, kernel, ref_func, batch_size,
-                  values.ptr());
+                  values.data());
   }
 }
 
 template <typename F, typename RF, typename ValidatorBuilder>
 void UnaryDoublePrecisionTest(F kernel, RF ref_func, const ValidatorBuilder& validator_builder) {
   const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(kernel);
-  const auto max_batch_size = 1'000'000u;
+  const auto max_batch_size = grid_size * block_size;
   std::vector<double> values(max_batch_size);
 
   MathTest<double, long double, 1> math_test(max_batch_size);
@@ -88,7 +84,7 @@ void UnaryDoublePrecisionTest(F kernel, RF ref_func, const ValidatorBuilder& val
     }
 
     thread_pool.Wait();
-    std::cout << "Pre math test" << std::endl;
+
     math_test.Run(validator_builder, grid_size, block_size, kernel, ref_func, batch_size,
                   values.data());
   }

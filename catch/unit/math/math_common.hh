@@ -30,22 +30,6 @@ THE SOFTWARE.
 
 namespace cg = cooperative_groups;
 
-#define MATH_BINARY_KERNEL_DEF(func_name)                                                          \
-  template <typename T>                                                                            \
-  __global__ void func_name##_kernel(T* const ys, const size_t num_xs, T* const x1s,               \
-                                     T* const x2s) {                                               \
-    const auto tid = cg::this_grid().thread_rank();                                                \
-    const auto stride = cg::this_grid().size();                                                    \
-                                                                                                   \
-    for (auto i = tid; i < num_xs; i += stride) {                                                  \
-      if constexpr (std::is_same_v<float, T>) {                                                    \
-        ys[i] = func_name##f(x1s[i], x2s[i]);                                                      \
-      } else if constexpr (std::is_same_v<double, T>) {                                            \
-        ys[i] = func_name(x1s[i], x2s[i]);                                                         \
-      }                                                                                            \
-    }                                                                                              \
-  }
-
 #define MATH_TERNARY_KERNEL_DEF(func_name)                                                         \
   template <typename T>                                                                            \
   __global__ void func_name##_kernel(T* const ys, const size_t num_xs, T* const x1s, T* const x2s, \
@@ -263,7 +247,7 @@ template <typename F> auto GetOccupancyMaxPotentialBlockSize(F kernel) {
   return std::make_tuple(grid_size, block_size);
 }
 
-size_t GetMaxAllowedDeviceMemoryUsage() {
+inline size_t GetMaxAllowedDeviceMemoryUsage() {
   // TODO - Add setting of allowed memory from the command line
   // If the cmd option is set, return that, otherwise return 80% of available
   hipDeviceProp_t props;
@@ -271,7 +255,7 @@ size_t GetMaxAllowedDeviceMemoryUsage() {
   return props.totalGlobalMem * 0.8;
 }
 
-uint64_t GetTestIterationCount() {
+inline uint64_t GetTestIterationCount() {
   // TODO - Add setting of iteration count from the command line
   return std::numeric_limits<uint32_t>::max() + 1ul;
 }

@@ -20,8 +20,9 @@ THE SOFTWARE.
 */
 
 #include "unary_common.hh"
-#include <math.h>
+#include "binary_common.hh"
 
+#include <boost/math/special_functions.hpp>
 
 #define UNARY_TRIG_TEST_DEF(func_name, sp_ulp, dp_ulp)                                             \
   MATH_UNARY_KERNEL_DEF(func_name)                                                                 \
@@ -59,3 +60,40 @@ UNARY_TRIG_TEST_DEF(asinh, 3, 2)
 UNARY_TRIG_TEST_DEF(acosh, 4, 2)
 
 UNARY_TRIG_TEST_DEF(atanh, 3, 2)
+
+
+MATH_UNARY_KERNEL_DEF(sinpi)
+
+TEST_CASE("Unit_Device_sinpif_Accuracy_Positive") {
+  UnarySinglePrecisionTest(sinpi_kernel<float>, boost::math::sin_pi<double>,
+                           ULPValidatorBuilderFactory<float>(2));
+}
+
+TEST_CASE("Unit_Device_sinpi_Accuracy_Positive") {
+  UnaryDoublePrecisionTest(sinpi_kernel<double>, boost::math::sin_pi<long double>,
+                           ULPValidatorBuilderFactory<double>(2));
+}
+
+
+MATH_UNARY_KERNEL_DEF(cospi)
+
+TEST_CASE("Unit_Device_cospif_Accuracy_Positive") {
+  UnarySinglePrecisionTest(cospi_kernel<float>, boost::math::cos_pi<double>,
+                           ULPValidatorBuilderFactory<float>(2));
+}
+
+TEST_CASE("Unit_Device_cospi_Accuracy_Positive") {
+  UnaryDoublePrecisionTest(cospi_kernel<double>, boost::math::cos_pi<long double>,
+                           ULPValidatorBuilderFactory<double>(2));
+}
+
+
+MATH_BINARY_KERNEL_DEF(atan2)
+
+TEMPLATE_TEST_CASE("Unit_Device_atan2_Accuracy_Positive", "", float, double) {
+  using RT = RefType_t<TestType>;
+  RT (*ref)(RT, RT) = std::atan2;
+  const auto ulp = std::is_same_v<float, TestType> ? 3 : 2;
+  BinaryBruteForceTest<TestType, RT>(atan2_kernel<TestType>, ref,
+                                     ULPValidatorBuilderFactory<TestType>(ulp));
+}

@@ -20,6 +20,7 @@
 
 set(TEST_SRC
   trig_funcs.cc
+  remainder_and_rounding_funcs.cc
 )
 
 hip_add_exe_to_target(NAME MathsTest

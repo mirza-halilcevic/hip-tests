@@ -113,12 +113,15 @@ include(CTest)
 # path used for generating the *_include.cmake file
 set(CATCH2_INCLUDE ${CATCH2_PATH}/cmake/Catch2/catch_include.cmake.in)
 
+find_package(Boost 1.74.0)
+
 include_directories(
     ${CATCH2_PATH}
     "./include"
     "./kernels"
     ${HIP_PATH}/include
     ${JSON_PARSER}
+    ${Boost_INCLUDE_DIRS}
 )
 
 option(RTC_TESTING "Run tests using HIP RTC to compile the kernels" OFF)

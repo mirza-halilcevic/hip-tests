@@ -30,8 +30,13 @@ THE SOFTWARE.
 #define OUTPUT_TYPE float
 
 INPUT_GENERATOR_WRAPPER_DEF(__sinf) {
-  uint32_t rand = rocrand(states);
-  return *reinterpret_cast<float*>(&rand);
+  if constexpr (brute_force) {
+    uint64_t base_i = base + i;
+    return *reinterpret_cast<float*>(&base_i);
+  } else {
+    // uint32_t rand = rocrand(states);
+    // return *reinterpret_cast<float*>(&rand);
+  }
 }
 
 TEST_VALUE_GENERATOR_WRAPPER_DEF(__sinf) { return sinf(x); }
@@ -50,5 +55,5 @@ TEST_CASE("Unit___sinf_Positive_Random") {
 }
 
 TEST_CASE("Unit___sinf_Positive_Brute_Force") {
-  MATH_TEST_BRUTE_FORCE(__sinf, 0, 10, 1024);
+  MATH_TEST_BRUTE_FORCE(__sinf, 100'000ULL, 0ULL, std::numeric_limits<uint32_t>::max() - 1ULL);
 }

@@ -22,7 +22,7 @@ THE SOFTWARE.
 
 #include "graph_engine.hh"
 
-__global__ void rocrand_setup_kernel(rocrand_state_xorwow* states, uint64_t seed) {
+__global__ void rocrand_setup_kernel(ROCRAND_STATE* states, uint64_t seed) {
   const auto tid = threadIdx.x + blockIdx.x * blockDim.x;
   rocrand_init(seed, tid, 0, &states[tid]);
 }

@@ -28,14 +28,15 @@ THE SOFTWARE.
 #define INPUT_GENERATOR_WRAPPER(func_name) InputGenerator_##func_name##_Wrapper
 
 #define INPUT_GENERATOR_WRAPPER_DEF(func_name)                                                     \
-  __device__ INPUT_TYPE INPUT_GENERATOR_WRAPPER(func_name)(rocrand_state_xorwow * states,          \
+  template <bool brute_force>                                                                      \
+  __device__ INPUT_TYPE INPUT_GENERATOR_WRAPPER(func_name)(ROCRAND_STATE * states, uint64_t base,  \
                                                            uint64_t i)
 
 #define INPUT_GENERATOR_DEF(func_name)                                                             \
   template <bool brute_force>                                                                      \
-  __global__ void INPUT_GENERATOR(func_name)(rocrand_state_xorwow * states, uint64_t * n,          \
-                                             INPUT_TYPE * x) {                                     \
-    InputGeneratorImpl<brute_force>(states, n, x, INPUT_GENERATOR_WRAPPER(func_name));             \
+  __global__ void INPUT_GENERATOR(func_name)(ROCRAND_STATE * states, uint64_t * base,              \
+                                             uint64_t * n, INPUT_TYPE * x) {                       \
+    InputGeneratorImpl(states, base, n, x, INPUT_GENERATOR_WRAPPER(func_name) < brute_force >);    \
   }
 
 #define TEST_VALUE_GENERATOR(func_name) TestValueGenerator_##func_name
@@ -45,9 +46,8 @@ THE SOFTWARE.
   __device__ OUTPUT_TYPE TEST_VALUE_GENERATOR_WRAPPER(func_name)(INPUT_TYPE x)
 
 #define TEST_VALUE_GENERATOR_DEF(func_name)                                                        \
-  template <bool brute_force>                                                                      \
   __global__ void TEST_VALUE_GENERATOR(func_name)(uint64_t * n, OUTPUT_TYPE * y, INPUT_TYPE * x) { \
-    TestValueGeneratorImpl<brute_force>(n, y, x, TEST_VALUE_GENERATOR_WRAPPER(func_name));         \
+    TestValueGeneratorImpl(n, y, x, TEST_VALUE_GENERATOR_WRAPPER(func_name));                      \
   }
 
 #define REFERENCE_GENERATOR(func_name) ReferenceGenerator_##func_name
@@ -57,12 +57,11 @@ THE SOFTWARE.
   OUTPUT_TYPE REFERENCE_GENERATOR_WRAPPER(func_name)(INPUT_TYPE x)
 
 #define REFERENCE_GENERATOR_DEF(func_name)                                                         \
-  template <bool brute_force> void REFERENCE_GENERATOR(func_name)(void** args) {                   \
+  void REFERENCE_GENERATOR(func_name)(void** args) {                                               \
     const auto arg0 = reinterpret_cast<uint64_t**>(args[0]);                                       \
     const auto arg1 = reinterpret_cast<OUTPUT_TYPE**>(args[1]);                                    \
     const auto arg2 = reinterpret_cast<INPUT_TYPE**>(args[2]);                                     \
-    ReferenceGeneratorImpl<brute_force>(*arg0, *arg1, *arg2,                                       \
-                                        REFERENCE_GENERATOR_WRAPPER(func_name));                   \
+    ReferenceGeneratorImpl(*arg0, *arg1, *arg2, REFERENCE_GENERATOR_WRAPPER(func_name));           \
   }
 
 #define VALIDATOR(func_name) Validator_##func_name
@@ -72,23 +71,19 @@ THE SOFTWARE.
   bool VALIDATOR_WRAPPER(func_name)(OUTPUT_TYPE y1, OUTPUT_TYPE y2, INPUT_TYPE x)
 
 #define VALIDATOR_DEF(func_name)                                                                   \
-  template <bool brute_force> void VALIDATOR(func_name)(void** args) {                             \
-    const auto arg0 = reinterpret_cast<std::string*>(args[0]);                                     \
+  void VALIDATOR(func_name)(void** args) {                                                         \
+    const auto arg0 = reinterpret_cast<FailureReport**>(args[0]);                                  \
     const auto arg1 = reinterpret_cast<uint64_t**>(args[1]);                                       \
     const auto arg2 = reinterpret_cast<OUTPUT_TYPE**>(args[2]);                                    \
     const auto arg3 = reinterpret_cast<OUTPUT_TYPE**>(args[3]);                                    \
     const auto arg4 = reinterpret_cast<INPUT_TYPE**>(args[4]);                                     \
-    ValidatorImpl<brute_force>(*arg0, *arg1, *arg2, *arg3, *arg4, VALIDATOR_WRAPPER(func_name));   \
+    ValidatorImpl(*arg0, *arg1, *arg2, *arg3, *arg4, VALIDATOR_WRAPPER(func_name));                \
   }
 
-#define MATH_TEST_BRUTE_FORCE(func_name, base_val, batch_size, num_val)                            \
-  MathTestImpl<true>(+INPUT_GENERATOR(func_name) < true >,                                         \
-                     +TEST_VALUE_GENERATOR(func_name) < true >,                                    \
-                     +REFERENCE_GENERATOR(func_name) < true >, +VALIDATOR(func_name) < true >,     \
-                     base_val, batch_size, num_val)
+#define MATH_TEST_BRUTE_FORCE(func_name, batch_size, begin, end)                                   \
+  MathTestImpl(+INPUT_GENERATOR(func_name) < true >, +TEST_VALUE_GENERATOR(func_name),             \
+               +REFERENCE_GENERATOR(func_name), +VALIDATOR(func_name), batch_size, begin, end)
 
-#define MATH_TEST_RANDOM(func_name, batch_size, num_val)                                           \
-  MathTestImpl<false>(+INPUT_GENERATOR(func_name) < false >,                                       \
-                      +TEST_VALUE_GENERATOR(func_name) < false >,                                  \
-                      +REFERENCE_GENERATOR(func_name) < false >, +VALIDATOR(func_name) < false >,  \
-                      0UL, batch_size, num_val)
+#define MATH_TEST_RANDOM(func_name, batch_size, end)                                               \
+  MathTestImpl(+INPUT_GENERATOR(func_name) < false >, +TEST_VALUE_GENERATOR(func_name),            \
+               +REFERENCE_GENERATOR(func_name), +VALIDATOR(func_name), batch_size, 0ULL, end)

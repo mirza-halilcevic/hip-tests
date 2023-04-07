@@ -40,64 +40,75 @@ __host__ __device__ FloatingPoint raw_add(FloatingPoint base, Integer i) {
 
 template <typename T> void SubmitTasks(T&& task, uint64_t n) {
   const uint64_t thread_count = thread_pool.thread_count();
-  const uint64_t chunk_size = n / thread_count;
-  const uint64_t tail_size = n % thread_count;
+  const uint64_t batch_size = n / thread_count;
 
-  uint64_t begin, end;
+  uint64_t begin, end = 0;
   for (uint64_t i = 0; i < thread_count; ++i) {
-    begin = chunk_size * i;
-    end = begin + chunk_size;
+    begin = batch_size * i;
+    end = begin + batch_size;
     thread_pool.Post([=] { task(begin, end); });
   }
 
-  task(end, end + tail_size);
+  const uint64_t tail = n % thread_count;
+  task(end, end + tail);
 
   thread_pool.Wait();
 }
 
-template <bool brute_force, typename T>
-__device__ void InputGeneratorImpl(rocrand_state_xorwow* states, uint64_t* n, T* x,
-                                   T (*wrapper)(rocrand_state_xorwow*, uint64_t)) {
-  if constexpr (brute_force) {
-    static_assert(std::is_floating_point_v<T>);
-    x[0] = *reinterpret_cast<T*>(&n[0]);
-  } else {
-    rocrand_state_xorwow local_state = states[0];
-    for (uint64_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n[0];
-         i += blockDim.x * gridDim.x) {
-      x[i] = wrapper(&local_state, i);
-    }
-    states[0] = local_state;
+template <typename InputType>
+__device__ void InputGeneratorImpl(ROCRAND_STATE* states, uint64_t* base, uint64_t* n, InputType* x,
+                                   InputType (*wrapper)(ROCRAND_STATE*, uint64_t, uint64_t)) {
+  // auto local_state = states[0];
+  for (uint64_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n[0]; i += blockDim.x * gridDim.x) {
+    x[i] = wrapper(states, base[0], i);
+  }
+  // states[0] = local_state;
+}
+
+template <typename OutputType, typename InputType>
+__device__ void TestValueGeneratorImpl(uint64_t* n, OutputType* y, InputType* x,
+                                       OutputType (*wrapper)(InputType)) {
+  for (uint64_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n[0]; i += blockDim.x * gridDim.x) {
+    y[i] = wrapper(x[i]);
   }
 }
 
-template <bool brute_force, typename T, typename U>
-__device__ void TestValueGeneratorImpl(uint64_t* n, T* y, U* x, T (*wrapper)(U)) {
-  for (uint64_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n[0]; i += blockDim.x * gridDim.x) {
-    if constexpr (brute_force) {
-      static_assert(std::is_floating_point_v<T>);
-      static_assert(std::is_floating_point_v<U>);
-      y[i] = wrapper(raw_add(x[0], static_cast<IntegerType<U>>(i)));
-    } else {
+template <typename OutputType, typename InputType>
+void ReferenceGeneratorImpl(uint64_t* n, OutputType* y, InputType* x,
+                            OutputType (*wrapper)(InputType)) {
+  const auto task = [=](uint64_t begin, uint64_t end) {
+    for (auto i = begin; i < end; ++i) {
       y[i] = wrapper(x[i]);
     }
-  }
+  };
 
-  auto tid = blockIdx.x * blockDim.x + threadIdx.x;
-  __syncthreads();
-  if (tid == 0) printf("%d\n", n[0]);
+  SubmitTasks(task, n[0]);
 }
 
-template <bool brute_force, typename T, typename U>
-void ReferenceGeneratorImpl(uint64_t* n, T* y, U* x, T (*wrapper)(U)) {
+template <typename OutputType, typename InputType>
+void ValidatorImpl(FailureReport* report, uint64_t* n, OutputType* y1, OutputType* y2, InputType* x,
+                   bool (*wrapper)(OutputType, OutputType, InputType)) {
   const auto task = [=](uint64_t begin, uint64_t end) {
-    for (uint64_t i = begin; i < end; ++i) {
-      if constexpr (brute_force) {
-        static_assert(std::is_floating_point_v<T>);
-        static_assert(std::is_floating_point_v<U>);
-        y[i] = wrapper(raw_add(x[0], static_cast<IntegerType<U>>(i)));
-      } else {
-        y[i] = wrapper(x[i]);
+    static std::mutex mtx;
+    for (auto i = begin; i < end; ++i) {
+      // {
+      //   std::lock_guard lg{mtx};
+      //   std::cout << y1[i] << " " << y2[i] << " " << *reinterpret_cast<uint32_t*>(&x[i])
+      //             << std::endl;
+      // }
+      if (!wrapper(y1[i], y2[i], x[i])) {
+        // std::stringstream ss;
+        // ss << std::scientific << std::setprecision(16) << &y1[i] << " " << &y2[i] << " " << &x[i]
+        //    << " " << i << "\n";
+        // // TODO improve report message
+
+        // static std::mutex mtx;
+        // {
+        //   std::lock_guard lg{mtx};
+        //   report->msg += ss.str();
+        // }
+
+        // return;
       }
     }
   };
@@ -105,58 +116,23 @@ void ReferenceGeneratorImpl(uint64_t* n, T* y, U* x, T (*wrapper)(U)) {
   SubmitTasks(task, n[0]);
 }
 
-template <bool brute_force, typename T, typename U>
-void ValidatorImpl(std::string& report, uint64_t* n, T* y1, T* y2, U* x, bool (*wrapper)(T, T, U)) {
-  const auto task = [=, &report](uint64_t begin, uint64_t end) {
-    for (uint64_t i = begin; i < end; ++i) {
-      U input;
-      if constexpr (brute_force) {
-        static_assert(std::is_floating_point_v<T>);
-        static_assert(std::is_floating_point_v<U>);
-        input = x[0];
-      } else {
-        input = x[i];
-      }
-
-      if (!wrapper(y1[i], y2[i], input)) {
-        std::stringstream ss;
-        ss << std::scientific << std::setprecision(16) << y1[i] << " " << y2[i] << " " << input
-           << "\n";
-        // TODO improve report message
-
-        static std::mutex mtx;
-        {
-          std::lock_guard lg{mtx};
-          report += ss.str();
-        }
-
-        return;
-      }
-    }
-  };
-
-  SubmitTasks(task, n[0]);
-}
-
-template <bool brute_force, typename T, typename U>
-void MathTestImpl(void (*input_generator)(rocrand_state_xorwow*, uint64_t*, U*),
-                  void (*test_value_generator)(uint64_t*, T*, U*),
+template <typename OutputType, typename InputType>
+void MathTestImpl(void (*input_generator)(ROCRAND_STATE*, uint64_t*, uint64_t*, InputType*),
+                  void (*test_value_generator)(uint64_t*, OutputType*, InputType*),
                   void (*reference_generator)(void**), void (*validator)(void**),
-                  uint64_t base_value, uint64_t batch_size, uint64_t num_values) {
+                  uint64_t batch_size, uint64_t begin, uint64_t end) {
   GraphEngineParams params = {0};
   params.input_generator = reinterpret_cast<void*>(input_generator);
   params.test_value_generator = reinterpret_cast<void*>(test_value_generator);
   params.reference_generator = reinterpret_cast<void*>(reference_generator);
   params.validator = reinterpret_cast<void*>(validator);
-  params.input_sizeof = sizeof(U);
-  params.test_value_sizeof = sizeof(T);
-  params.base_value = base_value;
   params.batch_size = batch_size;
 
-  GraphEngine<brute_force> graph_engine{params};
-
-  StreamGuard stream{Streams::created};
-  graph_engine.Launch(num_values, stream.stream());
+  GraphEngine<OutputType, InputType> graph_engine{params};
+  {
+    StreamGuard stream{Streams::perThread};
+    graph_engine.Launch(begin, end, stream.stream());
+  }
 }
 
 template <typename T, typename Matcher> class ValidatorBase : public Catch::MatcherBase<T> {

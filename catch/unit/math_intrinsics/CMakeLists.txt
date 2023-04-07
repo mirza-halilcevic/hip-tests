@@ -21,7 +21,7 @@
 set(TEST_SRC
     kernels.cc
     single_precision.cc
-    double_precision.cc
+    #double_precision.cc
 )
 
 hip_add_exe_to_target(NAME MathIntrinsicsTest

@@ -37,4 +37,4 @@ endif()
 add_test(NAME Unit_AtomicBuiltins_Negative_Parameters
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
-         atomic_builtins_kernels.cc 50 26) # Should be 34 warnings, see EXSWHTEC-309
+         atomic_builtins_kernels.cc 60 27) # Should be 35 warnings, see EXSWHTEC-309

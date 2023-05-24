@@ -18,27 +18,23 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-add_subdirectory(rtc)
-add_subdirectory(deviceLib)
-add_subdirectory(graph)
-add_subdirectory(memory)
-add_subdirectory(stream)
-add_subdirectory(event)
-add_subdirectory(occupancy)
-add_subdirectory(device)
-add_subdirectory(printf)
-add_subdirectory(texture)
-add_subdirectory(streamperthread)
-add_subdirectory(kernel)
-add_subdirectory(multiThread)
-add_subdirectory(compiler)
-add_subdirectory(errorHandling)
-add_subdirectory(cooperativeGrps)
-add_subdirectory(context)
-if(HIP_PLATFORM STREQUAL "amd")
-add_subdirectory(callback)
-#add_subdirectory(clock)
-# Vulkan interop APIs currently undefined for Nvidia
-add_subdirectory(vulkan_interop)
+set(TEST_SRC
+    atomic_builtins.cc
+)
+
+if(HIP_PLATFORM MATCHES "nvidia")
+    hip_add_exe_to_target(NAME AtomicBuiltinsTest
+                        TEST_SRC ${TEST_SRC}
+                        TEST_TARGET_NAME build_tests
+                        LINKER_LIBS nvrtc)
+elseif(HIP_PLATFORM MATCHES "amd")
+    hip_add_exe_to_target(NAME AtomicBuiltinsTest
+                        TEST_SRC ${TEST_SRC}
+                        TEST_TARGET_NAME build_tests
+                        LINKER_LIBS hiprtc)
 endif()
-add_subdirectory(atomicBuiltins)
+
+add_test(NAME Unit_AtomicBuiltins_Negative_Parameters
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         atomic_builtins_kernels.cc 50 26) # Should be 34 warnings, see EXSWHTEC-309

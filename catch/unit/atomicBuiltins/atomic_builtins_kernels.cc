@@ -89,7 +89,7 @@ __global__ void LoadCompileKernel(int* x, int* y) {
   *y = __hip_atomic_load(x, __ATOMIC_RELEASE, kMemScope);
   // Acquire-Release not allowed by C++11 for load
   *y = __hip_atomic_load(x, __ATOMIC_ACQ_REL, kMemScope);
-  // Memory order is out of bounds.
+  // Memory order is out of bounds
   *y = __hip_atomic_load(x, -1, kMemScope);
   *y = __hip_atomic_load(x, 10, kMemScope);
   // Memory scope is out of bounds
@@ -376,6 +376,7 @@ __global__ void FetchOrCompileKernel(int* x) {
 
 __global__ void FetchXorCompileKernel(int* x) {
   int old{};
+  // Valid combinations
   old = __hip_atomic_fetch_xor(x, 1, __ATOMIC_RELAXED, kMemScope);
   old = __hip_atomic_fetch_xor(x, 1, __ATOMIC_CONSUME, kMemScope);
   old = __hip_atomic_fetch_xor(x, 1, __ATOMIC_ACQUIRE, kMemScope);

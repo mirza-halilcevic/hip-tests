@@ -45,11 +45,14 @@ static constexpr auto kBuiltinStore{R"(
 
   __global__ void StoreCompileKernel(int* x) {
     __hip_atomic_store(x, 1, __ATOMIC_RELAXED, kMemScope);
-    __hip_atomic_store(x, 1, __ATOMIC_ACQUIRE, kMemScope);
     __hip_atomic_store(x, 1, __ATOMIC_RELEASE, kMemScope);
-    __hip_atomic_store(*x, 1, __ATOMIC_RELEASE, kMemScope);
-    __hip_atomic_store(x, 1, __ATOMIC_ACQ_REL, kMemScope);
     __hip_atomic_store(x, 1, __ATOMIC_SEQ_CST, kMemScope);
+
+    __hip_atomic_store(reinterpret_cast<const int*>(x), 1, kMemOrder, kMemScope);
+    __hip_atomic_store(*x, 1, kMemOrder, kMemScope);
+    __hip_atomic_store(x, 1, __ATOMIC_CONSUME, kMemScope);
+    __hip_atomic_store(x, 1, __ATOMIC_ACQUIRE, kMemScope);
+    __hip_atomic_store(x, 1, __ATOMIC_ACQ_REL, kMemScope);
     __hip_atomic_store(x, 1, -1, kMemScope);
     __hip_atomic_store(x, 1, 10, kMemScope);
     __hip_atomic_store(x, 1, kMemOrder, -1);
@@ -87,11 +90,13 @@ static constexpr auto kBuiltinLoad{R"(
 
   __global__ void LoadCompileKernel(int* x, int* y) {
     *y = __hip_atomic_load(x, __ATOMIC_RELAXED, kMemScope);
+    *y = __hip_atomic_load(x, __ATOMIC_CONSUME, kMemScope);
     *y = __hip_atomic_load(x, __ATOMIC_ACQUIRE, kMemScope);
-    *y = __hip_atomic_load(*x, __ATOMIC_ACQUIRE, kMemScope);
+    *y = __hip_atomic_load(x, __ATOMIC_SEQ_CST, kMemScope);
+
+    *y = __hip_atomic_load(*x, kMemOrder, kMemScope);
     *y = __hip_atomic_load(x, __ATOMIC_RELEASE, kMemScope);
     *y = __hip_atomic_load(x, __ATOMIC_ACQ_REL, kMemScope);
-    *y = __hip_atomic_load(x, __ATOMIC_SEQ_CST, kMemScope);
     *y = __hip_atomic_load(x, -1, kMemScope);
     *y = __hip_atomic_load(x, 10, kMemScope);
     *y = __hip_atomic_load(x, kMemOrder, -1);
@@ -127,16 +132,50 @@ static constexpr auto kBuiltinCompExWeak{R"(
     __device__ ~Dummy() {}
   };
 
-    __global__ void CompareWeakCompileKernel(int* x, int* expected) {
+  __global__ void CompareWeakCompileKernel(int* x, int* expected) {
     bool res{false};
-    res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_SEQ_CST, __ATOMIC_RELEASE,
+    res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED,
+                                            kMemScope);
+    res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_CONSUME, __ATOMIC_RELAXED,
+                                            kMemScope);
+    res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_CONSUME, __ATOMIC_CONSUME,
+                                            kMemScope);
+    res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED,
+                                            kMemScope);
+    res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_ACQUIRE, __ATOMIC_CONSUME,
+                                            kMemScope);
+    res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE,
+                                            kMemScope);
+    res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_RELEASE, __ATOMIC_RELAXED,
+                                            kMemScope);
+    res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_RELEASE, __ATOMIC_CONSUME,
+                                            kMemScope);
+    res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE,
+                                            kMemScope);
+    res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED,
+                                            kMemScope);
+    res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_ACQ_REL, __ATOMIC_CONSUME,
+                                            kMemScope);
+    res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE,
+                                            kMemScope);
+    res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_SEQ_CST, __ATOMIC_RELAXED,
+                                            kMemScope);
+    res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_SEQ_CST, __ATOMIC_CONSUME,
+                                            kMemScope);
+    res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_SEQ_CST, __ATOMIC_ACQUIRE,
                                             kMemScope);
     res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_SEQ_CST, __ATOMIC_ACQ_REL,
                                             kMemScope);
-    res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_RELAXED, __ATOMIC_ACQUIRE,
+    res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST,
                                             kMemScope);
-    res = __hip_atomic_compare_exchange_weak(*x, expected, 1, __ATOMIC_RELAXED, __ATOMIC_ACQUIRE,
+
+    res = __hip_atomic_compare_exchange_weak(x, expected, 1, kMemOrder, __ATOMIC_RELEASE, kMemScope);
+    res = __hip_atomic_compare_exchange_weak(x, expected, 1, kMemOrder, __ATOMIC_ACQ_REL, kMemScope);
+    res = __hip_atomic_compare_exchange_weak(x, expected, 1, __ATOMIC_RELAXED, __ATOMIC_SEQ_CST,
                                             kMemScope);
+    res = __hip_atomic_compare_exchange_weak(reinterpret_cast<const int*>(x), expected, 1, kMemOrder,
+                                            kMemOrder, kMemScope);
+    res = __hip_atomic_compare_exchange_weak(*x, expected, 1, kMemOrder, kMemOrder, kMemScope);
     res = __hip_atomic_compare_exchange_weak(x, expected, 1, -1, kMemOrder, kMemScope);
     res = __hip_atomic_compare_exchange_weak(x, expected, 1, 10, kMemOrder, kMemScope);
     res = __hip_atomic_compare_exchange_weak(x, expected, 1, kMemOrder, -1, kMemScope);
@@ -179,15 +218,50 @@ static constexpr auto kBuiltinCompExStrong{R"(
 
   __global__ void CompareStrongCompileKernel(int* x, int* expected) {
     bool res{false};
-
-    res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_SEQ_CST, __ATOMIC_RELEASE,
+    res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED,
+                                              kMemScope);
+    res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_CONSUME, __ATOMIC_RELAXED,
+                                              kMemScope);
+    res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_CONSUME, __ATOMIC_CONSUME,
+                                              kMemScope);
+    res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED,
+                                              kMemScope);
+    res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_ACQUIRE, __ATOMIC_CONSUME,
+                                              kMemScope);
+    res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE,
+                                              kMemScope);
+    res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_RELEASE, __ATOMIC_RELAXED,
+                                              kMemScope);
+    res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_RELEASE, __ATOMIC_CONSUME,
+                                              kMemScope);
+    res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE,
+                                              kMemScope);
+    res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED,
+                                              kMemScope);
+    res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_ACQ_REL, __ATOMIC_CONSUME,
+                                              kMemScope);
+    res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE,
+                                              kMemScope);
+    res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_SEQ_CST, __ATOMIC_RELAXED,
+                                              kMemScope);
+    res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_SEQ_CST, __ATOMIC_CONSUME,
+                                              kMemScope);
+    res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_SEQ_CST, __ATOMIC_ACQUIRE,
                                               kMemScope);
     res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_SEQ_CST, __ATOMIC_ACQ_REL,
                                               kMemScope);
-    res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_RELAXED, __ATOMIC_ACQUIRE,
+    res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST,
                                               kMemScope);
-    res = __hip_atomic_compare_exchange_strong(*x, expected, 1, __ATOMIC_RELAXED, __ATOMIC_ACQUIRE,
+
+    res =
+        __hip_atomic_compare_exchange_strong(x, expected, 1, kMemOrder, __ATOMIC_RELEASE, kMemScope);
+    res =
+        __hip_atomic_compare_exchange_strong(x, expected, 1, kMemOrder, __ATOMIC_ACQ_REL, kMemScope);
+    res = __hip_atomic_compare_exchange_strong(x, expected, 1, __ATOMIC_RELAXED, __ATOMIC_SEQ_CST,
                                               kMemScope);
+    res = __hip_atomic_compare_exchange_strong(reinterpret_cast<const int*>(x), expected, 1,
+                                              kMemOrder, kMemOrder, kMemScope);
+    res = __hip_atomic_compare_exchange_strong(*x, expected, 1, kMemOrder, kMemOrder, kMemScope);
     res = __hip_atomic_compare_exchange_strong(x, expected, 1, -1, kMemOrder, kMemScope);
     res = __hip_atomic_compare_exchange_strong(x, expected, 1, 10, kMemOrder, kMemScope);
     res = __hip_atomic_compare_exchange_strong(x, expected, 1, kMemOrder, -1, kMemScope);
@@ -231,11 +305,14 @@ static constexpr auto kBuiltinExchange{R"(
   __global__ void ExchangeCompileKernel(int* x) {
     int old{};
     old = __hip_atomic_exchange(x, 1, __ATOMIC_RELAXED, kMemScope);
+    old = __hip_atomic_exchange(x, 1, __ATOMIC_CONSUME, kMemScope);
     old = __hip_atomic_exchange(x, 1, __ATOMIC_ACQUIRE, kMemScope);
     old = __hip_atomic_exchange(x, 1, __ATOMIC_RELEASE, kMemScope);
-    old = __hip_atomic_exchange(*x, 1, __ATOMIC_RELEASE, kMemScope);
     old = __hip_atomic_exchange(x, 1, __ATOMIC_ACQ_REL, kMemScope);
     old = __hip_atomic_exchange(x, 1, __ATOMIC_SEQ_CST, kMemScope);
+
+    old = __hip_atomic_exchange(reinterpret_cast<const int*>(x), 1, kMemOrder, kMemScope);
+    old = __hip_atomic_exchange(*x, 1, kMemOrder, kMemScope);
     old = __hip_atomic_exchange(x, 1, -1, kMemScope);
     old = __hip_atomic_exchange(x, 1, 10, kMemScope);
     old = __hip_atomic_exchange(x, 1, kMemOrder, -1);
@@ -274,11 +351,14 @@ static constexpr auto kBuiltinFetchAdd{R"(
   __global__ void FetchAddCompileKernel(int* x) {
     int old{};
     old = __hip_atomic_fetch_add(x, 1, __ATOMIC_RELAXED, kMemScope);
-    old = __hip_atomic_fetch_add(*x, 1, __ATOMIC_RELAXED, kMemScope);
+    old = __hip_atomic_fetch_add(x, 1, __ATOMIC_CONSUME, kMemScope);
     old = __hip_atomic_fetch_add(x, 1, __ATOMIC_ACQUIRE, kMemScope);
     old = __hip_atomic_fetch_add(x, 1, __ATOMIC_RELEASE, kMemScope);
     old = __hip_atomic_fetch_add(x, 1, __ATOMIC_ACQ_REL, kMemScope);
     old = __hip_atomic_fetch_add(x, 1, __ATOMIC_SEQ_CST, kMemScope);
+
+    old = __hip_atomic_fetch_add(reinterpret_cast<const int*>(x), 1, kMemOrder, kMemScope);
+    old = __hip_atomic_fetch_add(*x, 1, kMemOrder, kMemScope);
     old = __hip_atomic_fetch_add(x, 1, -1, kMemScope);
     old = __hip_atomic_fetch_add(x, 1, 10, kMemScope);
     old = __hip_atomic_fetch_add(x, 1, kMemOrder, -1);
@@ -312,11 +392,14 @@ static constexpr auto kBuiltinFetchAnd{R"(
   __global__ void FetchAndCompileKernel(int* x) {
     int old{};
     old = __hip_atomic_fetch_and(x, 1, __ATOMIC_RELAXED, kMemScope);
-    old = __hip_atomic_fetch_and(*x, 1, __ATOMIC_RELAXED, kMemScope);
+    old = __hip_atomic_fetch_and(x, 1, __ATOMIC_CONSUME, kMemScope);
     old = __hip_atomic_fetch_and(x, 1, __ATOMIC_ACQUIRE, kMemScope);
     old = __hip_atomic_fetch_and(x, 1, __ATOMIC_RELEASE, kMemScope);
     old = __hip_atomic_fetch_and(x, 1, __ATOMIC_ACQ_REL, kMemScope);
     old = __hip_atomic_fetch_and(x, 1, __ATOMIC_SEQ_CST, kMemScope);
+
+    old = __hip_atomic_fetch_and(reinterpret_cast<const int*>(x), 1, kMemOrder, kMemScope);
+    old = __hip_atomic_fetch_and(*x, 1, kMemOrder, kMemScope);
     old = __hip_atomic_fetch_and(x, 1, -1, kMemScope);
     old = __hip_atomic_fetch_and(x, 1, 10, kMemScope);
     old = __hip_atomic_fetch_and(x, 1, kMemOrder, -1);
@@ -324,7 +407,7 @@ static constexpr auto kBuiltinFetchAnd{R"(
 
     Dummy dummy{};
     old = __hip_atomic_fetch_and(&dummy, 1, kMemOrder, kMemScope);
-    float float_var{1.5};
+    float float_var{1.5f};
     old = __hip_atomic_fetch_and(&float_var, 1, kMemOrder, kMemScope);
     double double_var{1.5};
     old = __hip_atomic_fetch_and(&double_var, 1, kMemOrder, kMemScope);
@@ -354,11 +437,14 @@ static constexpr auto kBuiltinFetchOr{R"(
   __global__ void FetchOrCompileKernel(int* x) {
     int old{};
     old = __hip_atomic_fetch_or(x, 1, __ATOMIC_RELAXED, kMemScope);
-    old = __hip_atomic_fetch_or(*x, 1, __ATOMIC_RELAXED, kMemScope);
+    old = __hip_atomic_fetch_or(x, 1, __ATOMIC_CONSUME, kMemScope);
     old = __hip_atomic_fetch_or(x, 1, __ATOMIC_ACQUIRE, kMemScope);
     old = __hip_atomic_fetch_or(x, 1, __ATOMIC_RELEASE, kMemScope);
     old = __hip_atomic_fetch_or(x, 1, __ATOMIC_ACQ_REL, kMemScope);
     old = __hip_atomic_fetch_or(x, 1, __ATOMIC_SEQ_CST, kMemScope);
+
+    old = __hip_atomic_fetch_or(reinterpret_cast<const int*>(x), 1, kMemOrder, kMemScope);
+    old = __hip_atomic_fetch_or(*x, 1, kMemOrder, kMemScope);
     old = __hip_atomic_fetch_or(x, 1, -1, kMemScope);
     old = __hip_atomic_fetch_or(x, 1, 10, kMemScope);
     old = __hip_atomic_fetch_or(x, 1, kMemOrder, -1);
@@ -396,11 +482,14 @@ static auto constexpr kBuiltinFetchXor{R"(
   __global__ void FetchXorCompileKernel(int* x) {
     int old{};
     old = __hip_atomic_fetch_xor(x, 1, __ATOMIC_RELAXED, kMemScope);
-    old = __hip_atomic_fetch_xor(*x, 1, __ATOMIC_RELAXED, kMemScope);
+    old = __hip_atomic_fetch_xor(x, 1, __ATOMIC_CONSUME, kMemScope);
     old = __hip_atomic_fetch_xor(x, 1, __ATOMIC_ACQUIRE, kMemScope);
     old = __hip_atomic_fetch_xor(x, 1, __ATOMIC_RELEASE, kMemScope);
     old = __hip_atomic_fetch_xor(x, 1, __ATOMIC_ACQ_REL, kMemScope);
     old = __hip_atomic_fetch_xor(x, 1, __ATOMIC_SEQ_CST, kMemScope);
+
+    old = __hip_atomic_fetch_xor(reinterpret_cast<const int*>(x), 1, kMemOrder, kMemScope);
+    old = __hip_atomic_fetch_xor(*x, 1, kMemOrder, kMemScope);
     old = __hip_atomic_fetch_xor(x, 1, -1, kMemScope);
     old = __hip_atomic_fetch_xor(x, 1, 10, kMemScope);
     old = __hip_atomic_fetch_xor(x, 1, kMemOrder, -1);
@@ -438,15 +527,18 @@ static constexpr auto kBuiltinFetchMax{R"(
   __global__ void FetchMaxCompileKernel(int* x) {
     int old{};
     old = __hip_atomic_fetch_max(x, 1, __ATOMIC_RELAXED, kMemScope);
-    old = __hip_atomic_fetch_max(*x, 1, __ATOMIC_RELAXED, kMemScope);
+    old = __hip_atomic_fetch_max(x, 1, __ATOMIC_CONSUME, kMemScope);
     old = __hip_atomic_fetch_max(x, 1, __ATOMIC_ACQUIRE, kMemScope);
     old = __hip_atomic_fetch_max(x, 1, __ATOMIC_RELEASE, kMemScope);
     old = __hip_atomic_fetch_max(x, 1, __ATOMIC_ACQ_REL, kMemScope);
     old = __hip_atomic_fetch_max(x, 1, __ATOMIC_SEQ_CST, kMemScope);
+
+    old = __hip_atomic_fetch_max(reinterpret_cast<const int*>(x), 1, kMemOrder, kMemScope);
+    old = __hip_atomic_fetch_max(*x, 1, kMemOrder, kMemScope);
     old = __hip_atomic_fetch_max(x, 1, -1, kMemScope);
     old = __hip_atomic_fetch_max(x, 1, 10, kMemScope);
-    old = __hip_atomic_fetch_max(x, 1, __ATOMIC_RELAXED, -1);
-    old = __hip_atomic_fetch_max(x, 1, __ATOMIC_RELAXED, 10);
+    old = __hip_atomic_fetch_max(x, 1, kMemOrder, -1);
+    old = __hip_atomic_fetch_max(x, 1, kMemOrder, 10);
 
     Dummy dummy{};
     old = __hip_atomic_fetch_max(&dummy, 1, kMemOrder, kMemScope);
@@ -476,11 +568,14 @@ static constexpr auto kBuiltinFetchMin{R"(
   __global__ void FetchMinCompileKernel(int* x) {
     int old{};
     old = __hip_atomic_fetch_min(x, 1, __ATOMIC_RELAXED, kMemScope);
-    old = __hip_atomic_fetch_min(*x, 1, __ATOMIC_RELAXED, kMemScope);
+    old = __hip_atomic_fetch_min(x, 1, __ATOMIC_CONSUME, kMemScope);
     old = __hip_atomic_fetch_min(x, 1, __ATOMIC_ACQUIRE, kMemScope);
     old = __hip_atomic_fetch_min(x, 1, __ATOMIC_RELEASE, kMemScope);
     old = __hip_atomic_fetch_min(x, 1, __ATOMIC_ACQ_REL, kMemScope);
     old = __hip_atomic_fetch_min(x, 1, __ATOMIC_SEQ_CST, kMemScope);
+
+    old = __hip_atomic_fetch_min(reinterpret_cast<const int*>(x), 1, kMemOrder, kMemScope);
+    old = __hip_atomic_fetch_min(*x, 1, kMemOrder, kMemScope);
     old = __hip_atomic_fetch_min(x, 1, -1, kMemScope);
     old = __hip_atomic_fetch_min(x, 1, 10, kMemScope);
     old = __hip_atomic_fetch_min(x, 1, kMemOrder, -1);

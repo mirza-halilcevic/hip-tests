@@ -58,17 +58,17 @@ void AtomicBuiltinsRTCWrapper(const char* program_source, int expected_errors_nu
 }
 
 TEST_CASE("Unit_AtomicBuiltins_Negative_Parameters_RTC") {
-  AtomicBuiltinsRTCWrapper(kBuiltinStore, 4, 4);
+  AtomicBuiltinsRTCWrapper(kBuiltinStore, 5, 5);
   AtomicBuiltinsRTCWrapper(kBuiltinLoad, 4, 4);
-  /* Begin: Should be 4 errors, 6 warnings for both. See EXSWHTEC-309*/
-  AtomicBuiltinsRTCWrapper(kBuiltinCompExWeak, 4, 2);
-  AtomicBuiltinsRTCWrapper(kBuiltinCompExStrong, 4, 2);
+  /* Begin: Should be 5 errors, 6 warnings for both. See EXSWHTEC-309*/
+  AtomicBuiltinsRTCWrapper(kBuiltinCompExWeak, 5, 2);
+  AtomicBuiltinsRTCWrapper(kBuiltinCompExStrong, 5, 2);
   /* End. */
-  AtomicBuiltinsRTCWrapper(kBuiltinExchange, 4, 2);
-  AtomicBuiltinsRTCWrapper(kBuiltinFetchAdd, 4, 2);
-  AtomicBuiltinsRTCWrapper(kBuiltinFetchAnd, 6, 2);
-  AtomicBuiltinsRTCWrapper(kBuiltinFetchOr, 6, 2);
-  AtomicBuiltinsRTCWrapper(kBuiltinFetchXor, 6, 2);
-  AtomicBuiltinsRTCWrapper(kBuiltinFetchMax, 4, 2);
-  AtomicBuiltinsRTCWrapper(kBuiltinFetchMin, 4, 2);
+  AtomicBuiltinsRTCWrapper(kBuiltinExchange, 5, 2);
+  AtomicBuiltinsRTCWrapper(kBuiltinFetchAdd, 5, 2);
+  AtomicBuiltinsRTCWrapper(kBuiltinFetchAnd, 7, 2);
+  AtomicBuiltinsRTCWrapper(kBuiltinFetchOr, 7, 2);
+  AtomicBuiltinsRTCWrapper(kBuiltinFetchXor, 7, 2);
+  AtomicBuiltinsRTCWrapper(kBuiltinFetchMax, 5, 2);
+  AtomicBuiltinsRTCWrapper(kBuiltinFetchMin, 5, 2);
 }

@@ -56,3 +56,10 @@ THE SOFTWARE.
  * This section describes tests for the error handling functions of HIP runtime API.
  * @}
  */
+
+/**
+ * @defgroup DriverTest Initialization and Version
+ * @{
+ * This section describes tests for the initialization and version functions of HIP runtime API.
+ * @}
+ */

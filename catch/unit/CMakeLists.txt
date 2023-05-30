@@ -41,5 +41,6 @@ add_subdirectory(module)
 #add_subdirectory(clock)
 # Vulkan interop APIs currently undefined for Nvidia
 add_subdirectory(vulkan_interop)
+add_subdirectory(gl_interop) # Disabled on NVIDIA due to defect - EXSWHTEC-246
 endif()
 add_subdirectory(executionControl)

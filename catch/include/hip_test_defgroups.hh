@@ -662,3 +662,10 @@ TEST_CASE("Unit_hipStreamValue_Wait64_NonBlocking_Mask_And"){}
  * This section describes tests for the occupancy functions of HIP runtime API.
  * @}
  */
+
+/**
+ * @defgroup GLTest Interop
+ * @{
+ * This section describes tests for the GL interop functions of HIP runtime API.
+ * @}
+ */

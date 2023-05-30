@@ -33,14 +33,17 @@ THE SOFTWARE.
 /**
  * Test Description
  * ------------------------
- *  - Performs basic peer to peer memcpy functionality between each pair of devices.
- *  - Launches computation kernel.
+ *  - For each pair of devices:
+ *    -# Allocate memory on both devices.
+ *    -# Launch kernel on one device.
+ *    -# Copy the results on the other device.
+ *    -# Compare results.
  * Test source
  * ------------------------
  *  - unit/memory/hipMemcpyPeer.cc
  * Test requirements
  * ------------------------
- *  - Peer access supported
+ *  - Device supports peer to peer access
  *  - Multi-device
  *  - HIP_VERSION >= 5.2
  */
@@ -93,13 +96,13 @@ TEST_CASE("Unit_hipMemcpyPeer_Positive_Default") {
 /**
  * Test Description
  * ------------------------
- *  - Checks synchronization behavior for peer memcpy.
+ *  - Validate synchronization behaviour of the API.
  * Test source
  * ------------------------
  *  - unit/memory/hipMemcpyPeer.cc
  * Test requirements
  * ------------------------
- *  - Peer access supported
+ *  - Device supports peer to peer access
  *  - Multi-device
  *  - HIP_VERSION >= 5.2
  */
@@ -140,13 +143,13 @@ TEST_CASE("Unit_hipMemcpyPeer_Positive_Synchronization_Behavior") {
 /**
  * Test Description
  * ------------------------
- *  - Checks that no data is copied if size is set to 0.
+ *  - Validate that no data is coped when size is set to zero.
  * Test source
  * ------------------------
  *  - unit/memory/hipMemcpyPeer.cc
  * Test requirements
  * ------------------------
- *  - Peer access supported
+ *  - Device supports peer to peer access
  *  - Multi-device
  *  - HIP_VERSION >= 5.2
  */
@@ -202,22 +205,22 @@ TEST_CASE("Unit_hipMemcpyPeer_Positive_ZeroSize") {
  * Test Description
  * ------------------------
  *  - Validates handling of invalid arguments:
- *    -# When output destination pointer is `nullptr`
+ *    -# When destination pointer is `nullptr`
  *      - Expected output: return `hipErrorInvalidValue`
  *    -# When source pointer is `nullptr`
  *      - Expected output: return `hipErrorInvalidValue`
- *    -# When copying more than allocated
+ *    -# When copying more memory than allocated
  *      - Expected output: return `hipErrorInvalidValue`
- *    -# When destination device ID is not valid (out of bounds)
+ *    -# When destination device ID is not valid, -1 or out of bounds
  *      - Expected output: return `hipErrorInvalidDevice`
- *    -# When source device ID is not valid (out of bounds)
+ *    -# When source device ID is not valid, -1 or out of bounds
  *      - Expected output: return `hipErrorInvalidDevice`
  * Test source
  * ------------------------
  *  - unit/memory/hipMemcpyPeer.cc
  * Test requirements
  * ------------------------
- *  - Peer access supported
+ *  - Device supports peer to peer access
  *  - Multi-device
  *  - HIP_VERSION >= 5.2
  */

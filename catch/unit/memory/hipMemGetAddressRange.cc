@@ -32,11 +32,11 @@ THE SOFTWARE.
 /**
  * Test Description
  * ------------------------
- *  - Allocate memory and check if base and size match allocated memory values.
- *  - Check for various offset values from base memory address:
- *    - Host address range
- *    - Device address range
- *    - Pitch address range
+ *  - Validates handling of various memory allocation types and offsets.
+ *  - Following memory allocation types are considered:
+ *    -# Host address range
+ *    -# Device address range
+ *    -# Pitch address range
  * Test source
  * ------------------------
  *  - unit/memory/hipMemGetAddressRange.cc
@@ -88,9 +88,9 @@ TEST_CASE("Unit_hipMemGetAddressRange_Positive") {
  * Test Description
  * ------------------------
  *  - Validates handling of invalid arguments:
- *    -# When device handle is not valid
+ *    -# When device pointer is not valid
  *      - Expected output: return `hipErrorNotFound`
- *    -# When offset is greated than allocated size
+ *    -# When offset is greater than allocated size
  *      - Expected output: return `hipErrorNotFound`
  * Test source
  * ------------------------

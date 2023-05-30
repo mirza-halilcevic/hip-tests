@@ -35,14 +35,14 @@ THE SOFTWARE.
 /**
  * Test Description
  * ------------------------
- *  - Enables peer access for each GPU pair.
- *  - Disables peer access for each GPU pair.
+ *  - Successfully enable peer access between each pair of devices.
+ *  - Successfully disable peer access between each pair of devices.
  * Test source
  * ------------------------
  *  - unit/device/hipDeviceEnableDisablePeerAccess.cc
  * Test requirements
  * ------------------------
- *  - PeerToPeer supported
+ *  - Device supports peer to peer access
  *  - Multi-device
  *  - HIP_VERSION >= 5.2
  */
@@ -73,18 +73,17 @@ TEST_CASE("Unit_hipDeviceEnableDisablePeerAccess_positive") {
  * Test Description
  * ------------------------
  *  - Validates handling of invalid arguments:
- *    -# When peer device ID is invalid (-1 or out of bounds)
+ *    -# When peer device ID is not valid, -1 or out of bounds
  *      - Expected output: return `hipErrorInvalidDevice`
- *    -# When flag is invalid (-1)
+ *    -# When flag is not valid (-1)
  *      - Expected output: return `hipErrorInvalidValue`
  *    -# When peer access has already been enabled
- *      - Expected output: return `hipErrorPeerAccessAleadyEnabled`
+ *      - Expected output: return `hipErrorPeerAccessAlreadyEnabled`
  * Test source
  * ------------------------
  *  - unit/device/hipDeviceEnableDisablePeerAccess.cc
  * Test requirements
  * ------------------------
- *  - Multi-device
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipDeviceEnablePeerAccess_negative") {
@@ -125,9 +124,9 @@ TEST_CASE("Unit_hipDeviceEnablePeerAccess_negative") {
  * @addtogroup hipDeviceDisablePeerAccess hipDeviceDisablePeerAccess
  * @{
  * @ingroup PeerToPeerTest
- * hipDeviceDisablePeerAccess(int peerDeviceId)` -
- * Disable direct access from current device's virtual address space
- * to memory allocations physically located on a peer device.
+ * `hipDeviceDisablePeerAccess(int peerDeviceId)` -
+ * Disable direct access from current device's virtual address space to memory allocations
+ * physically located on a peer device.
  * ________________________
  * Test cases from other modules:
  *  - @ref Unit_hipDeviceEnableDisablePeerAccess_positive
@@ -137,18 +136,17 @@ TEST_CASE("Unit_hipDeviceEnablePeerAccess_negative") {
  * Test Description
  * ------------------------
  *  - Validates handling of invalid arguments:
- *    -# When peer device ID is invalid (-1 or out of bounds)
+ *    -# When peer device ID is not valid, -1 or out of bounds
  *      - Expected output: return `hipErrorInvalidDevice`
  *    -# When peer access is not enabled
  *      - Expected output: return `hipErrorPeerAccessNotEnabled`
- *    -# When peer access is already disabled
+ *    -# When peer access has been disabled twice after enabling
  *      - Expected output: return `hipErrorPeerAccessNotEnabled`
  * Test source
  * ------------------------
  *  - unit/device/hipDeviceEnableDisablePeerAccess.cc
  * Test requirements
  * ------------------------
- *  - Multi-device
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipDeviceDisablePeerAccess_negative") {

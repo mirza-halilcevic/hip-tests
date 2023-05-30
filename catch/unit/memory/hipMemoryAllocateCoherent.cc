@@ -17,14 +17,15 @@ OUT OF OR INN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-/*
-This testcase verifies the following scenario
-1. Allocating the memory and modifying it coherently
-*/
-
 #include <hip_test_common.hh>
 #include <hip_test_kernels.hh>
 #include <hip_test_checkers.hh>
+
+/**
+ * @addtogroup hipHostMalloc hipHostMalloc
+ * @{
+ * @ingroup MemoryTest
+ */
 
 constexpr auto wait_sec = 5000;
 
@@ -56,6 +57,18 @@ __global__ void Kernel_gfx11(float* hostRes, int clkRate) {
 #endif
 }
 
+/**
+ * Test Description
+ * ------------------------
+ *  - Allocates the memory.
+ *  - Modifies it with coherent access.
+ * Test source
+ * ------------------------
+ *  - unit/memory/hipMemoryAllocateCoherent.cc
+ * Test requirements
+ * ------------------------
+ *  - HIP_VERSION >= 5.2
+ */
 TEST_CASE("Unit_hipHostMalloc_CoherentAccess") {
   int blocks = 2;
   float* hostRes;

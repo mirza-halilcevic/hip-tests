@@ -34,7 +34,8 @@ THE SOFTWARE.
 /**
  * Test Description
  * ------------------------
- *  - Verifies that each available device can access memory from all other devices.
+ *  - Checks if each device has enabled peer access with
+ *    all other devices.
  * Test source
  * ------------------------
  *  - unit/device/hipDeviceCanAccessPeer.cc
@@ -67,12 +68,12 @@ TEST_CASE("Unit_hipDeviceCanAccessPeer_positive") {
 /**
  * Test Description
  * ------------------------
- *  - Verifies handling of invalid arguments:
- *    -# When output pointer to the peer result is `nullptr`
+ *  - Validates handling of invalid arguments:
+ *    -# When output pointer to the access flag is `nullptr`
  *      - Expected output: return `hipErrorInvalidValue`
- *    -# When device ID is invalid (-1 or out of bounds)
+ *    -# When device ID is not valid, -1 or out of bounds
  *      - Expected output: return `hipErrorInvalidDevice`
- *    -# When peer device ID is invalid (-1 or out of bounds)
+ *    -# When peer device ID is not valid, -1 or out of bounds
  *      - Expected output: return `hipErrorInvalidDevice`
  * Test source
  * ------------------------

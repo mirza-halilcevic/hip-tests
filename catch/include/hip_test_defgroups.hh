@@ -42,3 +42,10 @@ THE SOFTWARE.
  * This section describes tests for device management functions of HIP runtime API.
  * @}
  */
+
+/**
+ * @defgroup EventTest Event Management
+ * @{
+ * This section describes tests for the event management functions of HIP runtime API.
+ * @}
+ */

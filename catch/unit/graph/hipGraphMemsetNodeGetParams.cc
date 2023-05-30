@@ -28,7 +28,7 @@ THE SOFTWARE.
  * @{
  * @ingroup GraphTest
  * `hipGraphMemsetNodeGetParams(hipGraphNode_t node, hipMemsetParams *pNodeParams)` -
- * 	Gets a memset node's parameters
+ * 	Gets a memset node's parameters.
  * ________________________
  * Test cases from other APIs:
  *  - @ref Unit_hipGraphMemsetNodeSetParams_Positive_Basic
@@ -38,10 +38,14 @@ THE SOFTWARE.
 /**
  * Test Description
  * ------------------------
- *    - Verify API behaviour with invalid arguments:
- *      -# node is nullptr
- *      -# pNodeParams is nullptr
- *      -# node is destroyed
+ *  - Verify API behaviour with invalid arguments:
+ *    -# When node is `nullptr`
+ *      - Expected output: return `hipErrorInvalidValue`
+ *    -# When pNodeParams is `nullptr`
+ *      - Expected output: return `hipErrorInvalidValue`
+ *    -# When node is destroyed
+ *      - Platform specific (NVIDIA)
+ *      - Expected output: return `hipErrorInvalidValue`
  * Test source
  * ------------------------
  *    - unit/graph/hipGraphMemsetNodeGetParams.cc
@@ -72,7 +76,7 @@ TEST_CASE("Unit_hipGraphMemsetNodeGetParams_Negative_Parameters") {
   }
 
 // Disabled on AMD due to defect - EXSWHTEC-208
-#if 0
+#if HT_NVIDIA
   SECTION("Node is destroyed") {
     HIP_CHECK(hipGraphCreate(&graph, 0));
     HIP_CHECK(hipGraphAddMemsetNode(&node, graph, nullptr, 0, &params));

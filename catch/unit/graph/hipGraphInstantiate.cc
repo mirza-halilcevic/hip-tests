@@ -17,42 +17,41 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-/**
-Testcase Scenarios :
-Functional -
-1) Create a graph and then used it for hipGraphInstantiate without adding any node to graph.
-2.a) Create an invalid graph as shown below:
-   ---> empty node ---> empty node --->
-     ^                              |
-     |                              |
-     --------------------------------
-   Try instantiating the graph. Instantiating the graph should result in error.
-2.b) Create a more complex cyclic graph. Try instantiating the graph. Instantiating the graph
-   should result in error.
-2.c) Create a graph with child node. The graph in the child node is a cyclical graph.
-   Try instantiating the graph. Instantiating the graph should result in error.
-3.a) Create a graph with redundant dependencies. Instantiate and execute the graph and validate
-   the output.
-3.b) Create a graph. Instantiate the graph multiple times. Execute all the instantiated graphs
-   and validate the output. Destroy the instantiated graphs at the end.
-3.c) Create a graph. Instantiate the graph multiple times. In loop, execute an instantiated
-   graph, validate the output and destroy the current instantiated graph.
-
-Negative -
-1) Pass pGraphExec as null ptr and verify that api returns error code and doesn’t crash.
-2) Pass graph as null/invalid ptr and check if api returns error.
-3) Pass pGraphExec as un-initilize object and verify that api returns error code and doesn’t crash.
-4) Pass Graph as un-initilize and verify that api returns error code and doesn’t crash.
-*/
-
 #include <hip_test_common.hh>
 #include <hip_test_checkers.hh>
 #include <hip_test_kernels.hh>
 
-#define NUM_OF_INSTANCES 10
-/* Test verifies hipGraphInstantiate API Negative scenarios.
+/**
+ * @addtogroup hipGraphInstantiate hipGraphInstantiate
+ * @{
+ * @ingroup GraphTest
+ * `hipGraphInstantiate(hipGraphExec_t* pGraphExec, hipGraph_t graph,
+ * hipGraphNode_t* pErrorNode, char* pLogBuffer, size_t bufferSize)` -
+ * Creates an executable graph from a graph.
+ * ________________________
+ * Test cases from other modules:
+ *  - @ref Unit_hipGraph_BasicFunctional
  */
 
+/**
+ * Test Description
+ * ------------------------
+ *  - Validates handling of invalid arguments:
+ *    -# When output pointer to the executable graph is `nullptr`
+ *      - Expected output: return `hipErrorInvalidValue`
+ *    -# When graph handle is `nullptr`
+ *      - Expected output: return `hipErrorInvalidValue`
+ *    -# When graph is not initialized
+ *      - Expected output: return `hipErrorInvalidValue`
+ *    -# When executable graph is not initialized
+ *      - Expected output: return `hipSuccess`
+ * Test source
+ * ------------------------
+ *  - unit/graph/hipGraphInstantiate.cc
+ * Test requirements
+ * ------------------------
+ *  - HIP_VERSION >= 5.2
+ */
 TEST_CASE("Unit_hipGraphInstantiate_Negative") {
   hipError_t ret;
   hipGraphExec_t gExec{};
@@ -79,8 +78,17 @@ TEST_CASE("Unit_hipGraphInstantiate_Negative") {
   HIP_CHECK(hipGraphDestroy(graph));
 }
 
-/* Test verifies hipGraphInstantiate Basic scenarios.
-Create a graph and then used it for hipGraphInstantiate without adding any node to graph.
+/**
+ * Test Description
+ * ------------------------
+ *  - Creates a graph.
+ *  - Instantiates an executable graph.
+ * Test source
+ * ------------------------
+ *  - unit/graph/hipGraphInstantiate.cc
+ * Test requirements
+ * ------------------------
+ *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipGraphInstantiate_Basic") {
   hipGraph_t graph;

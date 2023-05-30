@@ -17,57 +17,49 @@ OUT OF OR INN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-/*
-Testcase Scenarios of hipGraphDestroyNode API:
-
-Negative ::
-
-1) Pass nullptr to graph node
-
-Functional ::
-
-1) Create Node and destroy the node
-2) Create graph with dependencies and destroy one of the dependency node
-   before executing the graph.
-3) Create a graph with N nodes and (N-1) dependencies between them as shown
-   below. Start destroying the nodes in iteration from left. In each iteration
-   verify the number of nodes and dependencies using hipGraphGetNodes and
-   hipGraphGetEdges.
-   Node1-->Node2-->Node3->...................->NodeN
-4) Create a graph with N nodes and (N-1) dependencies between them as shown
-   above. Clone the graph. Start destroying the nodes in iteration from left
-   in the cloned graph. In each iteration verify the number of nodes and
-   dependencies using hipGraphGetNodes and hipGraphGetEdges. Once all nodes
-   in the cloned graph are deleted, verify the number of nodes in the original
-   graph are intact.
-5) Create a graph1 with N nodes and (N-1) dependencies between them as shown
-   above. Create another empty graph0. Add graph1 as child node to graph0.
-   Delete the child node in graph0. Verify that the nodes in graph1 are still
-   intact after deleting the child node using hipGraphGetNodes and hipGraphGetEdges.
-*/
-
 #include <hip_test_common.hh>
 #include <hip_test_checkers.hh>
 #include <hip_test_kernels.hh>
 
-#define NUM_OF_DUMMY_NODES 8
+/**
+ * @addtogroup hipGraphDestroyNode hipGraphDestroyNode
+ * @{
+ * @ingroup GraphTest
+ * `hipGraphDestroyNode(hipGraphNode_t node)` -
+ * Remove a node from the graph.
+ */
 
-static __global__ void dummyKernel() {
-  return;
-}
-
-/* This test covers the negative scenarios of
-   hipGraphDestroyNode API */
+/**
+ * Test Description
+ * ------------------------
+ *  - Validates handling of invalid arguments:
+ *    -# When node handle is `nullptr`
+ *      - Expected output: return `hipErrorInvalidValue`
+ * Test source
+ * ------------------------
+ *  - unit/graph/hipGraphDestroyNode.cc
+ * Test requirements
+ * ------------------------
+ *  - HIP_VERSION >= 5.2
+ */
 TEST_CASE("Unit_hipGraphDestroyNode_Negative") {
   SECTION("Passing nullptr to graph Node") {
     REQUIRE(hipGraphDestroyNode(nullptr) == hipErrorInvalidValue);
   }
 }
 
-/* This test covers the basic functionality of
-   hipGraphDestroyNode API where we create and destroy
-   the node
-*/
+/**
+ * Test Description
+ * ------------------------
+ *  - Creates graph.
+ *  - Destroys one of the nodes successfully.
+ * Test source
+ * ------------------------
+ *  - unit/graph/hipGraphDestroyNode.cc
+ * Test requirements
+ * ------------------------
+ *  - HIP_VERSION >= 5.2
+ */
 TEST_CASE("Unit_hipGraphDestroyNode_BasicFunctionality") {
   char *pOutBuff_d{};
   constexpr size_t size = 1024;
@@ -89,11 +81,19 @@ TEST_CASE("Unit_hipGraphDestroyNode_BasicFunctionality") {
   HIP_CHECK(hipFree(pOutBuff_d));
 }
 
-/*
-This testcase verifies the following scenario where
-graph is created with dependencies and one of the dependency is
-destroyed before execute the graph
-*/
+/**
+ * Test Description
+ * ------------------------
+ *  - Creates graph with dependencies.
+ *  - Destroys one of the dependency nodes.
+ *  - Executes the graph.
+ * Test source
+ * ------------------------
+ *  - unit/graph/hipGraphDestroyNode.cc
+ * Test requirements
+ * ------------------------
+ *  - HIP_VERSION >= 5.2
+ */
 TEST_CASE("Unit_hipGraphDestroyNode_DestroyDependencyNode") {
   constexpr size_t N = 1024;
   constexpr size_t Nbytes = N * sizeof(int);

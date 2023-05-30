@@ -20,54 +20,79 @@ THE SOFTWARE.
 #include <hip_test_common.hh>
 
 /**
-Negative Testcase Scenarios :
-1) Pass hipGraphExecDestroy with nullptr.
-2) Pass hipGraphExecDestroy with un-initilze structure.
-3) Destroy graph before exec-graph destroyed and verify no crash occurs.
-*/
+ * @addtogroup hipGraphExecDestroy hipGraphExecDestroy
+ * @{
+ * @ingroup GraphTest
+ * `hipGraphExecDestroy(hipGraphExec_t graphExec)` -
+ * Destroys an executable graph.
+ * ________________________
+ * Test cases from other modules:
+ *  - @ref Unit_hipGraph_BasicFunctional
+ */
 
-TEST_CASE("Unit_hipGraphExecDestroy_Negative") {
-  hipError_t ret;
-  SECTION("Pass hipGraphExecDestroy with nullptr") {
-    ret = hipGraphExecDestroy(nullptr);
-    REQUIRE(hipErrorInvalidValue == ret);
-  }
-  SECTION("Pass hipGraphExecDestroy with un-initilze structure") {
-    hipGraphExec_t graphExec{};
-    ret = hipGraphExecDestroy(graphExec);
-    REQUIRE(hipErrorInvalidValue == ret);
-  }
+static void HostFunctionSetToZero(void* arg) {
+  int* test_number = (int*)arg;
+  (*test_number) = 0;
 }
 
-TEST_CASE("Unit_hipGraphExecDestroy_Sequence") {
+static void HostFunctionAddOne(void* arg) {
+  int* test_number = (int*)arg;
+  (*test_number) += 1;
+}
+
+/* create an executable graph that will set an integer pointed to by 'number' to one*/
+static void CreateTestExecutableGraph(hipGraphExec_t* graph_exec, int* number) {
   hipGraph_t graph;
-  hipGraphExec_t graphExec;
-  hipStream_t streamForGraph;
-  hipGraphNode_t memsetNode;
+  hipGraphNode_t node_error;
+
+  hipGraphNode_t node_set_zero;
+  hipHostNodeParams params_set_to_zero = {HostFunctionSetToZero, number};
+
+  hipGraphNode_t node_add_one;
+  hipHostNodeParams params_set_add_one = {HostFunctionAddOne, number};
 
   HIP_CHECK(hipGraphCreate(&graph, 0));
-  HIP_CHECK(hipStreamCreate(&streamForGraph));
 
-  char *devData;
-  HIP_CHECK(hipMalloc(&devData, 1024));
-  hipMemsetParams memsetParams{};
-  memset(&memsetParams, 0, sizeof(memsetParams));
-  memsetParams.dst = reinterpret_cast<void*>(devData);
-  memsetParams.value = 0;
-  memsetParams.pitch = 0;
-  memsetParams.elementSize = sizeof(char);
-  memsetParams.width = 1024;
-  memsetParams.height = 1;
-  HIP_CHECK(hipGraphAddMemsetNode(&memsetNode, graph, nullptr, 0,
-                                  &memsetParams));
+  HIP_CHECK(hipGraphAddHostNode(&node_set_zero, graph, nullptr, 0, &params_set_to_zero));
+  HIP_CHECK(hipGraphAddHostNode(&node_add_one, graph, &node_set_zero, 1, &params_set_add_one));
 
-  HIP_CHECK(hipGraphInstantiate(&graphExec, graph, nullptr, nullptr, 0));
-  REQUIRE(graphExec != nullptr);
-  HIP_CHECK(hipGraphLaunch(graphExec, streamForGraph));
-  HIP_CHECK(hipStreamSynchronize(streamForGraph));
-
+  HIP_CHECK(hipGraphInstantiate(graph_exec, graph, &node_error, nullptr, 0));
   HIP_CHECK(hipGraphDestroy(graph));
-  HIP_CHECK(hipGraphExecDestroy(graphExec));
-  HIP_CHECK(hipStreamDestroy(streamForGraph));
 }
 
+/**
+ * Test Description
+ * ------------------------
+ *  - Creates an executable graph.
+ *  - Destroys it successfully.
+ * Test source
+ * ------------------------
+ *  - unit/graph/hipGraphExecDestroy.cc
+ * Test requirements
+ * ------------------------
+ *  - HIP_VERSION >= 5.2
+ */
+TEST_CASE("Unit_hipGraphExecDestroy_Positive_Basic") {
+  int number = 5;
+  hipGraphExec_t graph_exec;
+  CreateTestExecutableGraph(&graph_exec, &number);
+  REQUIRE(hipGraphExecDestroy(graph_exec) == hipSuccess);
+}
+
+/**
+ * Test Description
+ * ------------------------
+ *  - Validates handling of invalid arguments:
+ *    - When executable graph handle is not instantiated
+ *      - Expected output: return `hipErrorInvalidValue`
+ * Test source
+ * ------------------------
+ *  - unit/graph/hipGraphExecDestroy.cc
+ * Test requirements
+ * ------------------------
+ *  - HIP_VERSION >= 5.2
+ */
+TEST_CASE("Unit_hipGraphExecDestroy_Negative_Parameters") {
+  hipGraphExec_t graph_exec{};
+  HIP_CHECK_ERROR(hipGraphExecDestroy(graph_exec), hipErrorInvalidValue);
+}

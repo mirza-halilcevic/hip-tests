@@ -49,3 +49,10 @@ THE SOFTWARE.
  * This section describes tests for the event management functions of HIP runtime API.
  * @}
  */
+
+/**
+ * @defgroup ErrorTest Error Handling
+ * @{
+ * This section describes tests for the error handling functions of HIP runtime API.
+ * @}
+ */

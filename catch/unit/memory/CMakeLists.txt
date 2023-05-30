@@ -108,6 +108,7 @@ set(TEST_SRC
     hipPointerGetAttribute.cc
     hipDrvPtrGetAttributes.cc
     hipMemPrefetchAsync.cc
+    hipArray.cc
     hipMemGetInfo.cc
     hipFree.cc
     hipMemcpySync.cc

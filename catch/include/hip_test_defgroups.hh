@@ -887,3 +887,10 @@ TEST_CASE("Unit_hipMemsetFunctional_ZeroSize_hipMemsetD8") {}
  *  This section describes tests for the PeerToPeer device memory access functions of HIP runtime API.
  * @}
  */
+
+/**
+ * @defgroup VirtualTest Virtual Memory Management
+ * @{
+ * This section describes tests for the virtual memory management functions of HIP runtime API. 
+ * @}
+ */

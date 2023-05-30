@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Advanced Micro Devices, Inc. All Rights Reserved.
+# Copyright (c) 2022 Advanced Micro Devices, Inc. All Rights Reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -18,30 +18,20 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-add_subdirectory(rtc)
-add_subdirectory(deviceLib)
-add_subdirectory(graph)
-add_subdirectory(memory)
-add_subdirectory(stream)
-add_subdirectory(event)
-add_subdirectory(occupancy)
-add_subdirectory(device)
-add_subdirectory(printf)
-add_subdirectory(texture)
-add_subdirectory(streamperthread)
-add_subdirectory(kernel)
-add_subdirectory(multiThread)
-add_subdirectory(compiler)
-add_subdirectory(errorHandling)
-add_subdirectory(cooperativeGrps)
-add_subdirectory(context)
-if(HIP_PLATFORM STREQUAL "amd")
-add_subdirectory(callback)
-add_subdirectory(module)
-#add_subdirectory(clock)
-# Vulkan interop APIs currently undefined for Nvidia
-add_subdirectory(vulkan_interop)
-add_subdirectory(gl_interop) # Disabled on NVIDIA due to defect - EXSWHTEC-246
-add_subdirectory(virtualMemory)
-endif()
-add_subdirectory(executionControl)
+# Common Tests - Test independent of all platforms
+set(TEST_SRC
+    hipMemVmm.cc
+    hipMemSetGetAccess.cc
+    hipMemGetAllocationPropertiesFromHandle.cc
+    hipMemAddressFree.cc
+    hipMemAddressReserve.cc
+    hipMemCreate.cc
+    hipMemGetAllocationGranularity.cc
+    hipMemMap.cc
+    hipMemRelease.cc
+    hipMemUnmap.cc
+)
+
+hip_add_exe_to_target(NAME VirtualMemoryTest
+                      TEST_SRC ${TEST_SRC}
+                      TEST_TARGET_NAME build_tests)

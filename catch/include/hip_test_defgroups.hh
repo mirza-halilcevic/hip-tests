@@ -63,3 +63,10 @@ THE SOFTWARE.
  * This section describes tests for the initialization and version functions of HIP runtime API.
  * @}
  */
+
+/**
+ * @defgroup ModuleTest Module Management
+ * @{
+ * This section describes tests for the module management functions of HIP runtime API.
+ * @}
+ */

@@ -24,7 +24,7 @@ THE SOFTWARE.
 #include <algorithm>
 #include <iomanip>
 
-class HipAPIGroup{
+class HipAPIGroup {
   friend bool operator==(const HipAPIGroup& l_hip_api_group, const HipAPIGroup& r_hip_api_group);
 
  public:
@@ -40,6 +40,7 @@ class HipAPIGroup{
   std::string getBasicStatsXML() const;
   std::string getBasicStatsHTML() const;
   std::string createHTMLReport() const;
+
  private:
   std::string group_name;
   int total_number_of_apis;

@@ -65,6 +65,7 @@ class HipAPI {
   bool isDeprecated() const;
   std::string getBasicStatsXML() const;
   std::string createHTMLReport() const;
+
  private:
   std::string api_name;
   int number_of_calls;

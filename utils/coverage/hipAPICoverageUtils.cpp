@@ -105,7 +105,7 @@ HIP API instance. This instance shall be used to update occurrences.
 */
 void searchForAPI(HipAPI& hip_api, std::vector<std::string>& test_module_files) {
   std::cout << "Searching for " << hip_api.getName() << " in test module files." << std::endl;
-  for (auto const& test_module_file: test_module_files) {
+  for (auto const& test_module_file : test_module_files) {
     findAPICallInFile(hip_api, test_module_file);
     findAPITestCaseInFile(hip_api, test_module_file);
   }
@@ -115,7 +115,7 @@ void searchForAPI(HipAPI& hip_api, std::vector<std::string>& test_module_files) 
 Used to extract all HIP APIs from the passed header file.
 */
 std::vector<HipAPI> extractHipAPIs(std::string& hip_api_header_file,
-    std::vector<std::string>& api_group_names, bool start_groups) {
+                                   std::vector<std::string>& api_group_names, bool start_groups) {
   std::fstream hip_header_file_handler;
   hip_header_file_handler.open(hip_api_header_file);
 
@@ -148,8 +148,9 @@ std::vector<HipAPI> extractHipAPIs(std::string& hip_api_header_file,
     ++line_number;
 
     // Declarations of the HIP APIs start after the HIP API group has been defined.
-    if ((line.find(group_definition) != std::string::npos || line.find(add_group_definition) != std::string::npos)
-        && line.find(start_of_api_groups) != std::string::npos) {
+    if ((line.find(group_definition) != std::string::npos ||
+         line.find(add_group_definition) != std::string::npos) &&
+        line.find(start_of_api_groups) != std::string::npos) {
       api_group_names_start = true;
       continue;
     }
@@ -167,7 +168,7 @@ std::vector<HipAPI> extractHipAPIs(std::string& hip_api_header_file,
     /*
     If the API is deprecated, raise a flag and go to the
     next line where the API is declared.
-    */ 
+    */
     if (line.find(deprecated_line) != std::string::npos) {
       std::getline(hip_header_file_handler, line);
       ++line_number;
@@ -177,14 +178,14 @@ std::vector<HipAPI> extractHipAPIs(std::string& hip_api_header_file,
     }
 
     if (line.find(group_definition) != std::string::npos) {
-      std::string group_name = line.substr(line.find(group_definition) + group_definition.length() + 1);
+      std::string group_name =
+          line.substr(line.find(group_definition) + group_definition.length() + 1);
       group_name = group_name.substr(group_name.find(' ') + 1);
       api_group_names.push_back(group_name);
       api_group_names_tracker.push_back(group_name);
-    }
-    else if (line.find(add_group_definition) != std::string::npos)
-    {
-      std::string group_name = line.substr(line.find(add_group_definition) + add_group_definition.length() + 1);
+    } else if (line.find(add_group_definition) != std::string::npos) {
+      std::string group_name =
+          line.substr(line.find(add_group_definition) + add_group_definition.length() + 1);
       group_name = group_name.substr(group_name.find(' ') + 1);
       api_group_names.push_back(group_name);
       api_group_names_tracker.push_back(group_name);
@@ -207,16 +208,14 @@ std::vector<HipAPI> extractHipAPIs(std::string& hip_api_header_file,
         - Extract the name from that substring by finding the last "hip".
     Avoid comments.
     */
-    if (line.find(hip_api_prefix) != std::string::npos && 
-        line.find("(") != std::string::npos &&
-        line.find("  ") != 0 &&
-        line.find(" *") != 0) {
+    if (line.find(hip_api_prefix) != std::string::npos && line.find("(") != std::string::npos &&
+        line.find("  ") != 0 && line.find(" *") != 0) {
       std::string api_name_no_brackets{line.substr(0, line.find("("))};
       /*
       If there is no hip substring, then there is no valid API in that line.
       */
       if (api_name_no_brackets.rfind(hip_api_prefix) == std::string::npos) {
-          continue;
+        continue;
       }
 
       /*
@@ -233,13 +232,12 @@ std::vector<HipAPI> extractHipAPIs(std::string& hip_api_header_file,
         If the API is not present in the global list of HIP APIs, add it.
         */
         HipAPI hip_api{api_name, deprecated_flag, api_group_names_tracker.back()};
-        if(std::find(hip_apis.begin(), hip_apis.end(), hip_api) == hip_apis.end())
-        {
-            hip_apis.push_back(hip_api);
+        if (std::find(hip_apis.begin(), hip_apis.end(), hip_api) == hip_apis.end()) {
+          hip_apis.push_back(hip_api);
         }
       } else {
         std::cout << "[SKIP_FROM_COV] Group not detected for \"" << api_name << "\" in file \""
-            << hip_api_header_file << "\", line " << line_number << std::endl;
+                  << hip_api_header_file << "\", line " << line_number << std::endl;
       }
     }
   }
@@ -254,8 +252,7 @@ Goes through all subdirectories and searches for .cc and .hh files for
 HIP API invocations.
 Implements BFS algorithm to avoid recursion.
 */
-std::vector<std::string> extractTestModuleFiles(std::string& tests_root_directory)
-{
+std::vector<std::string> extractTestModuleFiles(std::string& tests_root_directory) {
   std::vector<std::string> directory_queue;
   directory_queue.push_back(tests_root_directory);
   std::vector<std::string> test_module_files;
@@ -263,11 +260,11 @@ std::vector<std::string> extractTestModuleFiles(std::string& tests_root_director
   while (!directory_queue.empty()) {
     std::string processed_entry = directory_queue.back();
     directory_queue.pop_back();
-    for (const auto& entry: std::filesystem::directory_iterator(processed_entry)) {
+    for (const auto& entry : std::filesystem::directory_iterator(processed_entry)) {
       if (std::filesystem::is_directory(entry.path())) {
         directory_queue.push_back(entry.path());
       } else {
-        if (entry.path().string().find(".cc") != std::string::npos || 
+        if (entry.path().string().find(".cc") != std::string::npos ||
             entry.path().string().find(".hh") != std::string::npos) {
           test_module_files.push_back(entry.path());
         }
@@ -278,7 +275,6 @@ std::vector<std::string> extractTestModuleFiles(std::string& tests_root_director
   return test_module_files;
 }
 
-std::string findAbsolutePathOfFile(std::string file_path)
-{
+std::string findAbsolutePathOfFile(std::string file_path) {
   return std::filesystem::canonical(std::filesystem::absolute(file_path));
 }

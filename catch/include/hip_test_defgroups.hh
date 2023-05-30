@@ -648,3 +648,10 @@ TEST_CASE("Unit_hipStreamValue_Wait64_NonBlocking_Mask_And"){}
  * @warning All Context Management APIs are **deprecated** and shall not be implemented.
  * @}
  */
+
+/**
+ * @defgroup TextureTest Texture Management
+ * @{
+ * This section describes tests for the texture management functions of HIP runtime API.
+ * @}
+ */

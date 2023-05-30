@@ -70,3 +70,10 @@ THE SOFTWARE.
  * This section describes tests for the module management functions of HIP runtime API.
  * @}
  */
+
+/**
+ * @defgroup ExecutionTest Execution Control
+ * @{
+ * This section describes tests for the execution control functions of HIP runtime API.
+ * @}
+ */

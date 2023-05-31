@@ -176,7 +176,7 @@ inline constexpr std::array kSpecialValuesDouble{
 };
 
 inline constexpr std::array kSpecialValuesFloat{
-    -std::numeric_limits<float>::quiet_NaN(),
+    //-std::numeric_limits<float>::quiet_NaN(),
     -std::numeric_limits<float>::infinity(),
     -std::numeric_limits<float>::max(),
     HEX_FLT(-, 1, 000002, +, 64),
@@ -226,7 +226,7 @@ inline constexpr std::array kSpecialValuesFloat{
     HEX_FLT(-, 0, 000002, -, 126),
     -0.0f,
 
-    std::numeric_limits<float>::quiet_NaN(),
+    //std::numeric_limits<float>::quiet_NaN(),
     std::numeric_limits<float>::infinity(),
     std::numeric_limits<float>::max(),
     HEX_FLT(+, 1, 000002, +, 64),

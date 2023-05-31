@@ -37,8 +37,12 @@ bool operator<(const HipAPI& l_hip_api, const HipAPI& r_hip_api) {
   return l_hip_api.api_name < r_hip_api.api_name;
 }
 
-HipAPI::HipAPI(std::string api_name, bool deprecated_flag, std::string api_group_name)
-    : api_name{api_name}, deprecated{deprecated_flag}, api_group_name{api_group_name} {}
+HipAPI::HipAPI(std::string api_name, bool deprecated_flag, std::string api_group_name,
+               std::string file_restriction)
+    : api_name{api_name},
+      deprecated{deprecated_flag},
+      api_group_name{api_group_name},
+      file_restriction{file_restriction} {}
 
 std::string HipAPI::getName() const { return api_name; }
 
@@ -233,3 +237,5 @@ std::string HipAPI::createHTMLReport() const {
 
   return html_report.str();
 }
+
+std::string HipAPI::getFileRestriction() const { return file_restriction; }

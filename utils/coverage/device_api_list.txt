@@ -40,3 +40,17 @@ Builtin Atomics [
   __hip_atomic_fetch_min
   __hip_atomic_fetch_max
 ]
+
+Cooperative Groups [
+  File restriction: cooperative_groups
+  size
+  thread_rank
+  group_index
+  thread_index
+  sync
+  shfl
+  shfl_up
+  shfl_down
+  shfl_xor
+  sync
+]

@@ -55,7 +55,8 @@ class HipAPI {
   friend bool operator<(const HipAPI& l_hip_api, const HipAPI& r_hip_api);
 
  public:
-  HipAPI(std::string api_name, bool deprecated_flag, std::string api_group_name);
+  HipAPI(std::string api_name, bool deprecated_flag, std::string api_group_name,
+         std::string file_restriction = "");
   std::string getName() const;
   std::string getGroupName() const;
   int getNumberOfCalls() const;
@@ -65,9 +66,11 @@ class HipAPI {
   bool isDeprecated() const;
   std::string getBasicStatsXML() const;
   std::string createHTMLReport() const;
+  std::string getFileRestriction() const;
 
  private:
   std::string api_name;
+  std::string file_restriction;
   int number_of_calls;
   bool deprecated;
   std::string api_group_name;

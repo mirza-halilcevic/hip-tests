@@ -44,15 +44,27 @@ void findAPICallInFile(HipAPI& hip_api, std::string test_module_file) {
   std::string api_call_with_parameter{", " + hip_api.getName() + "("};
   std::string api_call_with_return{"return " + hip_api.getName() + "("};
   std::string api_call_in_line("{ " + hip_api.getName() + "(");
+  std::string api_member{"." + hip_api.getName() + "("};
+
+  std::string api_restriction{hip_api.getFileRestriction()};
+  bool found_restriction{false};
 
   while (std::getline(test_module_file_handler, line)) {
     ++line_number;
+
+    if (api_restriction != "" && line.find(api_restriction) != std::string::npos) {
+      found_restriction = true;
+    }
+
     if ((line.find(api_call_with_assert) != std::string::npos) ||
         (line.find(api_call_with_assignment) != std::string::npos) ||
         (line.find(api_call_with_parameter) != std::string::npos) ||
         (line.find(api_call_with_return) != std::string::npos) ||
-        (line.find(api_call_in_line) != std::string::npos)) {
-      hip_api.addFileOccurrence(FileOccurrence(test_module_file, line_number));
+        (line.find(api_call_in_line) != std::string::npos) ||
+        (line.find(api_member) != std::string::npos)) {
+      if (api_restriction == "" || found_restriction) {
+        hip_api.addFileOccurrence(FileOccurrence(test_module_file, line_number));
+      }
     }
   }
 
@@ -268,6 +280,8 @@ std::vector<HipAPI> extractDeviceAPIs(std::string& apis_list_file,
   */
   int line_number{0};
   bool group_start{false};
+  std::string restriction{""};
+  std::string file_restriction_definition{"File restriction: "};
 
   while (std::getline(apis_list_file_handler, line)) {
     ++line_number;
@@ -284,9 +298,15 @@ std::vector<HipAPI> extractDeviceAPIs(std::string& apis_list_file,
       continue;
     }
 
+    if (line.find(file_restriction_definition) != std::string::npos) {
+      restriction =
+          line.substr(line.find(file_restriction_definition) + file_restriction_definition.size());
+      continue;
+    }
+
     if (group_start) {
       std::string api_name = line.substr(line.rfind(" ") + 1);
-      HipAPI hip_api{api_name, false, api_group_names.back()};
+      HipAPI hip_api{api_name, false, api_group_names.back(), restriction};
       device_apis.push_back(hip_api);
     }
   }

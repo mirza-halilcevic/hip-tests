@@ -96,7 +96,10 @@ void findAPITestCaseInFile(HipAPI& hip_api, std::string test_module_file) {
     }
 
     if (hip_api.getName() != current_api_name) {
-      continue;
+      if (std::find(hip_api.device_groups.begin(), hip_api.device_groups.end(), current_api_name) ==
+          hip_api.device_groups.end()) {
+        continue;
+      }
     }
 
     if (line.find(ref_test_case) != std::string::npos) {
@@ -280,8 +283,11 @@ std::vector<HipAPI> extractDeviceAPIs(std::string& apis_list_file,
   */
   int line_number{0};
   bool group_start{false};
+  bool device_groups_start{false};
   std::string restriction{""};
   std::string file_restriction_definition{"File restriction: "};
+  std::string device_groups_definition{"Device groups: ("};
+  std::vector<std::string> device_groups;
 
   while (std::getline(apis_list_file_handler, line)) {
     ++line_number;
@@ -304,9 +310,22 @@ std::vector<HipAPI> extractDeviceAPIs(std::string& apis_list_file,
       continue;
     }
 
+    if (line.find(device_groups_definition) != std::string::npos) {
+      std::getline(apis_list_file_handler, line);
+      while (line.find(")") == std::string::npos) {
+        std::string group_name = line;
+        group_name.erase(std::remove(group_name.begin(), group_name.end(), ' '), group_name.end());
+        std::cout << "MOZA|" << group_name << "|" << std::endl;
+        device_groups.push_back(group_name);
+        std::getline(apis_list_file_handler, line);
+      }
+      std::getline(apis_list_file_handler, line);
+    }
+
     if (group_start) {
       std::string api_name = line.substr(line.rfind(" ") + 1);
       HipAPI hip_api{api_name, false, api_group_names.back(), restriction};
+      hip_api.device_groups = device_groups;
       device_apis.push_back(hip_api);
     }
   }

@@ -43,6 +43,14 @@ Builtin Atomics [
 
 Cooperative Groups [
   File restriction: cooperative_groups
+  Device groups: (
+    coalesced_group_tile
+    coalesced_group
+    grid_group
+    multi_grid_group
+    thread_block_tile
+    thread_block
+    )
   size
   thread_rank
   group_index

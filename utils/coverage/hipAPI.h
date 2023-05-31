@@ -63,10 +63,11 @@ class HipAPI {
   int getNumberOfTestCases() const;
   void addFileOccurrence(FileOccurrence file_occurence);
   void addTestCase(TestCaseOccurrence test_case);
-  bool isDeprecated() const;
+  std::vector < bool isDeprecated() const;
   std::string getBasicStatsXML() const;
   std::string createHTMLReport() const;
   std::string getFileRestriction() const;
+  std::vector<std::string> device_groups;
 
  private:
   std::string api_name;

@@ -45,3 +45,4 @@ add_subdirectory(gl_interop) # Disabled on NVIDIA due to defect - EXSWHTEC-246
 add_subdirectory(virtualMemory)
 endif()
 add_subdirectory(executionControl)
+add_subdirectory(atomics)

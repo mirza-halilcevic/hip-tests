@@ -39,6 +39,7 @@ __device__ inline unsigned int thread_rank_in_grid() {
   return block_rank_in_grid * block_size + thread_rank_in_block;
 }
 
+<<<<<<< HEAD:catch/unit/cooperativeGrps/cooperative_groups_common.hh
 static __device__ void busy_wait(unsigned long long wait_period) {
   unsigned long long time_diff = 0;
   unsigned long long last_clock = clock64();
@@ -46,6 +47,22 @@ static __device__ void busy_wait(unsigned long long wait_period) {
     unsigned long long cur_clock = clock64();
     if (cur_clock > last_clock) {
       time_diff += (cur_clock - last_clock);
+=======
+template <typename T>
+void printResults(T* ptr, int size) {
+  for (int i = 0; i < size; i++) {
+    std::cout << ptr[i] << " ";
+  }
+  std::cout << '\n';
+}
+
+template <typename T>
+void compareResults(T* cpu, T* gpu, int size) {
+  for (unsigned int i = 0; i < size / sizeof(T); i++) {
+    if (cpu[i] != gpu[i]) {
+      INFO("Results do not match at index " << i);
+      REQUIRE(cpu[i] == gpu[i]);
+>>>>>>> 6d96fbc1f04b03e83091775177f7f40420a8c216:catch/unit/cooperativeGrps/hip_cg_common.hh
     }
     last_clock = cur_clock;
   }

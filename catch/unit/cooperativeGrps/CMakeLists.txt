@@ -18,6 +18,7 @@ set(TEST_SRC
   hipCGMultiGridGroupTypeViaBaseType.cc
   hipCGMultiGridGroupTypeViaPublicApi.cc
   grid_group.cc
+  coalesced_group.cc
 )
 if(HIP_PLATFORM STREQUAL "nvidia")
   set_source_files_properties(hipCGMultiGridGroupType.cc PROPERTIES COMPILE_FLAGS "-rdc=true -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")

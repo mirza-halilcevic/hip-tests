@@ -62,3 +62,23 @@ Cooperative Groups [
   shfl_xor
   sync
 ]
+
+Warp [
+  File restriction: cooperative_groups
+  Device groups: (
+    ballot
+    any
+    all
+    shfl_down
+    shfl_up
+    shfl
+    shfl_xor
+  )
+  __ballot
+  __any
+  __all
+  __shfl_down
+  __shfl_up
+  __shfl
+  __shfl_xor
+]

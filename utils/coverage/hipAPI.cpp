@@ -50,7 +50,9 @@ HipAPI::HipAPI(std::string api_name, bool deprecated_flag, std::string api_group
     : api_name{api_name},
       deprecated{deprecated_flag},
       api_group_name{api_group_name},
-      file_restriction{file_restriction} {}
+      file_restriction{file_restriction} {
+  test_cases.clear();
+}
 
 std::string HipAPI::getName() const { return api_name; }
 

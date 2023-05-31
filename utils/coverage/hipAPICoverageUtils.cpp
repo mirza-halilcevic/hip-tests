@@ -301,6 +301,7 @@ std::vector<HipAPI> extractDeviceAPIs(std::string& apis_list_file,
 
     if (line.find("]") != std::string::npos) {
       group_start = false;
+      device_groups.clear();
       continue;
     }
 

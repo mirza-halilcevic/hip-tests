@@ -315,7 +315,6 @@ std::vector<HipAPI> extractDeviceAPIs(std::string& apis_list_file,
       while (line.find(")") == std::string::npos) {
         std::string group_name = line;
         group_name.erase(std::remove(group_name.begin(), group_name.end(), ' '), group_name.end());
-        std::cout << "MOZA|" << group_name << "|" << std::endl;
         device_groups.push_back(group_name);
         std::getline(apis_list_file_handler, line);
       }

@@ -29,6 +29,14 @@ TestCaseOccurrence::TestCaseOccurrence(std::string test_case_name, std::string f
                                        int line_number)
     : FileOccurrence{file_name, line_number}, test_case_name{test_case_name} {}
 
+bool operator==(const TestCaseOccurrence& l_test, const TestCaseOccurrence& r_test) {
+  return l_test.test_case_name == r_test.test_case_name;
+}
+
+bool operator<(const TestCaseOccurrence& l_test, const TestCaseOccurrence& r_test) {
+  return l_test.test_case_name < r_test.test_case_name;
+}
+
 bool operator==(const HipAPI& l_hip_api, const HipAPI& r_hip_api) {
   return l_hip_api.api_name == r_hip_api.api_name;
 }
@@ -50,7 +58,7 @@ std::string HipAPI::getGroupName() const { return api_group_name; }
 
 int HipAPI::getNumberOfCalls() const { return file_occurrences.size(); }
 
-int HipAPI::getNumberOfTestCases() const { return test_cases.size(); }
+std::vector<TestCaseOccurrence> HipAPI::getTestCases() const { return test_cases; }
 
 void HipAPI::addFileOccurrence(FileOccurrence file_occurrence) {
   file_occurrences.push_back(file_occurrence);

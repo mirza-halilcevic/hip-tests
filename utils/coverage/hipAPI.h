@@ -40,6 +40,9 @@ Helper class used to store information in what file has the API Test Case been d
 and on what line of code in that file.
 */
 class TestCaseOccurrence : public FileOccurrence {
+  friend bool operator==(const TestCaseOccurrence& l_test, const TestCaseOccurrence& r_test);
+  friend bool operator<(const TestCaseOccurrence& l_test, const TestCaseOccurrence& r_test);
+
  public:
   std::string test_case_name;
   TestCaseOccurrence(std::string test_case_name, std::string file_name, int line_number);
@@ -60,10 +63,10 @@ class HipAPI {
   std::string getName() const;
   std::string getGroupName() const;
   int getNumberOfCalls() const;
-  int getNumberOfTestCases() const;
+  std::vector<TestCaseOccurrence> getTestCases() const;
   void addFileOccurrence(FileOccurrence file_occurence);
   void addTestCase(TestCaseOccurrence test_case);
-  std::vector < bool isDeprecated() const;
+  bool isDeprecated() const;
   std::string getBasicStatsXML() const;
   std::string createHTMLReport() const;
   std::string getFileRestriction() const;

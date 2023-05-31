@@ -32,6 +32,7 @@ HipAPIGroup::HipAPIGroup(std::string group_name, std::vector<HipAPI>& hip_apis)
       percentage_of_called_apis{0.f},
       total_number_of_apis{0},
       number_of_test_cases{0} {
+  std::vector<TestCaseOccurrence> test_cases;
   for (auto const& hip_api : hip_apis) {
     if (hip_api.getGroupName() != group_name) {
       continue;
@@ -48,8 +49,15 @@ HipAPIGroup::HipAPIGroup(std::string group_name, std::vector<HipAPI>& hip_apis)
     }
 
     number_of_api_calls += hip_api.getNumberOfCalls();
-    number_of_test_cases += hip_api.getNumberOfTestCases();
+
+    std::vector<TestCaseOccurrence> api_test_cases = hip_api.getTestCases();
+    test_cases.insert(test_cases.end(), api_test_cases.begin(), api_test_cases.end());
   }
+
+  std::sort(test_cases.begin(), test_cases.end());
+  auto last = std::unique(test_cases.begin(), test_cases.end());
+  test_cases.erase(last, test_cases.end());
+  number_of_test_cases = test_cases.size();
 
   total_number_of_apis = called_apis.size() + not_called_apis.size() + deprecated_apis.size();
   if (not_called_apis.empty()) {

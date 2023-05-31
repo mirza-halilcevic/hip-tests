@@ -913,11 +913,8 @@ TEST_CASE("Unit_hipMemsetFunctional_ZeroSize_hipMemsetD8") {}
 /**
  * Test Description
  * ------------------------
- *  - Compiles atomicAdd with invalid parameters.
+ *  - Compiles atomicMin with invalid parameters.
  *  - Compiles the source with specialized Python tool.
- *    -# Utilizes sub-process to invoke compilation of faulty source.
- *    -# Performs post-processing of compiler output and counts errors.
- * Test source
  * ------------------------
  *  - unit/atomics/CMakeLists.txt
  * Test requirements
@@ -1030,6 +1027,58 @@ TEST_CASE("Unit_atomicDec_Negative_Parameters") {}
 TEST_CASE("Unit_atomicExch_Negative_Parameters") {}
 /**
  * End doxygen group atomicExch.
+ * @}
+ */
+
+/**
+ * @addtogroup atomicMin atomicMin
+ * @{
+ * @ingroup AtomicsTest
+ */
+
+/**
+ * Test Description
+ * ------------------------
+ *  - Compiles atomicMin with invalid parameters.
+ *  - Compiles the source with specialized Python tool.
+ *    -# Utilizes sub-process to invoke compilation of faulty source.
+ *    -# Performs post-processing of compiler output and counts errors.
+ * Test source
+ * ------------------------
+ *  - unit/atomics/CMakeLists.txt
+ * Test requirements
+ * ------------------------
+ *  - HIP_VERSION >= 5.2
+ */
+TEST_CASE("Unit_atomicMin_Negative_Parameters") {}
+/**
+ * End doxygen group atomicMin.
+ * @}
+ */
+
+/**
+ * @addtogroup atomicMax atomicMax
+ * @{
+ * @ingroup AtomicsTest
+ */
+
+/**
+ * Test Description
+ * ------------------------
+ *  - Compiles atomicMax with invalid parameters.
+ *  - Compiles the source with specialized Python tool.
+ *    -# Utilizes sub-process to invoke compilation of faulty source.
+ *    -# Performs post-processing of compiler output and counts errors.
+ * Test source
+ * ------------------------
+ *  - unit/atomics/CMakeLists.txt
+ * Test requirements
+ * ------------------------
+ *  - HIP_VERSION >= 5.2
+ */
+TEST_CASE("Unit_atomicMax_Negative_Parameters") {}
+/**
+ * End doxygen group atomicMax.
  * @}
  */
 

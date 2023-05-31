@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Advanced Micro Devices, Inc. All Rights Reserved.
+# Copyright (c) 2022 Advanced Micro Devices, Inc. All Rights Reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -31,6 +31,14 @@ set(TEST_SRC
     atomicCAS_system.cc
     atomicExch.cc
     atomicExch_system.cc
+    atomicMin.cc
+    atomicMin_system.cc
+    atomicMax.cc
+    atomicMax_system.cc
+    safeAtomicMin.cc
+    unsafeAtomicMin.cc
+    safeAtomicMax.cc
+    unsafeAtomicMax.cc
 )
 
 if(HIP_PLATFORM MATCHES "nvidia")
@@ -38,15 +46,19 @@ if(HIP_PLATFORM MATCHES "nvidia")
     set_source_files_properties(atomicAdd_system.cc PROPERTIES COMPILE_FLAGS "-rdc=true -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
     set_source_files_properties(atomicSub_system.cc PROPERTIES COMPILE_FLAGS "-rdc=true -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
     set_source_files_properties(atomicCAS_system.cc PROPERTIES COMPILE_FLAGS "-rdc=true -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
+    set_source_files_properties(atomicMin_system.cc PROPERTIES COMPILE_FLAGS "-rdc=true -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
+    set_source_files_properties(atomicMax_system.cc PROPERTIES COMPILE_FLAGS "-rdc=true -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
     hip_add_exe_to_target(NAME AtomicsTest
                         TEST_SRC ${TEST_SRC}
                         TEST_TARGET_NAME build_tests
                         LINKER_LIBS "nvrtc -rdc=true -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
+    set(EXPECTED_ERRORS 42) # EXSWHTEC-278
 elseif(HIP_PLATFORM MATCHES "amd")
     hip_add_exe_to_target(NAME AtomicsTest
                         TEST_SRC ${TEST_SRC}
                         TEST_TARGET_NAME build_tests
                         LINKER_LIBS hiprtc)
+    set(EXPECTED_ERRORS 48)
 endif()
 
 add_test(NAME Unit_atomicAdd_Negative_Parameters
@@ -83,3 +95,13 @@ add_test(NAME Unit_atomicExch_system_Negative_Parameters
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
          atomicExch_system_negative_kernels.cc 40)
+
+add_test(NAME Unit_atomicMin_Negative_Parameters
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         atomicMin_negative_kernels.cc ${EXPECTED_ERRORS})
+
+add_test(NAME Unit_atomicMax_Negative_Parameters
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         atomicMax_negative_kernels.cc ${EXPECTED_ERRORS})

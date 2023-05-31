@@ -82,6 +82,7 @@ template <typename T> class LinearAllocGuard {
   }
 
   LinearAllocGuard(const LinearAllocGuard&) = delete;
+<<<<<<< HEAD
 
   LinearAllocGuard(LinearAllocGuard&& o)
       : allocation_type_{o.allocation_type_}, ptr_{o.ptr_}, host_ptr_{o.host_ptr_} {
@@ -96,6 +97,10 @@ template <typename T> class LinearAllocGuard {
     host_ptr_ = o.host_ptr_;
 
     o.allocation_type_ = LinearAllocs::noAlloc;
+=======
+  LinearAllocGuard(LinearAllocGuard&& o)
+      : allocation_type_(o.allocation_type_), ptr_(o.ptr_), host_ptr_(o.host_ptr_) {
+>>>>>>> db441b4177617a982e850e06226538bbafdfbe3b
     o.ptr_ = nullptr;
     o.host_ptr_ = nullptr;
   }
@@ -287,7 +292,7 @@ class StreamGuard {
   }
 
   ~StreamGuard() {
-    if (stream_type_ == Streams::created) {
+    if (stream_type_ == Streams::created && stream_ != nullptr) {
       static_cast<void>(hipStreamDestroy(stream_));
     }
   }

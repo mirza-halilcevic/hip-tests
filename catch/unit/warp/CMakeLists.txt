@@ -5,6 +5,8 @@ set(TEST_SRC
   warp_all.cc
   warp_shfl_up.cc
   warp_shfl_down.cc
+  warp_shfl_xor.cc
+  warp_shfl.cc
 )
 
 hip_add_exe_to_target(NAME WarpTest

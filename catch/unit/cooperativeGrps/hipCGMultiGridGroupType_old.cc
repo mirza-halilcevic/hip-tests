@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020 - 2022 Advanced Micro Devices, Inc. All rights reserved.
+Copyright (c) 2020 - 2021 Advanced Micro Devices, Inc. All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,12 +19,21 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
+
+
+/* HIT_START
+ * BUILD: %t %s ../../test_common.cpp NVCC_OPTIONS --std=c++11 -rdc=true -gencode
+ * arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode
+ * arch=compute_80,code=sm_80 TEST: %t HIT_END
+ */
+
 #include <hip_test_common.hh>
 #include <hip/hip_cooperative_groups.h>
 
 #include "hip_cg_common.hh"
 
-namespace cg = cooperative_groups;
+using namespace cooperative_groups;
+constexpr int MaxGPUs = 8;
 
 static __global__ void kernel_cg_multi_grid_group_type(int* grid_rank_dev, int* size_dev,
                                                        int* thd_rank_dev, int* is_valid_dev,
@@ -34,40 +43,40 @@ static __global__ void kernel_cg_multi_grid_group_type(int* grid_rank_dev, int* 
   int gIdx = (blockIdx.x * blockDim.x) + threadIdx.x;
 
   // Test num_grids
-  num_grids_dev[gIdx] = mg.num_grids();
+  numGridsTestD[gIdx] = mg.num_grids();
 
   // Test grid_rank
-  grid_rank_dev[gIdx] = mg.grid_rank();
+  gridRankTestD[gIdx] = mg.grid_rank();
 
   // Test size
-  size_dev[gIdx] = mg.size();
+  sizeTestD[gIdx] = mg.size();
 
   // Test thread_rank
-  thd_rank_dev[gIdx] = mg.thread_rank();
+  thdRankTestD[gIdx] = mg.thread_rank();
 
   // Test is_valid
-  is_valid_dev[gIdx] = mg.is_valid();
+  isValidTestD[gIdx] = mg.is_valid();
 
   // Test sync
   //
   // Eech thread assign 1 to their respective location
-  sync_dev[gIdx] = 1;
+  syncTestD[gIdx] = 1;
   // Grid level sync
-  cg::this_grid().sync();
+  this_grid().sync();
   // Thread 0 from work-group 0 of current grid (gpu) does grid level reduction
   if (blockIdx.x == 0 && threadIdx.x == 0) {
     for (uint i = 1; i < gridDim.x * blockDim.x; ++i) {
-      sync_dev[0] += sync_dev[i];
+      syncTestD[0] += syncTestD[i];
     }
-    sync_result[mg.grid_rank() + 1] = sync_dev[0];
+    syncResultD[mg.grid_rank() + 1] = syncTestD[0];
   }
   // multi-grid level sync
   mg.sync();
   // grid (gpu) 0 does final reduction across all grids (gpus)
   if (mg.grid_rank() == 0 && blockIdx.x == 0 && threadIdx.x == 0) {
-    sync_result[0] = 0;
+    syncResultD[0] = 0;
     for (uint i = 1; i <= mg.num_grids(); ++i) {
-      sync_result[0] += sync_result[i];
+      syncResultD[0] += syncResultD[i];
     }
   }
 }
@@ -331,38 +340,35 @@ static void test_cg_multi_grid_group_type(F kernel_func, int num_devices, int bl
                                           bool specific_api_test) {
   // Create a stream each device
   hipStream_t stream[MaxGPUs];
-  for (int i = 0; i < num_devices; i++) {
-    HIP_CHECK(hipSetDevice(i));
-    HIP_CHECK(hipDeviceSynchronize());  // Make sure work is done on this device
-    HIP_CHECK(hipStreamCreate(&stream[i]));
+  for (int i = 0; i < nGpu; i++) {
+    HIPCHECK(hipSetDevice(i));
+    HIPCHECK(hipDeviceSynchronize());  // Make sure work is done on this device
+    HIPCHECK(hipStreamCreate(&stream[i]));
   }
 
   // Allocate host and device memory
-  int num_bytes = sizeof(int) * 2 * block_size;
-  int *num_grids_dev[MaxGPUs], *num_grids_host[MaxGPUs];
-  int *grid_rank_dev[MaxGPUs], *grid_rank_host[MaxGPUs];
-  int *size_dev[MaxGPUs], *size_host[MaxGPUs];
-  int *thd_rank_dev[MaxGPUs], *thd_rank_host[MaxGPUs];
-  int *is_valid_dev[MaxGPUs], *is_valid_host[MaxGPUs];
-  int *sync_dev[MaxGPUs], *sync_result;
-  for (int i = 0; i < num_devices; i++) {
-    HIP_CHECK(hipSetDevice(i));
+  int nBytes = sizeof(int) * 2 * blockSize;
+  int *numGridsTestD[MaxGPUs], *numGridsTestH[MaxGPUs];
+  int *gridRankTestD[MaxGPUs], *gridRankTestH[MaxGPUs];
+  int *sizeTestD[MaxGPUs], *sizeTestH[MaxGPUs];
+  int *thdRankTestD[MaxGPUs], *thdRankTestH[MaxGPUs];
+  int *isValidTestD[MaxGPUs], *isValidTestH[MaxGPUs];
+  int *syncTestD[MaxGPUs], *syncResultD;
+  for (int i = 0; i < nGpu; i++) {
+    HIPCHECK(hipSetDevice(i));
 
-    if (specific_api_test) {
-      HIP_CHECK(hipMalloc(&num_grids_dev[i], num_bytes));
-      HIP_CHECK(hipHostMalloc(&num_grids_host[i], num_bytes));
-    }
+    HIPCHECK(hipMalloc(&numGridsTestD[i], nBytes));
+    HIPCHECK(hipMalloc(&gridRankTestD[i], nBytes));
+    HIPCHECK(hipMalloc(&sizeTestD[i], nBytes));
+    HIPCHECK(hipMalloc(&thdRankTestD[i], nBytes));
+    HIPCHECK(hipMalloc(&isValidTestD[i], nBytes));
+    HIPCHECK(hipMalloc(&syncTestD[i], nBytes));
 
-    HIP_CHECK(hipMalloc(&grid_rank_dev[i], num_bytes));
-    HIP_CHECK(hipMalloc(&size_dev[i], num_bytes));
-    HIP_CHECK(hipMalloc(&thd_rank_dev[i], num_bytes));
-    HIP_CHECK(hipMalloc(&is_valid_dev[i], num_bytes));
-    HIP_CHECK(hipMalloc(&sync_dev[i], num_bytes));
-
-    HIP_CHECK(hipHostMalloc(&grid_rank_host[i], num_bytes));
-    HIP_CHECK(hipHostMalloc(&size_host[i], num_bytes));
-    HIP_CHECK(hipHostMalloc(&thd_rank_host[i], num_bytes));
-    HIP_CHECK(hipHostMalloc(&is_valid_host[i], num_bytes));
+    HIPCHECK(hipHostMalloc(&numGridsTestH[i], nBytes));
+    HIPCHECK(hipHostMalloc(&gridRankTestH[i], nBytes));
+    HIPCHECK(hipHostMalloc(&sizeTestH[i], nBytes));
+    HIPCHECK(hipHostMalloc(&thdRankTestH[i], nBytes));
+    HIPCHECK(hipHostMalloc(&isValidTestH[i], nBytes));
 
     if (i == 0) {
       HIP_CHECK(
@@ -371,14 +377,11 @@ static void test_cg_multi_grid_group_type(F kernel_func, int num_devices, int bl
   }
 
   // Launch Kernel
-  int NumKernelArgs = 6;
-  if (specific_api_test) {
-    NumKernelArgs = 7;
-  }
-  hipLaunchParams* launchParamsList = new hipLaunchParams[num_devices];
+  constexpr int NumKernelArgs = 7;
+  hipLaunchParams* launchParamsList = new hipLaunchParams[nGpu];
   void* args[MaxGPUs * NumKernelArgs];
-  for (int i = 0; i < num_devices; i++) {
-    HIP_CHECK(hipSetDevice(i));
+  for (int i = 0; i < nGpu; i++) {
+    HIPCHECK(hipSetDevice(i));
 
     args[i * NumKernelArgs] = &grid_rank_dev[i];
     args[i * NumKernelArgs + 1] = &size_dev[i];
@@ -390,25 +393,23 @@ static void test_cg_multi_grid_group_type(F kernel_func, int num_devices, int bl
       args[i * NumKernelArgs + 6] = &num_grids_dev[i];
     }
 
-    launchParamsList[i].func = reinterpret_cast<void*>(kernel_func);
+    launchParamsList[i].func = reinterpret_cast<void*>(kernel_cg_multi_grid_group_type);
     launchParamsList[i].gridDim = 2;
-    launchParamsList[i].blockDim = block_size;
+    launchParamsList[i].blockDim = blockSize;
     launchParamsList[i].sharedMem = 0;
     launchParamsList[i].stream = stream[i];
     launchParamsList[i].args = &args[i * NumKernelArgs];
   }
-  HIP_CHECK(hipLaunchCooperativeKernelMultiDevice(launchParamsList, num_devices, 0));
+  HIPCHECK(hipLaunchCooperativeKernelMultiDevice(launchParamsList, nGpu, 0));
 
   // Copy result from device to host
-  for (int i = 0; i < num_devices; i++) {
-    HIP_CHECK(hipSetDevice(i));
-    if (specific_api_test) {
-      HIP_CHECK(hipMemcpy(num_grids_host[i], num_grids_dev[i], num_bytes, hipMemcpyDeviceToHost));
-    }
-    HIP_CHECK(hipMemcpy(grid_rank_host[i], grid_rank_dev[i], num_bytes, hipMemcpyDeviceToHost));
-    HIP_CHECK(hipMemcpy(size_host[i], size_dev[i], num_bytes, hipMemcpyDeviceToHost));
-    HIP_CHECK(hipMemcpy(thd_rank_host[i], thd_rank_dev[i], num_bytes, hipMemcpyDeviceToHost));
-    HIP_CHECK(hipMemcpy(is_valid_host[i], is_valid_dev[i], num_bytes, hipMemcpyDeviceToHost));
+  for (int i = 0; i < nGpu; i++) {
+    HIPCHECK(hipSetDevice(i));
+    HIPCHECK(hipMemcpy(numGridsTestH[i], numGridsTestD[i], nBytes, hipMemcpyDeviceToHost));
+    HIPCHECK(hipMemcpy(gridRankTestH[i], gridRankTestD[i], nBytes, hipMemcpyDeviceToHost));
+    HIPCHECK(hipMemcpy(sizeTestH[i], sizeTestD[i], nBytes, hipMemcpyDeviceToHost));
+    HIPCHECK(hipMemcpy(thdRankTestH[i], thdRankTestD[i], nBytes, hipMemcpyDeviceToHost));
+    HIPCHECK(hipMemcpy(isValidTestH[i], isValidTestD[i], nBytes, hipMemcpyDeviceToHost));
   }
 
   // Validate results
@@ -429,13 +430,14 @@ static void test_cg_multi_grid_group_type(F kernel_func, int num_devices, int bl
     ASSERT_EQUAL(sync_result[i + 1], 2 * block_size);
 
     // Validate uniqueness property of grid rank
-    grids_seen[i] = grid_rank_host[i][0];
+    gridsSeen[i] = gridRankTestH[i][0];
     for (int k = 0; k < i; ++k) {
-      INFO("Grid rank in multi-gpu setup should be unique");
-      REQUIRE(grids_seen[k] != grids_seen[i]);
+      if (gridsSeen[k] == gridsSeen[i]) {
+        assert(false && "Grid rank in multi-gpu setup should be unique");
+      }
     }
   }
-  ASSERT_EQUAL(sync_result[0], num_devices * 2 * block_size);
+  ASSERT_EQUAL(syncResultD[0], nGpu * 2 * blockSize);
 
   // Free host and device memory
   delete[] launchParamsList;
@@ -454,26 +456,27 @@ static void test_cg_multi_grid_group_type(F kernel_func, int num_devices, int bl
     HIP_CHECK(hipFree(sync_dev[i]));
 
     if (i == 0) {
-      HIP_CHECK(hipHostFree(sync_result));
+      HIPCHECK(hipHostFree(syncResultD));
     }
-    HIP_CHECK(hipHostFree(grid_rank_host[i]));
-    HIP_CHECK(hipHostFree(size_host[i]));
-    HIP_CHECK(hipHostFree(thd_rank_host[i]));
-    HIP_CHECK(hipHostFree(is_valid_host[i]));
+    HIPCHECK(hipHostFree(numGridsTestH[i]));
+    HIPCHECK(hipHostFree(gridRankTestH[i]));
+    HIPCHECK(hipHostFree(sizeTestH[i]));
+    HIPCHECK(hipHostFree(thdRankTestH[i]));
+    HIPCHECK(hipHostFree(isValidTestH[i]));
   }
 }
 
-TEST_CASE("Unit_hipCGMultiGridGroupType_Basic") {
-  int num_devices = 0;
-  HIP_CHECK(hipGetDeviceCount(&num_devices));
-  num_devices = min(num_devices, MaxGPUs);
+TEST_CASE("Unit_hipCGMultiGridGroupType") {
+  int nGpu = 0;
+  HIPCHECK(hipGetDeviceCount(&nGpu));
+  nGpu = min(nGpu, MaxGPUs);
 
-  // Set `max_threads_per_blk` by taking minimum among all available devices
-  int max_threads_per_blk = INT_MAX;
-  hipDeviceProp_t device_properties;
-  for (int i = 0; i < num_devices; i++) {
-    HIP_CHECK(hipGetDeviceProperties(&device_properties, i));
-    if (!device_properties.cooperativeMultiDeviceLaunch) {
+  // Set `maxThreadsPerBlock` by taking minimum among all available devices
+  int maxThreadsPerBlock = INT_MAX;
+  hipDeviceProp_t deviceProperties;
+  for (int i = 0; i < nGpu; i++) {
+    HIPCHECK(hipGetDeviceProperties(&deviceProperties, i));
+    if (!deviceProperties.cooperativeMultiDeviceLaunch) {
       HipTest::HIP_SKIP_TEST("Device doesn't support cooperative launch!");
       return;
     }

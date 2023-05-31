@@ -35,9 +35,13 @@ THE SOFTWARE.
 
 using namespace cooperative_groups;
 
-static __global__ void kernel_cg_thread_block_type(int* sizeTestD, int* thdRankTestD,
-                                                   int* syncTestD, dim3* groupIndexTestD,
-                                                   dim3* thdIndexTestD) {
+static __global__
+void kernel_cg_thread_block_type(int *sizeTestD,
+                                 int *thdRankTestD,
+                                 int *syncTestD,
+                                 dim3 *groupIndexTestD,
+                                 dim3 *thdIndexTestD)
+{
   thread_block tb = this_thread_block();
   int gIdx = (blockIdx.x * blockDim.x) + threadIdx.x;
   // Test size
@@ -62,7 +66,8 @@ static __global__ void kernel_cg_thread_block_type(int* sizeTestD, int* thdRankT
   thdIndexTestD[gIdx] = tb.thread_index();
 }
 
-static void test_cg_thread_block_type(int blockSize) {
+static void test_cg_thread_block_type(int blockSize)
+{
   int nBytes = sizeof(int) * 2 * blockSize;
   int nDim3Bytes = sizeof(dim3) * 2 * blockSize;
   int *sizeTestD, *sizeTestH;
@@ -86,8 +91,16 @@ static void test_cg_thread_block_type(int blockSize) {
   HIPCHECK(hipHostMalloc(&thdIndexTestH, nDim3Bytes));
 
   // Launch Kernel
-  hipLaunchKernelGGL(kernel_cg_thread_block_type, 2, blockSize, 0, 0, sizeTestD, thdRankTestD,
-                     syncTestD, groupIndexTestD, thdIndexTestD);
+  hipLaunchKernelGGL(kernel_cg_thread_block_type,
+                     2,
+                     blockSize,
+                     0,
+                     0,
+                     sizeTestD,
+                     thdRankTestD,
+                     syncTestD,
+                     groupIndexTestD,
+                     thdIndexTestD);
 
   // Copy result from device to host
   HIPCHECK(hipMemcpy(sizeTestH, sizeTestD, nBytes, hipMemcpyDeviceToHost));
@@ -101,10 +114,10 @@ static void test_cg_thread_block_type(int blockSize) {
     ASSERT_EQUAL(sizeTestH[i], blockSize);
     ASSERT_EQUAL(thdRankTestH[i], i % blockSize);
     ASSERT_EQUAL(syncTestH[i], 200);
-    ASSERT_EQUAL(groupIndexTestH[i].x, (uint)i / blockSize);
+    ASSERT_EQUAL(groupIndexTestH[i].x, (uint) i / blockSize);
     ASSERT_EQUAL(groupIndexTestH[i].y, 0);
     ASSERT_EQUAL(groupIndexTestH[i].z, 0);
-    ASSERT_EQUAL(thdIndexTestH[i].x, (uint)i % blockSize);
+    ASSERT_EQUAL(thdIndexTestH[i].x, (uint) i % blockSize);
     ASSERT_EQUAL(thdIndexTestH[i].y, 0);
     ASSERT_EQUAL(thdIndexTestH[i].z, 0);
   }
@@ -116,7 +129,7 @@ static void test_cg_thread_block_type(int blockSize) {
   HIPCHECK(hipFree(groupIndexTestD));
   HIPCHECK(hipFree(thdIndexTestD));
 
-  // Free host memory
+  //Free host memory
   HIPCHECK(hipHostFree(sizeTestH));
   HIPCHECK(hipHostFree(thdRankTestH));
   HIPCHECK(hipHostFree(syncTestH));
@@ -138,7 +151,7 @@ TEST_CASE("Unit_hipCGThreadBlockType") {
 
   // Test for blockSizes in powers of 2
   int maxThreadsPerBlock = deviceProperties.maxThreadsPerBlock;
-  for (int blockSize = 2; blockSize <= maxThreadsPerBlock; blockSize = blockSize * 2) {
+  for (int blockSize = 2; blockSize <= maxThreadsPerBlock; blockSize = blockSize*2) {
     test_cg_thread_block_type(blockSize);
   }
 

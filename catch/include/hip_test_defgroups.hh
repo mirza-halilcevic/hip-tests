@@ -1164,3 +1164,10 @@ TEST_CASE("Unit_atomicOr_Negative_Parameters") {}
  * End doxygen group AtomicsTest.
  * @}
  */
+
+/**
+ * @defgroup DeviceLanguageTest Device Language
+ * @{
+ * This section describes tests for the Device Language API.
+ * @}
+ */

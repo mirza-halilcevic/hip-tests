@@ -216,31 +216,31 @@ TEST_CASE("Unit_hipGraphAddMemcpyNode1D_Negative_Basic") {
   HipTest::initArrays(&A_d, &B_d, &C_d, &A_h, &B_h, &C_h, N, false);
 
   HIP_CHECK(hipGraphCreate(&graph, 0));
-  HIP_CHECK(hipGraphAddMemcpyNode1D(&memcpy_A, graph, nullptr, 0, A_d, A_h,
-                                    Nbytes, hipMemcpyHostToDevice));
+  HIP_CHECK(hipGraphAddMemcpyNode1D(&memcpy_A, graph, nullptr, 0, A_d, A_h, Nbytes,
+                                    hipMemcpyHostToDevice));
 
   //  Pass memcpy direction as hipMemcpyDeviceToHost and
   //  source pointer as host and destination pointer as device pointer
-  ret = hipGraphAddMemcpyNode1D(&memcpy_B, graph, nullptr, 0, B_d, B_h,
-                                Nbytes, hipMemcpyDeviceToHost);
+  ret = hipGraphAddMemcpyNode1D(&memcpy_B, graph, nullptr, 0, B_d, B_h, Nbytes,
+                                hipMemcpyDeviceToHost);
   REQUIRE(hipErrorInvalidValue == ret);
 
   //  Pass memcpy direction as hipMemcpyHostToDevice and
   //  source pointer as device and destination pointer as host pointer
-  ret = hipGraphAddMemcpyNode1D(&memcpy_C, graph, nullptr, 0, C_h, C_d,
-                                Nbytes, hipMemcpyHostToDevice);
+  ret = hipGraphAddMemcpyNode1D(&memcpy_C, graph, nullptr, 0, C_h, C_d, Nbytes,
+                                hipMemcpyHostToDevice);
   REQUIRE(hipErrorInvalidValue == ret);
 
   //  Pass memcpy direction as hipMemcpyDeviceToDevice and
   //  pass source pointer as device and destination pointer as host pointer
-  ret = hipGraphAddMemcpyNode1D(&memcpy_C, graph, nullptr, 0, C_h, C_d,
-                                Nbytes, hipMemcpyDeviceToDevice);
+  ret = hipGraphAddMemcpyNode1D(&memcpy_C, graph, nullptr, 0, C_h, C_d, Nbytes,
+                                hipMemcpyDeviceToDevice);
   REQUIRE(hipErrorInvalidValue == ret);
 
   //  Pass memcpy direction as hipMemcpyDeviceToDevice and
   //  pass source pointer as host and destination pointer as device pointer
-  ret = hipGraphAddMemcpyNode1D(&memcpy_C, graph, nullptr, 0, C_d, C_h,
-                                Nbytes, hipMemcpyDeviceToDevice);
+  ret = hipGraphAddMemcpyNode1D(&memcpy_C, graph, nullptr, 0, C_d, C_h, Nbytes,
+                                hipMemcpyDeviceToDevice);
   REQUIRE(hipErrorInvalidValue == ret);
 
   HipTest::freeArrays(A_d, B_d, C_d, A_h, B_h, C_h, false);

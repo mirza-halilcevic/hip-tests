@@ -81,7 +81,7 @@ TEST_CASE("Unit_hipStreamWaitEvent_Negative") {
   }
 }
 
- /* Test removed for Nvidia devices because it returns unexpected error */
+/* Test removed for Nvidia devices because it returns unexpected error */
 #if !HT_NVIDIA
 /**
  * Test Description
@@ -161,7 +161,7 @@ TEST_CASE("Unit_hipStreamWaitEvent_Default") {
   REQUIRE(stream != nullptr);
   REQUIRE(waitEvent != nullptr);
 
-  int deviceId {};
+  int deviceId{};
   HIP_CHECK(hipGetDevice(&deviceId));
 
   hipDeviceProp_t prop{};
@@ -187,8 +187,8 @@ TEST_CASE("Unit_hipStreamWaitEvent_Default") {
 /**
  * Test Description
  * ------------------------
- *  - Create multiple dependant kernels and synchronize between them with streams and waiting on events.
- * Test source
+ *  - Create multiple dependant kernels and synchronize between them with streams and waiting on
+ * events. Test source
  * ------------------------
  *  - unit/stream/hipStreamWaitEvent.cc
  * Test requirements
@@ -208,7 +208,7 @@ TEST_CASE("Unit_hipStreamWaitEvent_DifferentStreams") {
   REQUIRE(streamBlockedOnStreamA != nullptr);
   REQUIRE(waitEvent != nullptr);
 
-  int deviceId {};
+  int deviceId{};
   HIP_CHECK(hipGetDevice(&deviceId));
 
   hipDeviceProp_t prop{};
@@ -216,7 +216,7 @@ TEST_CASE("Unit_hipStreamWaitEvent_DifferentStreams") {
   auto clockRate = prop.clockRate;
   auto waitKernel_used = IsGfx11() ? waitKernel_gfx11 : waitKernel;
   waitKernel_used<<<1, 1, 0, blockedStreamA>>>(clockRate,
-                                          3);  // wait for 3 seconds
+                                               3);  // wait for 3 seconds
   HIP_CHECK(hipEventRecord(waitEvent, blockedStreamA));
 
   // Make sure stream is waiting for data to be set

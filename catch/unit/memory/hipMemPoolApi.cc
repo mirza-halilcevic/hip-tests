@@ -33,15 +33,7 @@
  */
 
 constexpr hipMemPoolProps kPoolProps = {
-  hipMemAllocationTypePinned,
-  hipMemHandleTypeNone,
-  {
-    hipMemLocationTypeDevice,
-    0
-  },
-  nullptr,
-  {0}
-};
+    hipMemAllocationTypePinned, hipMemHandleTypeNone, {hipMemLocationTypeDevice, 0}, nullptr, {0}};
 
 /**
  * Test Description
@@ -173,25 +165,17 @@ TEST_CASE("Unit_hipMemPoolApi_Basic") {
 
   HIP_CHECK(hipMemPoolGetAttribute(mem_pool, attr, &value));
 
-  hipMemAccessDesc desc_list = {
-    {
-      hipMemLocationTypeDevice,
-      0
-    },
-    hipMemAccessFlagsProtReadWrite
-  };
+  hipMemAccessDesc desc_list = {{hipMemLocationTypeDevice, 0}, hipMemAccessFlagsProtReadWrite};
   int count = 1;
   HIP_CHECK(hipMemPoolSetAccess(mem_pool, &desc_list, count));
 
   hipMemAccessFlags flags = hipMemAccessFlagsProtNone;
-  hipMemLocation location = {
-    hipMemLocationTypeDevice,
-    0
-  };
+  hipMemLocation location = {hipMemLocationTypeDevice, 0};
   HIP_CHECK(hipMemPoolGetAccess(&flags, mem_pool, &location));
 
   HIP_CHECK(hipMemPoolCreate(&mem_pool, &kPoolProps));
-  HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&B), numElements * sizeof(float), mem_pool, stream));
+  HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&B), numElements * sizeof(float),
+                                   mem_pool, stream));
   HIP_CHECK(hipMemPoolDestroy(mem_pool));
 
   HIP_CHECK(hipStreamDestroy(stream));
@@ -209,11 +193,15 @@ __global__ void kernel500ms(float* hostRes, int clkRate) {
   hostRes[tid] = tid + 1;
   __threadfence_system();
   // expecting that the data is getting flushed to host here!
-  uint64_t start = clock64()/clkRate, cur;
+  uint64_t start = clock64() / clkRate, cur;
   if (clkRate > 1) {
-    do { cur = clock64()/clkRate-start;}while (cur < wait_ms);
+    do {
+      cur = clock64() / clkRate - start;
+    } while (cur < wait_ms);
   } else {
-    do { cur = clock64()/start;}while (cur < wait_ms);
+    do {
+      cur = clock64() / start;
+    } while (cur < wait_ms);
   }
 }
 
@@ -223,11 +211,15 @@ __global__ void kernel500ms_gfx11(float* hostRes, int clkRate) {
   hostRes[tid] = tid + 1;
   __threadfence_system();
   // expecting that the data is getting flushed to host here!
-  uint64_t start = wall_clock64()/clkRate, cur;
+  uint64_t start = wall_clock64() / clkRate, cur;
   if (clkRate > 1) {
-    do { cur = wall_clock64()/clkRate-start;}while (cur < wait_ms);
+    do {
+      cur = wall_clock64() / clkRate - start;
+    } while (cur < wait_ms);
   } else {
-    do { cur = wall_clock64()/start;}while (cur < wait_ms);
+    do {
+      cur = wall_clock64() / start;
+    } while (cur < wait_ms);
   }
 #endif
 }
@@ -262,15 +254,17 @@ TEST_CASE("Unit_hipMemPoolApi_BasicAlloc") {
   hipMemPool_t mem_pool;
   HIP_CHECK(hipMemPoolCreate(&mem_pool, &kPoolProps));
 
-  float* B, *C;
+  float *B, *C;
   hipStream_t stream;
   HIP_CHECK(hipStreamCreate(&stream));
 
   size_t numElements = 8 * 1024 * 1024;
-  HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&B), numElements * sizeof(float), mem_pool, stream));
+  HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&B), numElements * sizeof(float),
+                                   mem_pool, stream));
 
   numElements = 1024;
-  HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&C), numElements * sizeof(float), mem_pool, stream));
+  HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&C), numElements * sizeof(float),
+                                   mem_pool, stream));
 
   int blocks = 1024;
   int clkRate;
@@ -374,15 +368,17 @@ TEST_CASE("Unit_hipMemPoolApi_BasicTrim") {
   hipMemPool_t mem_pool;
   HIP_CHECK(hipMemPoolCreate(&mem_pool, &kPoolProps));
 
-  float* B, *C;
+  float *B, *C;
   hipStream_t stream;
   HIP_CHECK(hipStreamCreate(&stream));
 
   size_t numElements = 8 * 1024 * 1024;
-  HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&B), numElements * sizeof(float), mem_pool, stream));
+  HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&B), numElements * sizeof(float),
+                                   mem_pool, stream));
 
   numElements = 1024;
-  HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&C), numElements * sizeof(float), mem_pool, stream));
+  HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&C), numElements * sizeof(float),
+                                   mem_pool, stream));
 
   int blocks = 2;
   int clkRate;
@@ -492,10 +488,12 @@ TEST_CASE("Unit_hipMemPoolApi_BasicReuse") {
   HIP_CHECK(hipStreamCreate(&stream));
 
   size_t numElements = 8 * 1024 * 1024;
-  HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&A), numElements * sizeof(float), mem_pool, stream));
+  HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&A), numElements * sizeof(float),
+                                   mem_pool, stream));
 
   numElements = 1024;
-  HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&C), numElements * sizeof(float), mem_pool, stream));
+  HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&C), numElements * sizeof(float),
+                                   mem_pool, stream));
 
   int blocks = 2;
   int clkRate;
@@ -514,7 +512,8 @@ TEST_CASE("Unit_hipMemPoolApi_BasicReuse") {
   HIP_CHECK(hipFreeAsync(reinterpret_cast<void*>(A), stream));
 
   numElements = 8 * 1024 * 1024;
-  HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&B), numElements * sizeof(float), mem_pool, stream));
+  HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&B), numElements * sizeof(float),
+                                   mem_pool, stream));
   // Runtime must reuse the pointer
   REQUIRE(A == B);
 
@@ -581,7 +580,7 @@ TEST_CASE("Unit_hipMemPoolApi_Opportunistic") {
   hipMemPoolAttr attr;
   int blocks = 2;
   int clkRate;
-   if (IsGfx11()) {
+  if (IsGfx11()) {
     HIPCHECK(hipDeviceGetAttribute(&clkRate, hipDeviceAttributeWallClockRate, 0));
   } else {
     HIPCHECK(hipDeviceGetAttribute(&clkRate, hipDeviceAttributeClockRate, 0));
@@ -595,12 +594,14 @@ TEST_CASE("Unit_hipMemPoolApi_Opportunistic") {
   HIP_CHECK(hipStreamCreateWithFlags(&stream2, hipStreamNonBlocking));
 
   size_t numElements = 1024;
-  HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&C), numElements * sizeof(float), mem_pool, stream));
+  HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&C), numElements * sizeof(float),
+                                   mem_pool, stream));
   int value = 0;
 
   SECTION("Disallow Opportunistic - No Reuse") {
     numElements = 8 * 1024 * 1024;
-    HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&A), numElements * sizeof(float), mem_pool, stream));
+    HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&A), numElements * sizeof(float),
+                                     mem_pool, stream));
 
     // Disable all default pool states
     attr = hipMemPoolReuseFollowEventDependencies;
@@ -625,7 +626,8 @@ TEST_CASE("Unit_hipMemPoolApi_Opportunistic") {
 
     numElements = 8 * 1024 * 1024;
     // Allocate memory for the second stream
-    HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&B), numElements * sizeof(float), mem_pool, stream2));
+    HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&B), numElements * sizeof(float),
+                                     mem_pool, stream2));
     // Without Opportunistic state runtime must allocate another buffer
     REQUIRE(A != B);
 
@@ -644,7 +646,8 @@ TEST_CASE("Unit_hipMemPoolApi_Opportunistic") {
 
   SECTION("Allow Opportunistic - Reuse") {
     numElements = 8 * 1024 * 1024;
-    HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&A), numElements * sizeof(float), mem_pool, stream));
+    HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&A), numElements * sizeof(float),
+                                     mem_pool, stream));
 
     value = 1;
     attr = hipMemPoolReuseAllowOpportunistic;
@@ -668,7 +671,8 @@ TEST_CASE("Unit_hipMemPoolApi_Opportunistic") {
 
     numElements = 8 * 1024 * 1024;
     // Allocate memory for the second stream
-    HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&B), numElements * sizeof(float), mem_pool, stream2));
+    HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&B), numElements * sizeof(float),
+                                     mem_pool, stream2));
     // With Opportunistic state runtime will reuse freed buffer A
     REQUIRE(A == B);
 
@@ -687,7 +691,8 @@ TEST_CASE("Unit_hipMemPoolApi_Opportunistic") {
 
   SECTION("Allow Opportunistic - No Reuse") {
     numElements = 8 * 1024 * 1024;
-    HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&A), numElements * sizeof(float), mem_pool, stream));
+    HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&A), numElements * sizeof(float),
+                                     mem_pool, stream));
 
     value = 1;
     attr = hipMemPoolReuseAllowOpportunistic;
@@ -695,7 +700,7 @@ TEST_CASE("Unit_hipMemPoolApi_Opportunistic") {
     HIP_CHECK(hipMemPoolSetAttribute(mem_pool, attr, &value));
 
     // Run kernel for 500 ms in the first stream
-      
+
     if (IsGfx11()) {
       kernel500ms_gfx11<<<32, blocks, 0, stream>>>(A, clkRate);
     } else {
@@ -707,8 +712,10 @@ TEST_CASE("Unit_hipMemPoolApi_Opportunistic") {
 
     numElements = 8 * 1024 * 1024;
     // Allocate memory for the second stream
-    HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&B), numElements * sizeof(float), mem_pool, stream2));
-    // With Opportunistic state runtime can't reuse freed buffer A, because it's still busy with the kernel
+    HIP_CHECK(hipMallocFromPoolAsync(reinterpret_cast<void**>(&B), numElements * sizeof(float),
+                                     mem_pool, stream2));
+    // With Opportunistic state runtime can't reuse freed buffer A, because it's still busy with the
+    // kernel
     REQUIRE(A != B);
 
     // Run kernel with the new memory in the second stream
@@ -787,8 +794,8 @@ TEST_CASE("Unit_hipMemPoolApi_Opportunistic") {
  * @addtogroup hipMemPoolGetAccess hipMemPoolGetAccess
  * @{
  * @ingroup StreamOTest
- * `hipMemPoolGetAccess(hipMemAccessFlags* flags, hipMemPool_t mem_pool, hipMemLocation* location)` -
- * Returns the accessibility of a pool from a device.
+ * `hipMemPoolGetAccess(hipMemAccessFlags* flags, hipMemPool_t mem_pool, hipMemLocation* location)`
+ * - Returns the accessibility of a pool from a device.
  * ________________________
  * Test cases from other modules:
  *  - @ref Unit_hipMemPoolApi_Basic

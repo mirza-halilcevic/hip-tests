@@ -42,11 +42,12 @@ static __global__ void sqr_ker_func(int* a, int* b, size_t N, int clockrate, siz
 
 static __global__ void sqr_ker_func_gfx11(int* a, int* b, int clockrate) {
 #if HT_AMD
-  int tx = hipBlockIdx_x*hipBlockDim_x + hipThreadIdx_x;
-  if (tx < LEN) b[tx] = a[tx]*a[tx];
-  uint64_t wait_t = DELAY_IN_MS,
-  start = wall_clock64()/clockrate, cur;
-  do { cur = wall_clock64()/clockrate - start;}while (cur < wait_t);
+  int tx = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
+  if (tx < LEN) b[tx] = a[tx] * a[tx];
+  uint64_t wait_t = DELAY_IN_MS, start = wall_clock64() / clockrate, cur;
+  do {
+    cur = wall_clock64() / clockrate - start;
+  } while (cur < wait_t);
 #endif
 }
 

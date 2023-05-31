@@ -29,55 +29,45 @@ THE SOFTWARE.
 
 namespace cg = cooperative_groups;
 
-namespace MinMax {
+namespace Bitwise {
 enum class AtomicOperation {
-  kMin = 0,
-  kMinSystem,
-  kMax,
-  kMaxSystem,
-  kSafeMin,
-  kUnsafeMin,
-  kSafeMax,
-  kUnsafeMax
+  kAnd = 0,
+  kAndSystem,
+  kOr,
+  kOrSystem,
+  kXor,
+  kXorSystem,
 };
 
-constexpr auto kIntegerTestValue = 5;
-constexpr auto kFloatingPointTestValue = 5.5;
+constexpr auto kMask = 0xAAAA;
+constexpr auto kTestValue = 0x4545;
+constexpr auto kAndTestValue = 0xFFFF;
 
 template <typename TestType, AtomicOperation operation>
 __host__ __device__ TestType GetTestValue() {
-  TestType test_value =
-      std::is_floating_point_v<TestType> ? kFloatingPointTestValue : kIntegerTestValue;
-
-  if constexpr (operation == AtomicOperation::kMin || operation == AtomicOperation::kMinSystem ||
-                operation == AtomicOperation::kUnsafeMin ||
-                operation == AtomicOperation::kSafeMin) {
-    return test_value - 2;
+  if constexpr (operation == AtomicOperation::kAnd || operation == AtomicOperation::kAndSystem) {
+    return kAndTestValue;
   }
 
-  return test_value + 2;
+  return kTestValue;
 }
 
 template <typename TestType, AtomicOperation operation>
 __device__ TestType PerformAtomicOperation(TestType* const mem) {
-  const auto val = GetTestValue<TestType, operation>();
+  const auto mask = kMask;
 
-  if constexpr (operation == AtomicOperation::kMin) {
-    return atomicMin(mem, val);
-  } else if constexpr (operation == AtomicOperation::kMinSystem) {
-    return atomicMin_system(mem, val);
-  } else if constexpr (operation == AtomicOperation::kMax) {
-    return atomicMax(mem, val);
-  } else if constexpr (operation == AtomicOperation::kMaxSystem) {
-    return atomicMax_system(mem, val);
-  } else if constexpr (operation == AtomicOperation::kUnsafeMin) {
-    return unsafeAtomicMin(mem, val);
-  } else if constexpr (operation == AtomicOperation::kSafeMin) {
-    return safeAtomicMin(mem, val);
-  } else if constexpr (operation == AtomicOperation::kUnsafeMax) {
-    return unsafeAtomicMax(mem, val);
-  } else if constexpr (operation == AtomicOperation::kSafeMax) {
-    return safeAtomicMax(mem, val);
+  if constexpr (operation == AtomicOperation::kAnd) {
+    return atomicAnd(mem, mask);
+  } else if constexpr (operation == AtomicOperation::kAndSystem) {
+    return atomicAnd_system(mem, mask);
+  } else if constexpr (operation == AtomicOperation::kOr) {
+    return atomicOr(mem, mask);
+  } else if constexpr (operation == AtomicOperation::kOrSystem) {
+    return atomicOr_system(mem, mask);
+  } else if constexpr (operation == AtomicOperation::kXor) {
+    return atomicXor(mem, mask);
+  } else if constexpr (operation == AtomicOperation::kXorSystem) {
+    return atomicXor_system(mem, mask);
   }
 }
 
@@ -155,13 +145,10 @@ struct TestParams {
 
 template <typename TestType, AtomicOperation operation>
 std::tuple<std::vector<TestType>, std::vector<TestType>> TestKernelHostRef(const TestParams& p) {
-  const auto val = GetTestValue<TestType, operation>();
-
   const auto thread_count = p.num_devices * p.kernel_count * p.ThreadCount();
 
-  TestType test_value =
-      std::is_floating_point_v<TestType> ? kFloatingPointTestValue : kIntegerTestValue;
-
+  TestType test_value = GetTestValue<TestType, operation>();
+  const auto mask = kMask;
   std::vector<TestType> res_vals(p.width, test_value);
   std::vector<TestType> old_vals;
   old_vals.reserve(thread_count);
@@ -170,15 +157,14 @@ std::tuple<std::vector<TestType>, std::vector<TestType>> TestKernelHostRef(const
     auto& res = res_vals[tid % p.width];
     old_vals.push_back(res);
 
-    if constexpr (operation == AtomicOperation::kMin || operation == AtomicOperation::kMinSystem ||
-                  operation == AtomicOperation::kUnsafeMin ||
-                  operation == AtomicOperation::kSafeMin) {
-      res = std::min(res, val);
-    } else if constexpr (operation == AtomicOperation::kMax ||
-                         operation == AtomicOperation::kMaxSystem ||
-                         operation == AtomicOperation::kUnsafeMax ||
-                         operation == AtomicOperation::kSafeMax) {
-      res = std::max(res, val);
+    if constexpr (operation == AtomicOperation::kAnd || operation == AtomicOperation::kAndSystem) {
+      res = res & mask;
+    } else if constexpr (operation == AtomicOperation::kOr ||
+                         operation == AtomicOperation::kOrSystem) {
+      res = res | mask;
+    } else if constexpr (operation == AtomicOperation::kXor ||
+                         operation == AtomicOperation::kXorSystem) {
+      res = res ^ mask;
     }
   }
 
@@ -236,8 +222,7 @@ void TestCore(const TestParams& p) {
   TestType* const mem_ptr =
       p.alloc_type == LinearAllocs::hipMalloc ? mem_dev.ptr() : mem_dev.host_ptr();
 
-  TestType test_value =
-      std::is_floating_point_v<TestType> ? kFloatingPointTestValue : kIntegerTestValue;
+  TestType test_value = GetTestValue<TestType, operation>();
   HIP_CHECK(hipMemset(mem_ptr, 0, mem_alloc_size));
   for (int i = 0; i < p.width * p.pitch / sizeof(TestType); ++i) {
     HIP_CHECK(hipMemcpy(&mem_ptr[i], &test_value, sizeof(TestType), hipMemcpyHostToDevice));
@@ -357,4 +342,4 @@ void MultipleDeviceMultipleKernelTest(const unsigned int num_devices,
     }
   }
 }
-}  // namespace MinMax
+}  // namespace Bitwise

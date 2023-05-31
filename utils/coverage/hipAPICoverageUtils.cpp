@@ -42,12 +42,16 @@ void findAPICallInFile(HipAPI& hip_api, std::string test_module_file) {
   std::string api_call_with_assert{"(" + hip_api.getName() + "("};
   std::string api_call_with_assignment{"= " + hip_api.getName() + "("};
   std::string api_call_with_parameter{", " + hip_api.getName() + "("};
+  std::string api_call_with_return{"return " + hip_api.getName() + "("};
+  std::string api_call_in_line("{ " + hip_api.getName() + "(");
 
   while (std::getline(test_module_file_handler, line)) {
     ++line_number;
     if ((line.find(api_call_with_assert) != std::string::npos) ||
         (line.find(api_call_with_assignment) != std::string::npos) ||
-        (line.find(api_call_with_parameter) != std::string::npos)) {
+        (line.find(api_call_with_parameter) != std::string::npos) ||
+        (line.find(api_call_with_return) != std::string::npos) ||
+        (line.find(api_call_in_line) != std::string::npos)) {
       hip_api.addFileOccurrence(FileOccurrence(test_module_file, line_number));
     }
   }

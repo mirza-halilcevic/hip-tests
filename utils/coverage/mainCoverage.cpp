@@ -39,6 +39,7 @@ int main(int argc, char** argv) {
       findAbsolutePathOfFile(hip_include_path + "/hip/hip_runtime_api.h")};
   std::string hip_rtc_header_file{findAbsolutePathOfFile(hip_include_path + "/hip/hiprtc.h")};
   std::string tests_root_directory{findAbsolutePathOfFile("../../catch")};
+  std::string device_api_file{"device_api_list.txt"};
 
   std::vector<std::string> api_group_names;
   // Extract all HIP API declarations from the HIP API header file.
@@ -50,6 +51,11 @@ int main(int argc, char** argv) {
   std::cout << "Number of detected HIP APIs from " << hip_rtc_header_file << ": "
             << hip_rtc_apis.size() << std::endl;
   hip_apis.insert(hip_apis.end(), hip_rtc_apis.begin(), hip_rtc_apis.end());
+
+  std::vector<HipAPI> device_apis{extractDeviceAPIs(device_api_file, api_group_names)};
+  std::cout << "Number of detected device APIs from " << device_api_file << ": "
+            << device_apis.size() << std::endl;
+  hip_apis.insert(hip_apis.end(), device_apis.begin(), device_apis.end());
 
   // Extract all test module .cc files that shall be used for API searching.
   std::cout << "Searching for HIP API calls in source files within " << tests_root_directory << "."

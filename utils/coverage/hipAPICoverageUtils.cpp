@@ -247,6 +247,51 @@ std::vector<HipAPI> extractHipAPIs(std::string& hip_api_header_file,
 }
 
 /*
+Used to extract all HIP APIs from the passed header file.
+*/
+std::vector<HipAPI> extractDeviceAPIs(std::string& apis_list_file,
+                                      std::vector<std::string>& api_group_names) {
+  std::fstream apis_list_file_handler;
+  apis_list_file_handler.open(apis_list_file);
+
+  std::string line;
+  std::vector<HipAPI> device_apis;
+
+  /*
+  Each HIP API has prefix hip in the name. Groups are marked with @defgroup, and the
+  main group that shall be considered is HIP API. Before that group is defined, lines
+  of code shall not be considered.
+  */
+  int line_number{0};
+  bool group_start{false};
+
+  while (std::getline(apis_list_file_handler, line)) {
+    ++line_number;
+
+    if (line.find("[") != std::string::npos) {
+      std::string group_name = line.substr(0, line.rfind(" "));
+      api_group_names.push_back(group_name);
+      group_start = true;
+      continue;
+    }
+
+    if (line.find("]") != std::string::npos) {
+      group_start = false;
+      continue;
+    }
+
+    if (group_start) {
+      std::string api_name = line.substr(line.rfind(" ") + 1);
+      HipAPI hip_api{api_name, false, api_group_names.back()};
+      device_apis.push_back(hip_api);
+    }
+  }
+
+  apis_list_file_handler.close();
+  return device_apis;
+}
+
+/*
 Used to extract test .cc files from the passed tests root directory.
 Goes through all subdirectories and searches for .cc and .hh files for
 HIP API invocations.

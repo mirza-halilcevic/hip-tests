@@ -66,7 +66,11 @@ void HipAPI::addFileOccurrence(FileOccurrence file_occurrence) {
   file_occurrences.push_back(file_occurrence);
 }
 
-void HipAPI::addTestCase(TestCaseOccurrence test_case) { test_cases.push_back(test_case); }
+void HipAPI::addTestCase(TestCaseOccurrence test_case) {
+  if (std::find(test_cases.begin(), test_cases.end(), test_case) == test_cases.end()) {
+    test_cases.push_back(test_case);
+  }
+}
 
 bool HipAPI::isDeprecated() const { return deprecated; }
 

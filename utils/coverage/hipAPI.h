@@ -23,6 +23,7 @@ THE SOFTWARE.
 #include <iostream>
 #include <vector>
 #include <sstream>
+#include <algorithm>
 
 /*
 Helper class used to store information in what file has HIP API been detected,

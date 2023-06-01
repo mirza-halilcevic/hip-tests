@@ -21,7 +21,6 @@ THE SOFTWARE.
 */
 
 #include "hipAPI.h"
-#include <algorithm>
 #include <iomanip>
 
 class HipAPIGroup {

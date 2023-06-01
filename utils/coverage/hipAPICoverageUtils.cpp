@@ -78,7 +78,7 @@ void findAPICallInFile(HipAPI& hip_api, std::string test_module_file) {
 Used to find all HIP API test cases within the passed test .cc files.
 Matching test case is detected when the HIP API in defined within doxygen comment.
 */
-void findAPITestCaseInFile(HipAPI& hip_api, std::string test_module_file) {
+void findAPITestCaseInFileByDoxygen(HipAPI& hip_api, std::string test_module_file) {
   std::fstream test_module_file_handler;
   test_module_file_handler.open(test_module_file);
 
@@ -122,6 +122,35 @@ void findAPITestCaseInFile(HipAPI& hip_api, std::string test_module_file) {
 }
 
 /*
+Used to find all HIP API test cases within the passed test .cc files.
+Matching test case is detected when the HIP API in defined within doxygen comment.
+*/
+void findAPITestCaseInFileByAPIName(HipAPI& hip_api, std::string test_module_file) {
+  std::fstream test_module_file_handler;
+  test_module_file_handler.open(test_module_file);
+
+  int line_number{0};
+  std::string line;
+
+  std::string test_case_definition{"TEST_CASE("};
+  std::string test_case{"None"};
+
+  while (std::getline(test_module_file_handler, line)) {
+    ++line_number;
+
+    if (line.find(test_case_definition) != std::string::npos) {
+      test_case = line.substr(line.find("\"") + 1);
+      test_case = test_case.substr(0, test_case.find("\""));
+      if (test_case.find("_" + hip_api.getName() + "_") != std::string::npos) {
+        hip_api.addTestCase(TestCaseOccurrence{test_case, test_module_file, line_number});
+      }
+    }
+  }
+
+  test_module_file_handler.close();
+}
+
+/*
 Used to iterate through all passed test .cc files and search for passed
 HIP API instance. This instance shall be used to update occurrences.
 */
@@ -129,7 +158,8 @@ void searchForAPI(HipAPI& hip_api, std::vector<std::string>& test_module_files) 
   std::cout << "Searching for " << hip_api.getName() << " in test module files." << std::endl;
   for (auto const& test_module_file : test_module_files) {
     findAPICallInFile(hip_api, test_module_file);
-    findAPITestCaseInFile(hip_api, test_module_file);
+    findAPITestCaseInFileByDoxygen(hip_api, test_module_file);
+    findAPITestCaseInFileByAPIName(hip_api, test_module_file);
   }
 }
 

@@ -27,7 +27,7 @@ Atomics [
   atomicXor_system
 ]
 
-Builtin Atomics [
+Builtin atomics [
   __hip_atomic_load
   __hip_atomic_store
   __hip_atomic_compare_exchange_weak
@@ -41,7 +41,7 @@ Builtin Atomics [
   __hip_atomic_fetch_max
 ]
 
-Cooperative Groups [
+Cooperative groups [
   File restriction: cooperative_groups
   Device groups: (
     coalesced_group_tile
@@ -89,7 +89,16 @@ Launch bounds [
   __launch_bounds__
 ]
 
-Other device language [
+Device assert [
   assert
   static_assert
+]
+
+Device clock [
+  Device groups: (
+    clock
+  )
+  clock
+  clock64
+  wall_clock64
 ]

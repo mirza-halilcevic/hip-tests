@@ -1287,3 +1287,9 @@ TEST_CASE("Unit_StaticAssert_Negative_Basic")
  * This section describes tests for the Device Language API.
  * @}
  */
+
+/**
+ * @defgroup DeviceLanguageTest Device Language
+ * @{
+ * This section describes tests for the Device Language API.
+ */

@@ -45,6 +45,7 @@ void findAPICallInFile(HipAPI& hip_api, std::string test_module_file) {
   std::string api_call_with_return{"return " + hip_api.getName() + "("};
   std::string api_call_in_line("{ " + hip_api.getName() + "(");
   std::string api_member{"." + hip_api.getName() + "("};
+  std::string api_newline{"  " + hip_api.getName() + "("};
 
   std::string api_restriction{hip_api.getFileRestriction()};
   bool found_restriction{false};
@@ -61,7 +62,9 @@ void findAPICallInFile(HipAPI& hip_api, std::string test_module_file) {
         (line.find(api_call_with_parameter) != std::string::npos) ||
         (line.find(api_call_with_return) != std::string::npos) ||
         (line.find(api_call_in_line) != std::string::npos) ||
-        (line.find(api_member) != std::string::npos)) {
+        (line.find(api_member) != std::string::npos) ||
+        (line.find(api_newline) != std::string::npos) ||
+        (line.find(hip_api.getName() + "(") == 0)) {
       if (api_restriction == "" || found_restriction) {
         hip_api.addFileOccurrence(FileOccurrence(test_module_file, line_number));
       }
@@ -302,6 +305,7 @@ std::vector<HipAPI> extractDeviceAPIs(std::string& apis_list_file,
     if (line.find("]") != std::string::npos) {
       group_start = false;
       device_groups.clear();
+      restriction = "";
       continue;
     }
 

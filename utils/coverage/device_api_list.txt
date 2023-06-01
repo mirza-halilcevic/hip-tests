@@ -82,8 +82,14 @@ Warp [
   __shfl_xor
 ]
 
+Launch bounds [
+  Device groups: (
+    launch_bounds
+  )
+  __launch_bounds__
+]
+
 Other device language [
-  launch_bounds
   assert
   static_assert
 ]

@@ -22,6 +22,7 @@ set(TEST_SRC
   root_funcs.cc
   pow_funcs.cc
   log_funcs.cc
+  trig_funcs.cc
 )
 
 if(HIP_PLATFORM MATCHES "nvidia")
@@ -52,3 +53,14 @@ add_test(NAME Unit_Device_log_Negative
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
          math_log_negative_kernels.cc 24)
+                      TEST_TARGET_NAME build_tests COMMON_SHARED_SRC ${COMMON_SHARED_SRC})
+
+add_test(NAME Unit_Device_Single_Precision_Trig_Functions_Negative
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         trig_single_precision_negative_kernels.cc 66)
+
+add_test(NAME Unit_Device_Double_Precision_Trig_Functions_Negative
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         trig_double_precision_negative_kernels.cc 66)

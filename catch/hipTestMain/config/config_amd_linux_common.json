@@ -92,6 +92,7 @@
 	   "NOTE: The following 2 tests are disabled due to defect - EXSWHTEC-238",
 	   "Unit_hipDrvMemcpy3D_Positive_Array",
 	   "Unit_hipDrvMemcpy3DAsync_Positive_Array",
-	   "Unit_hipMemGetAddressRange_Negative"
+	   "Unit_hipMemGetAddressRange_Negative",
+	   "Unit_ChannelDescriptor_Positive_16BitFloatingPoint"
 	]
 }

@@ -122,3 +122,9 @@ Device synchronization [
   __syncthreads_count
   __syncthreads_or
 ]
+
+Memory fence [
+  __threadfence
+  __threadfence_block
+  __threadfence_system
+]

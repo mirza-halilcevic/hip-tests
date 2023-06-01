@@ -1283,3 +1283,9 @@ TEST_CASE("Unit_StaticAssert_Negative_Basic")
  * This section describes tests for Synchronization Functions.
  * @}
  */
+
+/**
+ * @defgroup ThreadfenceTest Memory Fence Functions
+ * @{
+ * This section describes tests for Memory Fence Functions.
+ */

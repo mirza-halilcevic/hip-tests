@@ -101,6 +101,9 @@ template <typename T> class LinearAllocGuard {
   }
 
   ~LinearAllocGuard() {
+    if (ptr_ == nullptr) {
+      return;
+    }
     // No Catch macros, don't want to possibly throw in the destructor
     switch (allocation_type_) {
       case LinearAllocs::noAlloc:

@@ -1289,3 +1289,10 @@ TEST_CASE("Unit_StaticAssert_Negative_Basic")
  * @{
  * This section describes tests for Memory Fence Functions.
  */
+
+/**
+ * @defgroup MathTest Math Device Functions
+ * @{
+ * This section describes tests for device math functions of HIP runtime API.
+ * @}
+ */

@@ -18,40 +18,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-add_subdirectory(rtc)
-add_subdirectory(deviceLib)
-add_subdirectory(graph)
-add_subdirectory(memory)
-add_subdirectory(stream)
-add_subdirectory(event)
-add_subdirectory(occupancy)
-add_subdirectory(device)
-add_subdirectory(printf)
-add_subdirectory(texture)
-add_subdirectory(streamperthread)
-add_subdirectory(kernel)
-add_subdirectory(multiThread)
-add_subdirectory(compiler)
-add_subdirectory(errorHandling)
-add_subdirectory(cooperativeGrps)
-add_subdirectory(context)
-add_subdirectory(warp)
-add_subdirectory(device_memory)
-add_subdirectory(math)
-if(HIP_PLATFORM STREQUAL "amd")
-add_subdirectory(callback)
-add_subdirectory(module)
-#add_subdirectory(clock)
-add_subdirectory(hip_specific)
-# Vulkan interop APIs currently undefined for Nvidia
-add_subdirectory(vulkan_interop)
-add_subdirectory(gl_interop) # Disabled on NVIDIA due to defect - EXSWHTEC-246
-add_subdirectory(virtualMemory)
-endif()
-add_subdirectory(executionControl)
-add_subdirectory(atomics)
-add_subdirectory(launchBounds)
-add_subdirectory(assertion)
-add_subdirectory(channelDescriptor)
-add_subdirectory(syncthreads)
-add_subdirectory(threadfence)
+set(TEST_SRC
+)
+
+hip_add_exe_to_target(NAME MathsTest
+                      TEST_SRC ${TEST_SRC}
+                      TEST_TARGET_NAME build_tests COMMON_SHARED_SRC ${COMMON_SHARED_SRC})

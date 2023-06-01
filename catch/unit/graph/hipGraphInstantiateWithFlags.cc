@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 Advanced Micro Devices, Inc. All rights reserved.
+Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
@@ -343,6 +343,7 @@ TEST_CASE("Unit_hipGraphInstantiateWithFlags_StreamCaptureDeviceContextChg") {
     SUCCEED("skipped the testcase as no of devices is less than 2");
   }
 }
+<<<<<<< HEAD
 
 /* Create graph and add memAlloc node, but no corresponding memFree node to it.
   Instantiate graph with flag - hipGraphInstantiateFlagAutoFreeOnLaunch
@@ -388,3 +389,5 @@ TEST_CASE("Unit_hipGraphInstantiateWithFlags_FlagAutoFreeOnLaunch_check") {
   HIP_CHECK(hipGraphExecDestroy(graphExec));
   HIP_CHECK(hipStreamDestroy(stream));
 }
+=======
+>>>>>>> 86d4bd7e3b58fd3b8d80e02c3128e6b91e72e7d4

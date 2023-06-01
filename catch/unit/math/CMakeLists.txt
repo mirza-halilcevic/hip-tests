@@ -19,7 +19,7 @@
 # THE SOFTWARE.
 
 set(TEST_SRC
-  rounding_funcs.cc
+  casting_int_funcs.cc
 )
 
 hip_add_exe_to_target(NAME MathsTest

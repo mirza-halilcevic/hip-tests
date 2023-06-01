@@ -110,30 +110,6 @@ void UnarySinglePrecisionRangeTest(kernel_sig<T, float> kernel, ref_sig<RT, RTAr
   }
 }
 
-template <typename T1, typename T2, typename ValidatorBuilder>
-void UnaryIntRangeTest(kernel_sig<T1, T2> kernel, ref_sig<T1, T2> ref_func,
-                                   const ValidatorBuilder& validator_builder, const int a,
-                                   const int b) {
-  const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(kernel);
-  uint64_t stop = std::numeric_limits<uint32_t>::max() + 1ul;
-  const auto max_batch_size = GetMaxAllowedDeviceMemoryUsage() / (sizeof(T1) + sizeof(T2));
-  LinearAllocGuard<T2> values{LinearAllocs::hipHostMalloc, max_batch_size * sizeof(T2)};
-
-  MathTest math_test(kernel, max_batch_size);
-
-  uint32_t val = 0u;
-  const auto num_threads = thread_pool.thread_count();
-
-  size_t inserted = 0u;
-  for (T2 v = a; v != b; v++) {
-    values.ptr()[inserted++] = v;
-    if (inserted < max_batch_size) continue;
-
-    math_test.Run(validator_builder, grid_size, block_size, ref_func, inserted, values.ptr());
-    inserted = 0u;
-  }
-}
-
 template <typename T, typename RT, typename RTArg, typename ValidatorBuilder>
 void UnaryDoublePrecisionBruteForceTest(kernel_sig<T, double> kernel, ref_sig<RT, RTArg> ref_func,
                                         const ValidatorBuilder& validator_builder,

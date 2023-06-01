@@ -32,7 +32,7 @@ struct CmdOptions {
   bool no_display = false;
   bool progress = false;
   uint64_t accuracy_iterations = std::numeric_limits<uint32_t>::max() + 1ull;
-  int accuracy_max_memory = 80;
+  int accuracy_max_memory = 50;
 };
 
 extern CmdOptions cmd_options;

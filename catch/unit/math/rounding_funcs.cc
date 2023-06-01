@@ -432,6 +432,56 @@ CAST_INT2FLOAT_TEST_DEF(unsigned int, uint2float_rn, FE_TONEAREST)
 CAST_INT2FLOAT_TEST_DEF(unsigned int, uint2float_ru, FE_UPWARD)
 CAST_INT2FLOAT_TEST_DEF(unsigned int, uint2float_rz, FE_TOWARDZERO)
 
+CAST_INT2FLOAT_TEST_DEF(long long int, ll2float_rd, FE_DOWNWARD)
+CAST_INT2FLOAT_TEST_DEF(long long int, ll2float_rn, FE_TONEAREST)
+CAST_INT2FLOAT_TEST_DEF(long long int, ll2float_ru, FE_UPWARD)
+CAST_INT2FLOAT_TEST_DEF(long long int, ll2float_rz, FE_TOWARDZERO)
+
+CAST_INT2FLOAT_TEST_DEF(unsigned long long int, ull2float_rd, FE_DOWNWARD)
+CAST_INT2FLOAT_TEST_DEF(unsigned long long int, ull2float_rn, FE_TONEAREST)
+CAST_INT2FLOAT_TEST_DEF(unsigned long long int, ull2float_ru, FE_UPWARD)
+CAST_INT2FLOAT_TEST_DEF(unsigned long long int, ull2float_rz, FE_TOWARDZERO)
+
+CAST_KERNEL_DEF(int_as_float)
+
+float int_as_float_ref(int arg) {
+  float tmp;
+  memcpy(&tmp, &arg, sizeof(tmp)); 
+  return tmp;
+}
+
+TEST_CASE("Unit_Device_int_as_float_Positive") {
+  float (*ref)(int) = int_as_float_ref;
+  UnaryIntRangeTest(int_as_float_kernel<float, int>, ref, EqValidatorBuilderFactory<float>(), std::numeric_limits<int>::lowest(), std::numeric_limits<int>::max());
+}
+
+CAST_KERNEL_DEF(uint_as_float)
+
+float uint_as_float_ref(unsigned int arg) {
+  float tmp;
+  memcpy(&tmp, &arg, sizeof(tmp)); 
+  return tmp;
+}
+
+TEST_CASE("Unit_Device_uint_as_float_Positive") {
+   float (*ref)(unsigned int) = uint_as_float_ref;
+  UnaryIntRangeTest(uint_as_float_kernel<unsigned int, float>, ref, EqValidatorBuilderFactory<float>(), std::numeric_limits<unsigned int>::lowest(), std::numeric_limits<unsigned int>::max());
+}
+
+CAST_KERNEL_DEF(double2loint)
+
+int double2loint_ref(double arg) {
+  int tmp[2];
+  memcpy(tmp, &arg, sizeof(tmp)); 
+  return tmp[0];
+}
+
+TEST_CASE("Unit_Device_double2loint_Positive") {
+  int (*ref)(double) = double2loint_ref;
+  UnaryDoublePrecisionTest(double2loint_kernel<int, double>, ref, EqValidatorBuilderFactory<int>());
+}
+
+
 /*
   
  

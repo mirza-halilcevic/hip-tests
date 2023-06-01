@@ -344,6 +344,7 @@ TEST_CASE("Unit_hipGraphInstantiateWithFlags_StreamCaptureDeviceContextChg") {
   }
 }
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 /* Create graph and add memAlloc node, but no corresponding memFree node to it.
   Instantiate graph with flag - hipGraphInstantiateFlagAutoFreeOnLaunch
@@ -391,3 +392,5 @@ TEST_CASE("Unit_hipGraphInstantiateWithFlags_FlagAutoFreeOnLaunch_check") {
 }
 =======
 >>>>>>> 86d4bd7e3b58fd3b8d80e02c3128e6b91e72e7d4
+=======
+>>>>>>> c289aa70c0fbf26db8e9f06ab9ec0f8d8bfceaf6

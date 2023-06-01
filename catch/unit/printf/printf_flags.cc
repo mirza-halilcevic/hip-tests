@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
+Copyright (c) 2023 Advanced Micro Devices, Inc. All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -20,23 +20,54 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-#include <hip/hip_runtime.h>
+#include <hip_test_common.hh>
+#include <hip_test_process.hh>
 
-__global__ void test_kernel() {
-  printf("%08d\n", 42);
-  printf("%08i\n", -42);
-  printf("%08u\n", 42);
-  printf("%08g\n", 123.456);
-  printf("%0+8d\n", 42);
-  printf("%+d\n", -42);
-  printf("%+08d\n", 42);
-  printf("%-8s\n", "xyzzy");
-  printf("% i\n", -42);
-  printf("%-16.8d\n", 42);
-  printf("%16.8d\n", 42);
-}
+/**
+ * @addtogroup printf printf
+ * @{
+ * @ingroup DeviceLanguageTest
+ */
 
-int main() {
-  test_kernel<<<1, 1>>>();
-  static_cast<void>(hipDeviceSynchronize());
+
+/**
+ * Test Description
+ * ------------------------
+ *    - Sanity test for `printf(format, ...)` to check all format specifier flags.
+ *
+ * Test source
+ * ------------------------
+ *    - unit/printf/printf_flags.cc
+ * Test requirements
+ * ------------------------
+ *    - HIP_VERSION >= 5.2
+ */
+TEST_CASE("Unit_Device_printf_flags_Sanity_Positive") {
+  std::string reference(R"here(00000042
+-0000042
+00000042
+0123.456
++0000042
+-42
++0000042
+xyzzy   
+-42
+ 42
+00000042        
+        00000042
+052
+0x2a
+0X2A
+42.000000
+4.200000e+01
+4.200000E+01
+42.0000
+42.0000
+0x1.5p+5
+0X1.5P+5
+)here");
+
+  hip::SpawnProc proc("printf_flags_exe", true);
+  REQUIRE(proc.run() == 0);
+  REQUIRE(proc.getOutput() == reference);
 }

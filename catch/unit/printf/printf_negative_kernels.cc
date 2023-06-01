@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
+Copyright (c) 2023 Advanced Micro Devices, Inc. All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,75 +21,21 @@ THE SOFTWARE.
 */
 
 #include <hip_test_common.hh>
-#include <hip_test_process.hh>
 
-TEST_CASE("Unit_printf_specifier") {
-#ifdef __HIP_PLATFORM_NVIDIA__
-  std::string reference(R"here(xyzzy
-%
-hello % world
-%s
-%s0xf01dab1eca55e77e
-%cxyzzy
-sep
--42
-42
-123.456000
--123.456000
--1.234560e+02
-1.234560E+02
-123.456
--123.456
-x
-(null)
-(nil)
-3.14159000    hello 0xf01dab1eca55e77e
-)here");
-#elif !defined(_WIN32)
-  std::string reference(R"here(xyzzy
-%
-hello % world
-%s
-%s0xf01dab1eca55e77e
-%cxyzzy
-sep
--42
-42
-123.456000
--123.456000
--1.234560e+02
-1.234560E+02
-123.456
--123.456
-x
+struct Dummy {
+  __device__ Dummy() {}
+  __device__ ~Dummy() {}
+};
 
-(nil)
-3.14159000    hello 0xf01dab1eca55e77e
-)here");
-#else
-  std::string reference(R"here(xyzzy
-%
-hello % world
-%s
-%sF01DAB1ECA55E77E
-%cxyzzy
-sep
--42
-42
-123.456000
--123.456000
--1.234560e+02
-1.234560E+02
-123.456
--123.456
-x
-
-0000000000000000
-3.14159000    hello F01DAB1ECA55E77E
-)here");
-#endif
-
-  hip::SpawnProc proc("printfSpecifiers_exe", true);
-  REQUIRE(0 == proc.run());
-  REQUIRE(proc.getOutput() == reference);
-}
+/*int printf(T*)*/
+__global__ void printf_n1(int* p) { printf(p); }
+__global__ void printf_n2(unsigned int* p) { printf(p); }
+__global__ void printf_n3(short* p) { printf(p); }
+__global__ void printf_n4(long* p) { printf(p); }
+__global__ void printf_n5(unsigned long* p) { printf(p); }
+__global__ void printf_n6(long long* p) { printf(p); }
+__global__ void printf_n7(unsigned long long* p) { printf(p); }
+__global__ void printf_n8(float* p) { printf(p); }
+__global__ void printf_n9(double* p) { printf(p); }
+__global__ void printf_n10(long double* p) { printf(p); }
+__global__ void printf_n11(Dummy* p) { printf(p); }

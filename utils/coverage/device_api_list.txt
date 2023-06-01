@@ -102,3 +102,16 @@ Device clock [
   clock64
   wall_clock64
 ]
+
+Device printf [
+  printf
+]
+
+HIP specific [
+  Device groups: (
+    hip_hc_8pk
+  )
+  __hip_hc_add8pk
+  __hip_hc_sub8pk
+  __hip_hc_mul8pk
+]

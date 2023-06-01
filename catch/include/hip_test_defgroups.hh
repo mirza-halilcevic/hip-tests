@@ -1226,17 +1226,6 @@ TEST_CASE("Unit_Kernel_Launch_bounds_Negative_Parameters_ParseError") {}
  */
 
 /**
- * End doxygen group DeviceLanguageTest.
- * @}
- */
-
-/**
- * @defgroup DeviceLanguageTest Device Language
- * @{
- * This section describes tests for the Device Language API.
- */
-
-/**
  * @addtogroup static_assert static_assert
  * @{
  * @ingroup DeviceLanguageTest
@@ -1279,17 +1268,4 @@ TEST_CASE("Unit_StaticAssert_Negative_Basic")
 /**
  * End doxygen group DeviceLanguageTest.
  * @}
- */
-
-/**
- * @defgroup DeviceLanguageTest Device Language
- * @{
- * This section describes tests for the Device Language API.
- * @}
- */
-
-/**
- * @defgroup DeviceLanguageTest Device Language
- * @{
- * This section describes tests for the Device Language API.
  */

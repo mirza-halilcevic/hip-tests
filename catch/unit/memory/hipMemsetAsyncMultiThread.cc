@@ -27,10 +27,18 @@
 
 #define NUM_THREADS 20
 #define ITER 10
+<<<<<<< HEAD
 #define N (4 * 1024 * 1024)
 
 
 template <typename T> class MemSetAsyncMthreadTest {
+=======
+#define N (4*1024*1024)
+
+
+template <typename T>
+class MemSetAsyncMthreadTest {
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
  public:
   T *A_h, *A_d, *B_h;
   T memSetVal;
@@ -54,16 +62,26 @@ template <typename T> class MemSetAsyncMthreadTest {
   }
 
   void threadCompleteStatus() {
+<<<<<<< HEAD
     for (int k = 0; k < N; k++) {
       if ((A_h[k] == memSetVal) && (B_h[k] == memSetVal)) {
         validateCount += 1;
+=======
+    for (int k = 0 ; k < N ; k++) {
+      if ((A_h[k] == memSetVal) && (B_h[k] == memSetVal)) {
+        validateCount+= 1;
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
       }
     }
   }
 
   bool resultAfterAllIterations() {
     memDeallocate();
+<<<<<<< HEAD
     testResult = (validateCount == (ITER * N)) ? true : false;
+=======
+    testResult = (validateCount == (ITER * N)) ? true: false;
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
     return testResult;
   }
 
@@ -76,25 +94,45 @@ template <typename T> class MemSetAsyncMthreadTest {
 };
 
 template <typename T>
+<<<<<<< HEAD
 void queueJobsForhipMemsetAsync(T* A_d, T* A_h, T memSetVal, size_t Nbytes, hipStream_t stream) {
+=======
+void queueJobsForhipMemsetAsync(T* A_d, T* A_h, T memSetVal, size_t Nbytes,
+                                hipStream_t stream) {
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
   HIPCHECK(hipMemsetAsync(A_d, memSetVal, N, stream));
   HIPCHECK(hipMemcpyAsync(A_h, A_d, Nbytes, hipMemcpyDeviceToHost, stream));
 }
 
 template <typename T>
+<<<<<<< HEAD
 void queueJobsForhipMemsetD32Async(T* A_d, T* A_h, T memSetVal, size_t Nbytes, hipStream_t stream) {
+=======
+void queueJobsForhipMemsetD32Async(T* A_d, T* A_h, T memSetVal, size_t Nbytes,
+                                   hipStream_t stream) {
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
   HIPCHECK(hipMemsetD32Async((hipDeviceptr_t)A_d, memSetVal, N, stream));
   HIPCHECK(hipMemcpyAsync(A_h, A_d, Nbytes, hipMemcpyDeviceToHost, stream));
 }
 
 template <typename T>
+<<<<<<< HEAD
 void queueJobsForhipMemsetD16Async(T* A_d, T* A_h, T memSetVal, size_t Nbytes, hipStream_t stream) {
+=======
+void queueJobsForhipMemsetD16Async(T* A_d, T* A_h, T memSetVal, size_t Nbytes,
+                                   hipStream_t stream) {
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
   HIPCHECK(hipMemsetD16Async((hipDeviceptr_t)A_d, memSetVal, N, stream));
   HIPCHECK(hipMemcpyAsync(A_h, A_d, Nbytes, hipMemcpyDeviceToHost, stream));
 }
 
 template <typename T>
+<<<<<<< HEAD
 void queueJobsForhipMemsetD8Async(T* A_d, T* A_h, T memSetVal, size_t Nbytes, hipStream_t stream) {
+=======
+void queueJobsForhipMemsetD8Async(T* A_d, T* A_h, T memSetVal, size_t Nbytes,
+                                  hipStream_t stream) {
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
   HIPCHECK(hipMemsetD8Async((hipDeviceptr_t)A_d, memSetVal, N, stream));
   HIPCHECK(hipMemcpyAsync(A_h, A_d, Nbytes, hipMemcpyDeviceToHost, stream));
 }
@@ -103,11 +141,16 @@ void queueJobsForhipMemsetD8Async(T* A_d, T* A_h, T memSetVal, size_t Nbytes, hi
  * finished on all threads successfully
  */
 bool testhipMemsetAsyncWithMultiThread() {
+<<<<<<< HEAD
   MemSetAsyncMthreadTest<char> obj;
+=======
+  MemSetAsyncMthreadTest <char> obj;
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
   constexpr char memsetval = 0x42;
   obj.memAllocate(memsetval);
   std::thread t[NUM_THREADS];
 
+<<<<<<< HEAD
   for (int i = 0; i < ITER; i++) {
     for (int k = 0; k < NUM_THREADS; k++) {
       if (k % 2) {
@@ -120,6 +163,20 @@ bool testhipMemsetAsyncWithMultiThread() {
     }
 
     for (int j = 0; j < NUM_THREADS; j++) {
+=======
+  for (int i = 0 ; i < ITER ; i++) {
+    for (int k = 0 ; k < NUM_THREADS ; k++) {
+      if (k%2) {
+        t[k] = std::thread(queueJobsForhipMemsetAsync<char>, obj.A_d, obj.A_h,
+                           obj.memSetVal, obj.Nbytes, obj.stream);
+      } else {
+        t[k] = std::thread(queueJobsForhipMemsetAsync<char>, obj.A_d, obj.B_h,
+                             obj.memSetVal, obj.Nbytes, obj.stream);
+      }
+    }
+
+    for (int j = 0 ; j < NUM_THREADS ; j++) {
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
       t[j].join();
     }
 
@@ -130,11 +187,16 @@ bool testhipMemsetAsyncWithMultiThread() {
 }
 
 bool testhipMemsetD32AsyncWithMultiThread() {
+<<<<<<< HEAD
   MemSetAsyncMthreadTest<int32_t> obj;
+=======
+  MemSetAsyncMthreadTest <int32_t> obj;
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
   constexpr int memsetD32val = 0xDEADBEEF;
   obj.memAllocate(memsetD32val);
   std::thread t[NUM_THREADS];
 
+<<<<<<< HEAD
   for (int i = 0; i < ITER; i++) {
     for (int k = 0; k < NUM_THREADS; k++) {
       if (k % 2) {
@@ -147,6 +209,20 @@ bool testhipMemsetD32AsyncWithMultiThread() {
     }
 
     for (int j = 0; j < NUM_THREADS; j++) {
+=======
+  for (int i = 0 ; i < ITER ; i++) {
+    for (int k = 0 ; k < NUM_THREADS ; k++) {
+      if (k%2) {
+        t[k] = std::thread(queueJobsForhipMemsetD32Async<int32_t>, obj.A_d,
+                           obj.A_h, obj.memSetVal, obj.Nbytes, obj.stream);
+      } else {
+        t[k] = std::thread(queueJobsForhipMemsetD32Async<int32_t>, obj.A_d,
+                           obj.B_h, obj.memSetVal, obj.Nbytes, obj.stream);
+      }
+    }
+
+    for (int j = 0 ; j < NUM_THREADS ; j++) {
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
       t[j].join();
     }
 
@@ -157,11 +233,16 @@ bool testhipMemsetD32AsyncWithMultiThread() {
 }
 
 bool testhipMemsetD16AsyncWithMultiThread() {
+<<<<<<< HEAD
   MemSetAsyncMthreadTest<int16_t> obj;
+=======
+  MemSetAsyncMthreadTest <int16_t> obj;
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
   constexpr int16_t memsetD16val = 0xDEAD;
   obj.memAllocate(memsetD16val);
   std::thread t[NUM_THREADS];
 
+<<<<<<< HEAD
   for (int i = 0; i < ITER; i++) {
     for (int k = 0; k < NUM_THREADS; k++) {
       if (k % 2) {
@@ -174,6 +255,20 @@ bool testhipMemsetD16AsyncWithMultiThread() {
     }
 
     for (int j = 0; j < NUM_THREADS; j++) {
+=======
+  for (int i = 0 ; i < ITER ; i++) {
+    for (int k = 0 ; k < NUM_THREADS ; k++) {
+      if (k%2) {
+        t[k] = std::thread(queueJobsForhipMemsetD16Async<int16_t>, obj.A_d,
+                           obj.A_h, obj.memSetVal, obj.Nbytes, obj.stream);
+      } else {
+        t[k] = std::thread(queueJobsForhipMemsetD16Async<int16_t>, obj.A_d,
+                           obj.B_h, obj.memSetVal, obj.Nbytes, obj.stream);
+      }
+    }
+
+    for (int j = 0 ; j < NUM_THREADS ; j++) {
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
       t[j].join();
     }
 
@@ -184,11 +279,16 @@ bool testhipMemsetD16AsyncWithMultiThread() {
 }
 
 bool testhipMemsetD8AsyncWithMultiThread() {
+<<<<<<< HEAD
   MemSetAsyncMthreadTest<char> obj;
+=======
+  MemSetAsyncMthreadTest <char> obj;
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
   constexpr char memsetD8val = 0xDE;
   obj.memAllocate(memsetD8val);
   std::thread t[NUM_THREADS];
 
+<<<<<<< HEAD
   for (int i = 0; i < ITER; i++) {
     for (int k = 0; k < NUM_THREADS; k++) {
       if (k % 2) {
@@ -200,6 +300,19 @@ bool testhipMemsetD8AsyncWithMultiThread() {
       }
     }
     for (int j = 0; j < NUM_THREADS; j++) {
+=======
+  for (int i = 0 ; i < ITER ; i++) {
+    for (int k = 0 ; k < NUM_THREADS ; k++) {
+      if (k%2) {
+        t[k] = std::thread(queueJobsForhipMemsetD8Async<char>, obj.A_d,
+                           obj.A_h, obj.memSetVal, obj.Nbytes, obj.stream);
+      } else {
+        t[k] = std::thread(queueJobsForhipMemsetD8Async<char>, obj.A_d,
+                           obj.B_h, obj.memSetVal, obj.Nbytes, obj.stream);
+      }
+    }
+    for (int j = 0 ; j < NUM_THREADS ; j++) {
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
       t[j].join();
     }
 
@@ -209,6 +322,7 @@ bool testhipMemsetD8AsyncWithMultiThread() {
   return obj.resultAfterAllIterations();
 }
 
+<<<<<<< HEAD
 /**
  * @addtogroup hipMemsetAsync hipMemsetAsync
  * @{
@@ -229,6 +343,11 @@ bool testhipMemsetD8AsyncWithMultiThread() {
  * Test requirements
  * ------------------------
  *  - HIP_VERSION >= 5.2
+=======
+
+/*
+ * Test that validates functionality of hipmemsetAsync apis over multi threads
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
  */
 TEST_CASE("Unit_hipMemsetAsync_QueueJobsMultithreaded") {
   bool ret;

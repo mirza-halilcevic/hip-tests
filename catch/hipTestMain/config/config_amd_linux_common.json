@@ -52,6 +52,7 @@
 	   "Unit_hipIpcGetMemHandle_Positive_Unique_Handles_Separate_Allocations",
 	   "Unit_hipStreamCreateWithFlags_DefaultStreamInteraction",
 	   "Unit_hipStreamWaitEvent_UninitializedStream_Negative",
+<<<<<<< HEAD
 	   "Unit_hipDeviceSetSharedMemConfig_Negative_Parameters",
 	   "Disabling tests tracked with SWDEV-394083",
 	   "Unit_hipDeviceSynchronize_Positive_Nullstream",
@@ -94,6 +95,8 @@
 	   "Unit_hipDrvMemcpy3DAsync_Positive_Array",
 	   "Unit_hipMemGetAddressRange_Negative",
 	   "Unit_ChannelDescriptor_Positive_16BitFloatingPoint",
+=======
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
 	   "Unit_hipDeviceSetSharedMemConfig_Negative_Parameters"
 	]
 }

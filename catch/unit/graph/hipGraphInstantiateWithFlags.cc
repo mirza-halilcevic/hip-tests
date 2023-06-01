@@ -17,6 +17,30 @@ OUT OF OR INN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+<<<<<<< HEAD
+=======
+/*
+hipGraphInstantiateWithFlags(hipGraphExec_t* pGraphExec, hipGraph_t graph, unsigned long long flags);
+Testcase Scenarios of hipGraphInstantiateWithFlags API:
+
+Negative:
+1) Pass nullptr to pGraphExec
+2) Pass nullptr to graph
+4) Pass invalid flag
+
+Functional:
+
+1) Create dependencies graph and instantiate the graph
+2) Create graph in one GPU device and instantiate, launch in peer GPU device
+3) Create stream capture graph and instantite the graph
+4) Create stream capture graph in one GPU device  and instantite the graph launch
+   in peer GPU device
+
+Mapping is missing for NVIDIA platform hence skipping the testcases
+*/
+
+
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
 #include <hip_test_common.hh>
 #include <hip_test_checkers.hh>
 #include <hip_test_kernels.hh>
@@ -347,6 +371,7 @@ TEST_CASE("Unit_hipGraphInstantiateWithFlags_StreamCaptureDeviceContextChg") {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 /* Create graph and add memAlloc node, but no corresponding memFree node to it.
   Instantiate graph with flag - hipGraphInstantiateFlagAutoFreeOnLaunch
@@ -400,3 +425,5 @@ TEST_CASE("Unit_hipGraphInstantiateWithFlags_FlagAutoFreeOnLaunch_check") {
 >>>>>>> 011184e5c08ec961d8473f89809443595da5cff2
 =======
 >>>>>>> b0e356b2b69150c4da70421776c550c889d2014f
+=======
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692

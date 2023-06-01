@@ -19,10 +19,14 @@
 # THE SOFTWARE.
 
 set(TEST_SRC
+<<<<<<< HEAD
   root_funcs.cc
   pow_funcs.cc
   log_funcs.cc
   trig_funcs.cc
+=======
+  special_funcs.cc
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
 )
 
 if(HIP_PLATFORM MATCHES "nvidia")
@@ -36,6 +40,7 @@ hip_add_exe_to_target(NAME MathsTest
                       TEST_TARGET_NAME build_tests COMMON_SHARED_SRC ${COMMON_SHARED_SRC}
                       LINKER_LIBS ${LINKER_LIBS})
 
+<<<<<<< HEAD
 add_test(NAME Unit_Device_root_1Dand2D_Negative
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
@@ -64,3 +69,9 @@ add_test(NAME Unit_Device_Double_Precision_Trig_Functions_Negative
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
          trig_double_precision_negative_kernels.cc 66)
+=======
+add_test(NAME Unit_Device_special_funcs_Negative
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         math_special_func_kernels.cc 76)
+>>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692

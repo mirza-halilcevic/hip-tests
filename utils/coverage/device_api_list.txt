@@ -55,7 +55,6 @@ Cooperative Groups [
   thread_rank
   group_index
   thread_index
-  sync
   shfl
   shfl_up
   shfl_down
@@ -81,4 +80,10 @@ Warp [
   __shfl_up
   __shfl
   __shfl_xor
+]
+
+Other device language [
+  launch_bounds
+  assert
+  static_assert
 ]

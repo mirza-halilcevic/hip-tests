@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Advanced Micro Devices, Inc. All Rights Reserved.
+# Copyright (c) 2023 Advanced Micro Devices, Inc. All Rights Reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -18,21 +18,28 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-# Common Tests - Test independent of all platforms
 set(TEST_SRC
-    hipMemFaultStackAllocation.cc
-    hipLaunchBounds.cc
-    hipShflTests.cc
+    __syncthreads.cc
+    __syncthreads_count.cc
+    __syncthreads_and.cc
+    __syncthreads_or.cc
 )
 
-# only for AMD
-if(HIP_PLATFORM MATCHES "amd")
-  set(AMD_SRC
-      hipShflUpDownTest.cc
-  )
-  set(TEST_SRC ${TEST_SRC} ${AMD_SRC})
-endif()
-
-hip_add_exe_to_target(NAME KernelTest
+hip_add_exe_to_target(NAME SyncthreadsTest
                       TEST_SRC ${TEST_SRC}
                       TEST_TARGET_NAME build_tests)
+
+add_test(NAME Unit___syncthreads_count_Negative_Parameters
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         __syncthreads_count_negative_kernels.cc 2)
+
+add_test(NAME Unit___syncthreads_and_Negative_Parameters
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         __syncthreads_and_negative_kernels.cc 2)
+
+add_test(NAME Unit___syncthreads_or_Negative_Parameters
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         __syncthreads_or_negative_kernels.cc 2)

@@ -1269,3 +1269,17 @@ TEST_CASE("Unit_StaticAssert_Negative_Basic")
  * End doxygen group DeviceLanguageTest.
  * @}
  */
+
+/**
+ * @defgroup ShflTest warp shuffle function Management
+ * @{
+ * This section describes the warp shuffle types & functions of HIP runtime API.
+ * @}
+ */
+
+/**
+ * @defgroup SyncthreadsTest Synchronization Functions
+ * @{
+ * This section describes tests for Synchronization Functions.
+ * @}
+ */

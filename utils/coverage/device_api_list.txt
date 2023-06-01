@@ -115,3 +115,10 @@ HIP specific [
   __hip_hc_sub8pk
   __hip_hc_mul8pk
 ]
+
+Device synchronization [
+  __syncthreads
+  __syncthreads_and
+  __syncthreads_count
+  __syncthreads_or
+]

@@ -18,34 +18,31 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-add_subdirectory(rtc)
-add_subdirectory(deviceLib)
-add_subdirectory(graph)
-add_subdirectory(memory)
-add_subdirectory(stream)
-add_subdirectory(event)
-add_subdirectory(occupancy)
-add_subdirectory(device)
-add_subdirectory(printf)
-add_subdirectory(texture)
-add_subdirectory(streamperthread)
-add_subdirectory(kernel)
-add_subdirectory(multiThread)
-add_subdirectory(compiler)
-add_subdirectory(errorHandling)
-add_subdirectory(cooperativeGrps)
-add_subdirectory(context)
-add_subdirectory(warp)
-if(HIP_PLATFORM STREQUAL "amd")
-add_subdirectory(callback)
-add_subdirectory(module)
-#add_subdirectory(clock)
-# Vulkan interop APIs currently undefined for Nvidia
-add_subdirectory(vulkan_interop)
-add_subdirectory(gl_interop) # Disabled on NVIDIA due to defect - EXSWHTEC-246
-add_subdirectory(virtualMemory)
+if(HIP_PLATFORM MATCHES "nvidia")
+    set(TEST_SRC
+        assert.cc
+    )
+    hip_add_exe_to_target(NAME AssertionTest
+                          TEST_SRC ${TEST_SRC}
+                          TEST_TARGET_NAME build_tests
+                          LINKER_LIBS nvrtc)
+elseif(HIP_PLATFORM MATCHES "amd")
+    set(TEST_SRC
+        static_assert.cc
+        assert.cc
+    )
+    hip_add_exe_to_target(NAME AssertionTest
+                          TEST_SRC ${TEST_SRC}
+                          TEST_TARGET_NAME build_tests
+                          LINKER_LIBS hiprtc)
 endif()
-add_subdirectory(executionControl)
-add_subdirectory(atomics)
-add_subdirectory(launchBounds)
-add_subdirectory(assertion)
+
+add_test(NAME Unit_StaticAssert_Positive_Basic
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         static_assert_kernels_positive.cc 2)
+
+add_test(NAME Unit_StaticAssert_Negative_Basic
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         static_assert_kernels_negative.cc 2)

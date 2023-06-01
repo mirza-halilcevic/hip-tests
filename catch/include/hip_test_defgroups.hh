@@ -1229,3 +1229,54 @@ TEST_CASE("Unit_Kernel_Launch_bounds_Negative_Parameters_ParseError") {}
  * End doxygen group DeviceLanguageTest.
  * @}
  */
+
+/**
+ * @defgroup DeviceLanguageTest Device Language
+ * @{
+ * This section describes tests for the Device Language API.
+ */
+
+/**
+ * @addtogroup static_assert static_assert
+ * @{
+ * @ingroup DeviceLanguageTest
+ */
+
+/**
+ * Test Description
+ * ------------------------
+ *  - Compiles kernels with static_assert calls:
+ *    -# Expected that static_assert passes and compilation is successful.
+ *    -# Expected that static_assert fails and compilation has errors.
+ * Test source
+ * ------------------------
+ *  - unit/assertion/CMakeLists.txt
+ * Test requirements
+ * ------------------------
+ *  - HIP_VERSION >= 5.2
+ */
+TEST_CASE("Unit_StaticAssert_Positive_Basic") {}
+
+/**
+ * Test Description
+ * ------------------------
+ *  - Passes invalidly formed expressions to static_assert calls.
+ *  - Uses expressions that are not constexpr and values that are not known during compilation.
+ * Test source
+ * ------------------------
+ *  - unit/assertion/CMakeLists.txt
+ * Test requirements
+ * ------------------------
+ *  - HIP_VERSION >= 5.2
+ */
+TEST_CASE("Unit_StaticAssert_Negative_Basic")
+
+/**
+ * End doxygen group static_assert.
+ * @}
+ */
+
+/**
+ * End doxygen group DeviceLanguageTest.
+ * @}
+ */

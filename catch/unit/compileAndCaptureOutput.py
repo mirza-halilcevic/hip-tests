@@ -95,7 +95,6 @@ if __name__ == '__main__':
     CompileAndCapture.expected_error_count = int(sys.argv[5])
   except IndexError:
     CompileAndCapture.expected_error_count = 0
-
   try:
     CompileAndCapture.expected_warning_count = int(sys.argv[6])
   except IndexError:

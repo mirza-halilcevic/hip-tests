@@ -128,3 +128,8 @@ Memory fence [
   __threadfence_block
   __threadfence_system
 ]
+
+Device memory [
+  memcpy
+  memset
+]

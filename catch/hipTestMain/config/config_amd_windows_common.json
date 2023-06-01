@@ -108,7 +108,6 @@
 	   "Unit_hipGraphMemsetNodeSetParams_Positive_Basic - uint8_t",
 	   "Unit_hipStreamWaitEvent_UninitializedStream_Negative",
 	   "Unit_hipDeviceSetSharedMemConfig_Negative_Parameters",
-<<<<<<< HEAD
 	   "Unit_hipDeviceGetUuid_Positive",
 	   "Disabling test tracked SWDEV-394199",
 	   "Unit_hipStreamCreateWithPriority_MulthreadNonblockingflag",
@@ -150,8 +149,6 @@
 	   "Unit_hipLaunchHostFunc_Graph",
 	   "Unit_hipLaunchHostFunc_KernelHost",
 	   "Unit_ChannelDescriptor_Positive_16BitFloatingPoint",
-=======
->>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
 	   "Unit_hipDeviceGetUuid_Positive"
 	]
 }

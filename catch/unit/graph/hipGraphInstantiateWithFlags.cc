@@ -343,13 +343,6 @@ TEST_CASE("Unit_hipGraphInstantiateWithFlags_StreamCaptureDeviceContextChg") {
     SUCCEED("skipped the testcase as no of devices is less than 2");
   }
 }
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 
 /* Create graph and add memAlloc node, but no corresponding memFree node to it.
   Instantiate graph with flag - hipGraphInstantiateFlagAutoFreeOnLaunch
@@ -395,17 +388,3 @@ TEST_CASE("Unit_hipGraphInstantiateWithFlags_FlagAutoFreeOnLaunch_check") {
   HIP_CHECK(hipGraphExecDestroy(graphExec));
   HIP_CHECK(hipStreamDestroy(stream));
 }
-=======
->>>>>>> 86d4bd7e3b58fd3b8d80e02c3128e6b91e72e7d4
-=======
->>>>>>> c289aa70c0fbf26db8e9f06ab9ec0f8d8bfceaf6
-=======
->>>>>>> 011184e5c08ec961d8473f89809443595da5cff2
-=======
->>>>>>> b0e356b2b69150c4da70421776c550c889d2014f
-=======
->>>>>>> af0b340ec7b8b97a060b4f39f45f7240854d0692
-=======
->>>>>>> 492e5378699122a60bba304a1ba331f60a2fc0ea
-=======
->>>>>>> 58ebec2d659698dbc4644050ba70c54702a645f3

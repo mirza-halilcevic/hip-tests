@@ -82,8 +82,22 @@ __global__ void atomic_exch_kernel(T* const global_mem, T* const old_vals, const
     __syncthreads();
   }
 
-  old_vals[tid] = perform_atomic_exch<T, scope>(pitched_offset(mem, pitch, tid % width),
-                                                base_val + static_cast<T>(tid + width));
+  const auto N = cooperative_groups::this_grid().size() - warpSize;
+
+  T* atomic_addr = pitched_offset(mem, pitch, tid % width);
+
+  if (tid < N) {
+    old_vals[tid] =
+        perform_atomic_exch<T, scope>(atomic_addr, base_val + static_cast<T>(tid + width));
+  } else if (tid < N + width) {
+    uint8_t* const begin_addr = reinterpret_cast<uint8_t*>(atomic_addr + 1);
+    uint8_t* const end_addr = reinterpret_cast<uint8_t*>(atomic_addr) + pitch;
+    for (volatile uint8_t* addr = begin_addr; addr != end_addr; ++addr) {
+      uint8_t val = addr[0];
+      val ^= 0xAB;
+      addr[0] = val;
+    }
+  }
 
   if constexpr (use_shared_mem) {
     __syncthreads();

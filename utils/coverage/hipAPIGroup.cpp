@@ -150,7 +150,11 @@ std::string HipAPIGroup::getBasicStatsHTML() const {
     font_class = "coverNumMed";
     color_bar = "resources/amber.png";
   } else {
-    font_class = "coverNumHi";
+    if (number_of_test_cases == 0) {
+      font_class = "coverNumHiNoTestCases";
+    } else {
+      font_class = "coverNumHi";
+    }
     color_bar = "resources/emerald.png";
   }
 

@@ -20,7 +20,7 @@ THE SOFTWARE.
 */
 
 #include "casting_common.hh"
-#include "casting_float_negative_kernels_rtc.hh"
+#include "casting_int_negative_kernels_rtc.hh"
 
 #define CAST_INT2FLOAT_TEST_DEF(T1, T2, kern_name, round_dir)                                      \
   CAST_KERNEL_DEF(kern_name, T1, T2)                                                               \

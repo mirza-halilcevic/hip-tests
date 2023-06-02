@@ -134,11 +134,6 @@ static constexpr auto kInt2Double{R"(
   __global__ void int2double_rn_kernel_v1(double* result, int* x) { *result = __int2double_rn(x); }
   __global__ void int2double_rn_kernel_v2(double* result, Dummy x) { *result = __int2double_rn(x); }
   __global__ void int2double_rn_kernel_v3(Dummy* result, int x) { *result = __int2double_rn(x); }
-  __global__ void hiloint2double_kernel_v1(double* result, int* x, int y) { *result = __hiloint2double(x, y); }
-  __global__ void hiloint2double_kernel_v2(double* result, int x, int* y) { *result = __hiloint2double(x, y); }
-  __global__ void hiloint2double_kernel_v3(double* result, Dummy x, int y) { *result = __hiloint2double(x, y); }
-  __global__ void hiloint2double_kernel_v4(double* result, int x, Dummy y) { *result = __hiloint2double(x, y); }
-  __global__ void hiloint2double_kernel_v5(Dummy* result, int x, int y) { *result = __hiloint2double(x, y); }
 )"};
 
 static constexpr auto kUint2Double{R"(
@@ -168,7 +163,7 @@ static constexpr auto kLL2Double{R"(
   __global__ void ll2double_ru_kernel_v1(double* result, long long int* x) { *result = __ll2double_ru(x); }
   __global__ void ll2double_ru_kernel_v2(double* result, Dummy x) { *result = __ll2double_ru(x); }
   __global__ void ll2double_ru_kernel_v3(Dummy* result, long long int x) { *result = __ll2double_ru(x); }
-  __global__ void ll2double_rz_kernel_v1(double* result, long long int* x) { *result = __ll2fdouble_rz(x); }
+  __global__ void ll2double_rz_kernel_v1(double* result, long long int* x) { *result = __ll2double_rz(x); }
   __global__ void ll2double_rz_kernel_v2(double* result, Dummy x) { *result = __ll2double_rz(x); }
   __global__ void ll2double_rz_kernel_v3(Dummy* result, long long int x) { *result = __ll2double_rz(x); }
 )"};
@@ -188,7 +183,7 @@ static constexpr auto kULL2Double{R"(
   __global__ void ull2double_ru_kernel_v1(double* result, unsigned long long int* x) { *result = __ull2double_ru(x); }
   __global__ void ull2double_ru_kernel_v2(double* result, Dummy x) { *result = __ull2double_ru(x); }
   __global__ void ull2double_ru_kernel_v3(Dummy* result, unsigned long long int x) { *result = __ull2double_ru(x); }
-  __global__ void ull2double_rz_kernel_v1(double* result, unsigned long long int* x) { *result = __ull2fdouble_rz(x); }
+  __global__ void ull2double_rz_kernel_v1(double* result, unsigned long long int* x) { *result = __ull2double_rz(x); }
   __global__ void ull2double_rz_kernel_v2(double* result, Dummy x) { *result = __ull2double_rz(x); }
   __global__ void ull2double_rz_kernel_v3(Dummy* result, unsigned long long int x) { *result = __ull2double_rz(x); }
 )"};

@@ -33,7 +33,6 @@ namespace cg = cooperative_groups;
                                                                                                    \
     for (auto i = tid; i < num_xs; i += stride) {                                                  \
       ys[i] = __##func_name(xs[i]);                                                                \
-      printf("%lf", ys[i]);                                                                        \
     }                                                                                              \
   }
 

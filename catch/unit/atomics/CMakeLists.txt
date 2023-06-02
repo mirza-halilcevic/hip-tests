@@ -42,6 +42,9 @@ set(TEST_SRC
     __hip_atomic_fetch_add.cc
     __hip_atomic_fetch_add.cc
     __hip_atomic_compare_exchange_strong.cc
+    __hip_atomic_fetch_and.cc
+    __hip_atomic_fetch_or.cc
+    __hip_atomic_fetch_xor.cc
 )
 
 if(HIP_PLATFORM MATCHES "nvidia")

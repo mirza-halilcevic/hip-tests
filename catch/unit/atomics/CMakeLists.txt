@@ -29,6 +29,7 @@ set(TEST_SRC
     safeAtomicAdd.cc
     atomicCAS.cc
     atomicCAS_system.cc
+    __hip_atomic_fetch_add.cc
 )
 
 if(HIP_PLATFORM MATCHES "nvidia")

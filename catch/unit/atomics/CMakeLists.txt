@@ -40,6 +40,8 @@ set(TEST_SRC
     safeAtomicMax.cc
     unsafeAtomicMax.cc
     __hip_atomic_fetch_add.cc
+    __hip_atomic_fetch_add.cc
+    __hip_atomic_compare_exchange_strong.cc
 )
 
 if(HIP_PLATFORM MATCHES "nvidia")
@@ -47,8 +49,6 @@ if(HIP_PLATFORM MATCHES "nvidia")
     set_source_files_properties(atomicAdd_system.cc PROPERTIES COMPILE_FLAGS "-rdc=true -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
     set_source_files_properties(atomicSub_system.cc PROPERTIES COMPILE_FLAGS "-rdc=true -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
     set_source_files_properties(atomicCAS_system.cc PROPERTIES COMPILE_FLAGS "-rdc=true -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
-    set_source_files_properties(atomicMin_system.cc PROPERTIES COMPILE_FLAGS "-rdc=true -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
-    set_source_files_properties(atomicMax_system.cc PROPERTIES COMPILE_FLAGS "-rdc=true -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
     hip_add_exe_to_target(NAME AtomicsTest
                         TEST_SRC ${TEST_SRC}
                         TEST_TARGET_NAME build_tests
@@ -86,38 +86,3 @@ add_test(NAME Unit_atomicCAS_Negative_Parameters
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
          atomicCAS_negative_kernels.cc 48)
-
-add_test(NAME Unit_atomicExch_Negative_Parameters
-         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
-         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
-         atomicExch_negative_kernels.cc 40)
-
-add_test(NAME Unit_atomicExch_system_Negative_Parameters
-         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
-         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
-         atomicExch_system_negative_kernels.cc 40)
-
-add_test(NAME Unit_atomicMin_Negative_Parameters
-         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
-         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
-         atomicMin_negative_kernels.cc ${EXPECTED_ERRORS})
-
-add_test(NAME Unit_atomicMax_Negative_Parameters
-         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
-         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
-         atomicMax_negative_kernels.cc ${EXPECTED_ERRORS})
-
-add_test(NAME Unit_atomicAnd_Negative_Parameters
-         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
-         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
-         atomicAnd_negative_kernels.cc ${EXPECTED_ERRORS})
-
-add_test(NAME Unit_atomicOr_Negative_Parameters
-         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
-         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
-         atomicOr_negative_kernels.cc ${EXPECTED_ERRORS})
-
-add_test(NAME Unit_atomicXor_Negative_Parameters
-         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
-         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
-         atomicXor_negative_kernels.cc ${EXPECTED_ERRORS})

@@ -25,7 +25,7 @@ THE SOFTWARE.
 #include <hip_test_common.hh>
 
 /**
- * @addtogroup __hip_atomic_fetch_add __hip_atomic_fetch_add
+ * @addtogroup __hip_atomic_compare_exchange_strong __hip_atomic_compare_exchange_strong
  * @{
  * @ingroup AtomicsTest
  */
@@ -44,36 +44,36 @@ THE SOFTWARE.
  *      -# Same as the above, but the elements are spread out by L1 cache line size bytes.
  *
  *    - The test is run for:
- *      - All overloads of __hip_atomic_fetch_add
+ *      - All overloads of __hip_atomic_compare_exchange_strong
  *      - hipMalloc, hipMallocManaged, hipHostMalloc and hipHostRegister allocated memory
  *      - Shared memory
  *      - WAVEFRONT memory scope.
  * Test source
  * ------------------------
- *    - unit/atomics/__hip_atomic_fetch_add.cc
+ *    - unit/atomics/__hip_atomic_compare_exchange_strong.cc
  * Test requirements
  * ------------------------
  *    - HIP_VERSION >= 5.2
  */
-TEMPLATE_TEST_CASE("Unit___hip_atomic_fetch_add_Positive_Wavefront", "", int, unsigned int,
-                   unsigned long, unsigned long long, float, double) {
+TEMPLATE_TEST_CASE("Unit___hip_atomic_compare_exchange_strong_Positive_Wavefront", "", int,
+                   unsigned int, unsigned long, unsigned long long, float, double) {
   int warp_size = 0;
   HIP_CHECK(hipDeviceGetAttribute(&warp_size, hipDeviceAttributeWarpSize, 0));
   const auto cache_line_size = 128u;
 
   for (auto current = 0; current < cmd_options.iterations; ++current) {
     DYNAMIC_SECTION("Same address " << current) {
-      SingleDeviceSingleKernelTest<TestType, AtomicOperation::kBuiltinAdd,
+      SingleDeviceSingleKernelTest<TestType, AtomicOperation::kBuiltinCAS,
                                    __HIP_MEMORY_SCOPE_WAVEFRONT>(1, sizeof(TestType));
     }
 
     DYNAMIC_SECTION("Adjacent addresses " << current) {
-      SingleDeviceSingleKernelTest<TestType, AtomicOperation::kBuiltinAdd,
+      SingleDeviceSingleKernelTest<TestType, AtomicOperation::kBuiltinCAS,
                                    __HIP_MEMORY_SCOPE_WAVEFRONT>(warp_size, sizeof(TestType));
     }
 
     DYNAMIC_SECTION("Scattered addresses " << current) {
-      SingleDeviceSingleKernelTest<TestType, AtomicOperation::kBuiltinAdd,
+      SingleDeviceSingleKernelTest<TestType, AtomicOperation::kBuiltinCAS,
                                    __HIP_MEMORY_SCOPE_WAVEFRONT>(warp_size, cache_line_size);
     }
   }
@@ -93,36 +93,36 @@ TEMPLATE_TEST_CASE("Unit___hip_atomic_fetch_add_Positive_Wavefront", "", int, un
  *      -# Same as the above, but the elements are spread out by L1 cache line size bytes.
  *
  *    - The test is run for:
- *      - All overloads of __hip_atomic_fetch_add
+ *      - All overloads of __hip_atomic_compare_exchange_strong
  *      - hipMalloc, hipMallocManaged, hipHostMalloc and hipHostRegister allocated memory
  *      - Shared memory
  *      - WORKGROUP memory scope.
  * Test source
  * ------------------------
- *    - unit/atomics/__hip_atomic_fetch_add.cc
+ *    - unit/atomics/__hip_atomic_compare_exchange_strong.cc
  * Test requirements
  * ------------------------
  *    - HIP_VERSION >= 5.2
  */
-TEMPLATE_TEST_CASE("Unit___hip_atomic_fetch_add_Positive_Workgroup", "", int, unsigned int,
-                   unsigned long, unsigned long long, float, double) {
+TEMPLATE_TEST_CASE("Unit___hip_atomic_compare_exchange_strong_Positive_Workgroup", "", int,
+                   unsigned int, unsigned long, unsigned long long, float, double) {
   int warp_size = 0;
   HIP_CHECK(hipDeviceGetAttribute(&warp_size, hipDeviceAttributeWarpSize, 0));
   const auto cache_line_size = 128u;
 
   for (auto current = 0; current < cmd_options.iterations; ++current) {
     DYNAMIC_SECTION("Same address " << current) {
-      SingleDeviceSingleKernelTest<TestType, AtomicOperation::kBuiltinAdd,
+      SingleDeviceSingleKernelTest<TestType, AtomicOperation::kBuiltinCAS,
                                    __HIP_MEMORY_SCOPE_WORKGROUP>(1, sizeof(TestType));
     }
 
     DYNAMIC_SECTION("Adjacent addresses " << current) {
-      SingleDeviceSingleKernelTest<TestType, AtomicOperation::kBuiltinAdd,
+      SingleDeviceSingleKernelTest<TestType, AtomicOperation::kBuiltinCAS,
                                    __HIP_MEMORY_SCOPE_WORKGROUP>(warp_size, sizeof(TestType));
     }
 
     DYNAMIC_SECTION("Scattered addresses " << current) {
-      SingleDeviceSingleKernelTest<TestType, AtomicOperation::kBuiltinAdd,
+      SingleDeviceSingleKernelTest<TestType, AtomicOperation::kBuiltinCAS,
                                    __HIP_MEMORY_SCOPE_WORKGROUP>(warp_size, cache_line_size);
     }
   }

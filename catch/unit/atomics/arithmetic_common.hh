@@ -38,7 +38,10 @@ enum class AtomicOperation {
   kDec,
   kUnsafeAdd,
   kSafeAdd,
-  kBuiltinAdd
+  kCASAdd,
+  kCASAddSystem,
+  kBuiltinAdd,
+  kBuiltinCAS
 };
 
 constexpr auto kIntegerTestValue = 7;
@@ -52,6 +55,47 @@ __host__ __device__ TestType GetTestValue() {
   }
 
   return std::is_floating_point_v<TestType> ? kFloatingPointTestValue : kIntegerTestValue;
+}
+
+template <typename TestType> __device__ TestType CASAtomicAdd(TestType* address, TestType val) {
+  TestType old = *address, assumed;
+
+  do {
+    assumed = old;
+    old = atomicCAS(address, assumed, val + assumed);
+  } while (assumed != old);
+
+  return old;
+}
+
+template <typename TestType>
+__device__ TestType CASAtomicAddSystem(TestType* address, TestType val) {
+  TestType old = *address, assumed;
+
+  do {
+    assumed = old;
+    old = atomicCAS_system(address, assumed, val + assumed);
+  } while (assumed != old);
+
+  return old;
+}
+
+template <typename TestType, int memory_scope = __HIP_MEMORY_SCOPE_AGENT>
+__device__ TestType BuiltinCASAtomicAdd(TestType* address, TestType val) {
+  TestType old = *address, assumed;
+
+  const auto builtin_cas = [](TestType* address, TestType assumed, TestType val) {
+    __hip_atomic_compare_exchange_strong(address, &assumed, val, __ATOMIC_RELAXED, __ATOMIC_RELAXED,
+                                         memory_scope);
+    return assumed;
+  };
+
+  do {
+    assumed = old;
+    old = builtin_cas(address, assumed, val + assumed);
+  } while (assumed != old);
+
+  return old;
 }
 
 template <typename TestType, AtomicOperation operation, int memory_scope = __HIP_MEMORY_SCOPE_AGENT>
@@ -74,8 +118,14 @@ __device__ TestType PerformAtomicOperation(TestType* const mem) {
     return unsafeAtomicAdd(mem, val);
   } else if constexpr (operation == AtomicOperation::kSafeAdd) {
     return safeAtomicAdd(mem, val);
+  } else if constexpr (operation == AtomicOperation::kCASAdd) {
+    return CASAtomicAdd(mem, val);
+  } else if constexpr (operation == AtomicOperation::kCASAddSystem) {
+    return CASAtomicAddSystem(mem, val);
   } else if constexpr (operation == AtomicOperation::kBuiltinAdd) {
     return __hip_atomic_fetch_add(mem, val, __ATOMIC_RELAXED, memory_scope);
+  } else if constexpr (operation == AtomicOperation::kBuiltinCAS) {
+    return BuiltinCASAtomicAdd<TestType, memory_scope>(mem, val);
   }
 }
 
@@ -192,8 +242,10 @@ std::tuple<std::vector<TestType>, std::vector<TestType>> TestKernelHostRef(const
 
     if constexpr (operation == AtomicOperation::kAdd || operation == AtomicOperation::kAddSystem ||
                   operation == AtomicOperation::kUnsafeAdd ||
-                  operation == AtomicOperation::kSafeAdd ||
-                  operation == AtomicOperation::kBuiltinAdd) {
+                  operation == AtomicOperation::kSafeAdd || operation == AtomicOperation::kCASAdd ||
+                  operation == AtomicOperation::kCASAddSystem ||
+                  operation == AtomicOperation::kBuiltinAdd ||
+                  operation == AtomicOperation::kBuiltinCAS) {
       res = res + val;
     } else if constexpr (operation == AtomicOperation::kSub ||
                          operation == AtomicOperation::kSubSystem) {
@@ -259,7 +311,9 @@ void HostAtomicOperation(const unsigned int iterations, TestType* mem, TestType*
 
   for (auto i = 0u; i < iterations; ++i) {
     if constexpr (operation == AtomicOperation::kAddSystem ||
-                  operation == AtomicOperation::kBuiltinAdd) {
+                  operation == AtomicOperation::kCASAddSystem ||
+                  operation == AtomicOperation::kBuiltinAdd ||
+                  operation == AtomicOperation::kBuiltinCAS) {
       old_vals[i] = __atomic_fetch_add(PitchedOffset(mem, pitch, i % width), val, __ATOMIC_RELAXED);
     } else if constexpr (operation == AtomicOperation::kSubSystem) {
       old_vals[i] = __atomic_fetch_sub(PitchedOffset(mem, pitch, i % width), val, __ATOMIC_RELAXED);
@@ -352,10 +406,12 @@ void SingleDeviceSingleKernelTest(const unsigned int width, const unsigned int p
   TestParams params;
   params.num_devices = 1;
   params.kernel_count = 1;
-  if constexpr (operation == AtomicOperation::kBuiltinAdd &&
+  if constexpr ((operation == AtomicOperation::kBuiltinAdd ||
+                 operation == AtomicOperation::kBuiltinCAS) &&
                 memory_scope == __HIP_MEMORY_SCOPE_SINGLETHREAD) {
     params.threads = 1;
-  } else if constexpr (operation == AtomicOperation::kBuiltinAdd &&
+  } else if constexpr ((operation == AtomicOperation::kBuiltinAdd ||
+                        operation == AtomicOperation::kBuiltinCAS) &&
                        memory_scope == __HIP_MEMORY_SCOPE_WAVEFRONT) {
     int warp_size = 0;
     HIP_CHECK(hipDeviceGetAttribute(&warp_size, hipDeviceAttributeWarpSize, 0));
@@ -367,7 +423,8 @@ void SingleDeviceSingleKernelTest(const unsigned int width, const unsigned int p
   params.pitch = pitch;
 
   SECTION("Global memory") {
-    if constexpr (operation == AtomicOperation::kBuiltinAdd &&
+    if constexpr ((operation == AtomicOperation::kBuiltinAdd ||
+                   operation == AtomicOperation::kBuiltinCAS) &&
                   (memory_scope == __HIP_MEMORY_SCOPE_SINGLETHREAD ||
                    memory_scope == __HIP_MEMORY_SCOPE_WAVEFRONT ||
                    memory_scope == __HIP_MEMORY_SCOPE_WORKGROUP)) {

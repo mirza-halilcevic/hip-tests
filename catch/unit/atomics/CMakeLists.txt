@@ -25,6 +25,9 @@ set(TEST_SRC
     atomicOr_system.cc
     atomicXor.cc
     atomicXor_system.cc
+    __hip_atomic_fetch_and.cc
+    __hip_atomic_fetch_or.cc
+    __hip_atomic_fetch_xor.cc
 )
 
 if(HIP_PLATFORM MATCHES "nvidia")

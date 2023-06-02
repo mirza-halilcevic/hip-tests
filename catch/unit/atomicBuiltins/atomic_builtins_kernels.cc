@@ -22,8 +22,6 @@ THE SOFTWARE.
 
 constexpr int kMemOrder = __ATOMIC_RELAXED;
 constexpr int kMemScope = __HIP_MEMORY_SCOPE_SYSTEM;
-constexpr int kThreads = 1;
-constexpr int kBlocks = 1;
 
 // Trivially-copyable class.
 class DummyTC {

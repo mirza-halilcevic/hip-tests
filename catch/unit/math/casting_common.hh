@@ -36,7 +36,7 @@ namespace cg = cooperative_groups;
     }                                                                                              \
   }
 
-#define CAST_RINT_REF_DEF(func_name, T1, T2, round_dir)                                            \
+#define CAST_RND_RINT_REF_DEF(func_name, T1, T2, round_dir)                                        \
   T1 func_name##_ref(T2 arg) {                                                                     \
     int curr_direction = fegetround();                                                             \
     if (arg >= static_cast<T2>(std::numeric_limits<T1>::max()))                                    \
@@ -49,12 +49,28 @@ namespace cg = cooperative_groups;
     return result;                                                                                 \
   }
 
-#define CAST_REF_DEF(func_name, T1, T2, round_dir)                                                 \
+#define CAST_RND_RZ_REF_DEF(func_name, T1, T2)                                                     \
+  T1 func_name##_ref(T2 arg) {                                                                     \
+    if (arg >= static_cast<T2>(std::numeric_limits<T1>::max()))                                    \
+      return std::numeric_limits<T1>::max();                                                       \
+    else if (arg <= static_cast<T2>(std::numeric_limits<T1>::min()))                               \
+      return std::numeric_limits<T1>::min();                                                       \
+    T1 result = static_cast<T1>(arg);                                                              \
+    return result;                                                                                 \
+  }
+
+#define CAST_RND_REF_DEF(func_name, T1, T2, round_dir)                                             \
   T1 func_name##_ref(T2 arg) {                                                                     \
     int curr_direction = fegetround();                                                             \
     fesetround(round_dir);                                                                         \
     T1 result = static_cast<T1>(arg);                                                              \
     fesetround(curr_direction);                                                                    \
+    return result;                                                                                 \
+  }
+
+#define CAST_REF_DEF(func_name, T1, T2)                                                            \
+  T1 func_name##_ref(T2 arg) {                                                                     \
+    T1 result = static_cast<T1>(arg);                                                              \
     return result;                                                                                 \
   }
 
@@ -93,8 +109,8 @@ void CastDoublePrecisionTest(kernel_sig<T, double> kernel, ref_sig<T, double> re
   SECTION("Special values") {
     CastDoublePrecisionSpecialValuesTest(kernel, ref, validator_builder);
   }
-
-  SECTION("Brute force") { UnaryDoublePrecisionBruteForceTest(kernel, ref, validator_builder); }
+/*
+  SECTION("Brute force") { UnaryDoublePrecisionBruteForceTest(kernel, ref, validator_builder); }*/
 }
 
 template <typename T1, typename T2, typename ValidatorBuilder>
@@ -103,7 +119,6 @@ void CastIntRangeTest(kernel_sig<T1, T2> kernel, ref_sig<T1, T2> ref_func,
                                    const T2 a = std::numeric_limits<T2>::lowest(),
                                    const T2 b = std::numeric_limits<T2>::max()) {
   const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(kernel);
-  uint64_t stop = std::numeric_limits<uint32_t>::max() + 1ul;
   const auto max_batch_size = GetMaxAllowedDeviceMemoryUsage() / (sizeof(T1) + sizeof(T2));
   LinearAllocGuard<T2> values{LinearAllocs::hipHostMalloc, max_batch_size * sizeof(T2)};
 

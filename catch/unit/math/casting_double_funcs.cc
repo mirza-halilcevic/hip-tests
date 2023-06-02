@@ -23,27 +23,47 @@ THE SOFTWARE.
 
 #define CAST_DOUBLE2INT_TEST_DEF(T, kern_name, round_dir)                                          \
   CAST_KERNEL_DEF(kern_name, T, double)                                                            \
-  CAST_RINT_REF_DEF(kern_name, T, double, round_dir)                                               \
+  CAST_RND_RINT_REF_DEF(kern_name, T, double, round_dir)                                           \
                                                                                                    \
   TEST_CASE("Unit_Device_" #kern_name "_Positive") {                                               \
     T (*ref)(double) = kern_name##_ref;                                                            \
     CastDoublePrecisionTest(kern_name##_kernel, ref,                                               \
                              EqValidatorBuilderFactory<T>());                                      \
-  }                                                                                                \
+  }
+
+#define CAST_DOUBLE2INT_RZ_TEST_DEF(T, kern_name)                                                  \
+  CAST_KERNEL_DEF(kern_name, T, double)                                                            \
+  CAST_RND_RZ_REF_DEF(kern_name, T, double)                                                        \
+                                                                                                   \
+  TEST_CASE("Unit_Device_" #kern_name "_Positive") {                                               \
+    T (*ref)(double) = kern_name##_ref;                                                            \
+    CastDoublePrecisionTest(kern_name##_kernel, ref,                                               \
+                             EqValidatorBuilderFactory<T>());                                      \
+  }
 
 CAST_DOUBLE2INT_TEST_DEF(int, double2int_rd, FE_DOWNWARD)
 CAST_DOUBLE2INT_TEST_DEF(int, double2int_rn, FE_TONEAREST)
 CAST_DOUBLE2INT_TEST_DEF(int, double2int_ru, FE_UPWARD)
-CAST_DOUBLE2INT_TEST_DEF(int, double2int_rz, FE_TOWARDZERO)
+CAST_DOUBLE2INT_RZ_TEST_DEF(int, double2int_rz)
 
 CAST_DOUBLE2INT_TEST_DEF(unsigned int, double2uint_rd, FE_DOWNWARD)
 CAST_DOUBLE2INT_TEST_DEF(unsigned int, double2uint_rn, FE_TONEAREST)
 CAST_DOUBLE2INT_TEST_DEF(unsigned int, double2uint_ru, FE_UPWARD)
-CAST_DOUBLE2INT_TEST_DEF(unsigned int, double2uint_rz, FE_TOWARDZERO)
+CAST_DOUBLE2INT_RZ_TEST_DEF(unsigned int, double2uint_rz)
 
 #define CAST_DOUBLE2LL_TEST_DEF(T, kern_name, round_dir)                                           \
   CAST_KERNEL_DEF(kern_name, T, double)                                                            \
-  CAST_RINT_REF_DEF(kern_name, T, double, round_dir)                                               \
+  CAST_RND_RINT_REF_DEF(kern_name, T, double, round_dir)                                           \
+                                                                                                   \
+  TEST_CASE("Unit_Device_" #kern_name "_Positive") {                                               \
+    T (*ref)(double) = kern_name##_ref;                                                            \
+    UnaryDoublePrecisionBruteForceTest(kern_name##_kernel, ref,                                    \
+                             EqValidatorBuilderFactory<T>(), static_cast<double>(std::numeric_limits<T>::min()), static_cast<double>(std::numeric_limits<T>::max()));                              \
+  }
+
+#define CAST_DOUBLE2LL_RZ_TEST_DEF(T, kern_name)                                                   \
+  CAST_KERNEL_DEF(kern_name, T, double)                                                            \
+  CAST_RND_RZ_REF_DEF(kern_name, T, double)                                                        \
                                                                                                    \
   TEST_CASE("Unit_Device_" #kern_name "_Positive") {                                               \
     T (*ref)(double) = kern_name##_ref;                                                            \
@@ -54,25 +74,35 @@ CAST_DOUBLE2INT_TEST_DEF(unsigned int, double2uint_rz, FE_TOWARDZERO)
 CAST_DOUBLE2LL_TEST_DEF(long long int, double2ll_rd, FE_DOWNWARD)
 CAST_DOUBLE2LL_TEST_DEF(long long int, double2ll_rn, FE_TONEAREST)
 CAST_DOUBLE2LL_TEST_DEF(long long int, double2ll_ru, FE_UPWARD)
-CAST_DOUBLE2LL_TEST_DEF(long long int, double2ll_rz, FE_TOWARDZERO)
+CAST_DOUBLE2LL_RZ_TEST_DEF(long long int, double2ll_rz)
 
 CAST_DOUBLE2LL_TEST_DEF(unsigned long long int, double2ull_rd, FE_DOWNWARD)
 CAST_DOUBLE2LL_TEST_DEF(unsigned long long int, double2ull_rn, FE_TONEAREST)
 CAST_DOUBLE2LL_TEST_DEF(unsigned long long int, double2ull_ru, FE_UPWARD)
-CAST_DOUBLE2LL_TEST_DEF(unsigned long long int, double2ull_rz, FE_TOWARDZERO)
+CAST_DOUBLE2LL_RZ_TEST_DEF(unsigned long long int, double2ull_rz)
 
 #define CAST_DOUBLE2FLOAT_TEST_DEF(kern_name, round_dir)                                           \
   CAST_KERNEL_DEF(kern_name, float, double)                                                        \
-  CAST_REF_DEF(kern_name, float, double, round_dir)                                                \
+  CAST_RND_REF_DEF(kern_name, float, double, round_dir)                                            \
                                                                                                    \
   TEST_CASE("Unit_Device_" #kern_name "_Positive") {                                               \
     float (*ref)(double) = kern_name##_ref;                                                        \
     CastDoublePrecisionTest(kern_name##_kernel, ref,                                               \
                              EqValidatorBuilderFactory<float>());                                  \
-  }                                                                                                \
+  }
+
+#define CAST_DOUBLE2FLOAT_RN_TEST_DEF(kern_name)                                                   \
+  CAST_KERNEL_DEF(kern_name, float, double)                                                        \
+  CAST_REF_DEF(kern_name, float, double)                                                           \
+                                                                                                   \
+  TEST_CASE("Unit_Device_" #kern_name "_Positive") {                                               \
+    float (*ref)(double) = kern_name##_ref;                                                        \
+    CastDoublePrecisionTest(kern_name##_kernel, ref,                                               \
+                             EqValidatorBuilderFactory<float>());                                  \
+  }
 
 CAST_DOUBLE2FLOAT_TEST_DEF(double2float_rd, FE_DOWNWARD)
-CAST_DOUBLE2FLOAT_TEST_DEF(double2float_rn, FE_TONEAREST)
+CAST_DOUBLE2FLOAT_RN_TEST_DEF(double2float_rn)
 CAST_DOUBLE2FLOAT_TEST_DEF(double2float_ru, FE_UPWARD)
 CAST_DOUBLE2FLOAT_TEST_DEF(double2float_rz, FE_TOWARDZERO)
 

@@ -22,10 +22,10 @@ THE SOFTWARE.
 
 #pragma once
 
+#include <cmd_options.hh>
 #include <hip_test_common.hh>
 #include <hip/hip_cooperative_groups.h>
 #include <resource_guards.hh>
-#include <cmd_options.hh>
 
 namespace cg = cooperative_groups;
 
@@ -104,9 +104,17 @@ __host__ __device__ TestType* PitchedOffset(TestType* const ptr, const unsigned 
   return reinterpret_cast<TestType*>(byte_ptr + idx * pitch);
 }
 
+__device__ void GenerateMemoryTraffic(uint8_t* const begin_addr, uint8_t* const end_addr) {
+  for (volatile uint8_t* addr = begin_addr; addr != end_addr; ++addr) {
+    uint8_t val = *addr;
+    val ^= 0xAB;
+    *addr = val;
+  }
+}
+
 template <typename TestType, AtomicOperation operation, bool use_shared_mem>
 __global__ void TestKernel(TestType* const global_mem, TestType* const old_vals,
-                           const unsigned int width, const unsigned pitch) {
+                           const unsigned int width, const unsigned int pitch) {
   extern __shared__ uint8_t shared_mem[];
 
   const auto tid = cg::this_grid().thread_rank();
@@ -121,8 +129,18 @@ __global__ void TestKernel(TestType* const global_mem, TestType* const old_vals,
     __syncthreads();
   }
 
-  old_vals[tid] =
-      PerformAtomicOperation<TestType, operation>(PitchedOffset(mem, pitch, tid % width));
+  const auto n = cooperative_groups::this_grid().size() - width;
+
+  TestType* atomic_addr = PitchedOffset(mem, pitch, tid % width);
+
+  if (tid < n) {
+    old_vals[tid] =
+        PerformAtomicOperation<TestType, operation>(PitchedOffset(mem, pitch, tid % width));
+  } else {
+    uint8_t* const begin_addr = reinterpret_cast<uint8_t*>(atomic_addr + 1);
+    uint8_t* const end_addr = reinterpret_cast<uint8_t*>(atomic_addr) + pitch;
+    GenerateMemoryTraffic(begin_addr, end_addr);
+  }
 
   if constexpr (use_shared_mem) {
     __syncthreads();
@@ -183,7 +201,7 @@ std::tuple<std::vector<TestType>, std::vector<TestType>> TestKernelHostRef(const
 
   for (auto i = 0u; i < p.num_devices; ++i) {
     for (auto j = 0u; j < p.kernel_count; ++j) {
-      for (auto tid = 0u; tid < p.ThreadCount(); ++tid) {
+      for (auto tid = 0u; tid < p.ThreadCount() - p.width; ++tid) {
         perform_op(tid);
       }
     }

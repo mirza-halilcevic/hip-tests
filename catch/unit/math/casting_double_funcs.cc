@@ -20,6 +20,7 @@ THE SOFTWARE.
 */
 
 #include "casting_common.hh"
+#include "casting_double_negative_kernels_rtc.hh"
 
 #define CAST_DOUBLE2INT_TEST_DEF(T, kern_name, round_dir)                                          \
   CAST_KERNEL_DEF(kern_name, T, double)                                                            \
@@ -44,10 +45,14 @@ CAST_DOUBLE2INT_TEST_DEF(int, double2int_rn, FE_TONEAREST)
 CAST_DOUBLE2INT_TEST_DEF(int, double2int_ru, FE_UPWARD)
 CAST_DOUBLE2INT_RZ_TEST_DEF(int, double2int_rz)
 
+TEST_CASE("Unit_Device_double2int_Negative_RTC") { NegativeTestRTCWrapper<12>(kDouble2Int); }
+
 CAST_DOUBLE2INT_TEST_DEF(unsigned int, double2uint_rd, FE_DOWNWARD)
 CAST_DOUBLE2INT_TEST_DEF(unsigned int, double2uint_rn, FE_TONEAREST)
 CAST_DOUBLE2INT_TEST_DEF(unsigned int, double2uint_ru, FE_UPWARD)
 CAST_DOUBLE2INT_RZ_TEST_DEF(unsigned int, double2uint_rz)
+
+TEST_CASE("Unit_Device_double2uint_Negative_RTC") { NegativeTestRTCWrapper<12>(kDouble2Uint); }
 
 #define CAST_DOUBLE2LL_TEST_DEF(T, kern_name, round_dir)                                           \
   CAST_KERNEL_DEF(kern_name, T, double)                                                            \
@@ -76,10 +81,14 @@ CAST_DOUBLE2LL_TEST_DEF(long long int, double2ll_rn, FE_TONEAREST)
 CAST_DOUBLE2LL_TEST_DEF(long long int, double2ll_ru, FE_UPWARD)
 CAST_DOUBLE2LL_RZ_TEST_DEF(long long int, double2ll_rz)
 
+TEST_CASE("Unit_Device_double2ll_Negative_RTC") { NegativeTestRTCWrapper<12>(kDouble2LL); }
+
 CAST_DOUBLE2LL_TEST_DEF(unsigned long long int, double2ull_rd, FE_DOWNWARD)
 CAST_DOUBLE2LL_TEST_DEF(unsigned long long int, double2ull_rn, FE_TONEAREST)
 CAST_DOUBLE2LL_TEST_DEF(unsigned long long int, double2ull_ru, FE_UPWARD)
 CAST_DOUBLE2LL_RZ_TEST_DEF(unsigned long long int, double2ull_rz)
+
+TEST_CASE("Unit_Device_double2ull_Negative_RTC") { NegativeTestRTCWrapper<12>(kDouble2ULL); }
 
 #define CAST_DOUBLE2FLOAT_TEST_DEF(kern_name, round_dir)                                           \
   CAST_KERNEL_DEF(kern_name, float, double)                                                        \
@@ -104,6 +113,8 @@ CAST_DOUBLE2FLOAT_RN_TEST_DEF(double2float_rn)
 CAST_DOUBLE2FLOAT_TEST_DEF(double2float_ru, FE_UPWARD)
 CAST_DOUBLE2FLOAT_TEST_DEF(double2float_rz, FE_TOWARDZERO)
 
+TEST_CASE("Unit_Device_double2float_Negative_RTC") { NegativeTestRTCWrapper<12>(kDouble2Float); }
+
 CAST_KERNEL_DEF(double2hiint, int, double)
 
 int double2hiint_ref(double arg) {
@@ -116,6 +127,8 @@ TEST_CASE("Unit_Device_double2hiint_Positive") {
   int (*ref)(double) = double2hiint_ref;
   CastDoublePrecisionTest(double2hiint_kernel, ref, EqValidatorBuilderFactory<int>());
 }
+
+TEST_CASE("Unit_Device_double2hiint_Negative_RTC") { NegativeTestRTCWrapper<3>(kDouble2Hiint); }
 
 CAST_KERNEL_DEF(double2loint, int, double)
 
@@ -130,6 +143,8 @@ TEST_CASE("Unit_Device_double2loint_Positive") {
   CastDoublePrecisionTest(double2loint_kernel, ref, EqValidatorBuilderFactory<int>());
 }
 
+TEST_CASE("Unit_Device_double2loint_Negative_RTC") { NegativeTestRTCWrapper<3>(kDouble2Loint); }
+
 CAST_KERNEL_DEF(double_as_longlong, long long int, double)
 
 TEST_CASE("Unit_Device_double_as_longlong_Positive") {
@@ -137,3 +152,5 @@ TEST_CASE("Unit_Device_double_as_longlong_Positive") {
   CastDoublePrecisionTest(double_as_longlong_kernel, ref,
                           EqValidatorBuilderFactory<long long int>());
 }
+
+TEST_CASE("Unit_Device_double_as_longlong_Negative_RTC") { NegativeTestRTCWrapper<3>(kDoubleAsLonglong); }

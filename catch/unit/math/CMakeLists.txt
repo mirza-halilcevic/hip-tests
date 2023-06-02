@@ -25,3 +25,18 @@ set(TEST_SRC
 hip_add_exe_to_target(NAME MathsTest
                       TEST_SRC ${TEST_SRC}
                       TEST_TARGET_NAME build_tests COMMON_SHARED_SRC ${COMMON_SHARED_SRC})
+
+add_test(NAME Unit_Device_casting_double_Negative
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         casting_double_negative_kernels.cc 69)
+
+add_test(NAME Unit_Device_casting_float_Negative
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         casting_float_negative_kernels.cc 54)
+
+add_test(NAME Unit_Device_casting_int_Negative
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         casting_int_negative_kernels.cc 92)

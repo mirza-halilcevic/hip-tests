@@ -478,3 +478,77 @@ Device texture functions [
   tex3DGrad
   tex2Dgather
 ]
+
+Device conversion functions [
+  __double2float_rd
+  __double2float_rn
+  __double2float_ru
+  __double2float_rz
+  __double2hiint
+  __double2loint
+  __double2int_rd
+  __double2int_rn
+  __double2int_ru
+  __double2int_rz
+  __double2ll_rd
+  __double2ll_rn
+  __double2ll_ru
+  __double2ll_rz
+  __double2uint_rd
+  __double2uint_rn
+  __double2uint_ru
+  __double2uint_rz
+  __double2ull_rd
+  __double2ull_rn
+  __double2ull_ru
+  __double2ull_rz
+  __double_as_longlong
+  __float2int_rd
+  __float2int_rn
+  __float2int_ru
+  __float2int_rz
+  __float2ll_rd
+  __float2ll_rn
+  __float2ll_ru
+  __float2ll_rz
+  __float2uint_rd
+  __float2uint_rn
+  __float2uint_ru
+  __float2uint_rz
+  __float2ull_rd
+  __float2ull_rn
+  __float2ull_ru
+  __float2ull_rz
+  __float_as_int
+  __float_as_uint
+  __hiloint2double
+  __int2double_rn
+  __int2float_rd
+  __int2float_rn
+  __int2float_ru
+  __int2float_rz
+  __int_as_float
+  __ll2double_rd
+  __ll2double_rn
+  __ll2double_ru
+  __ll2double_rz
+  __ll2float_rd
+  __ll2float_rn
+  __ll2float_ru
+  __ll2float_rz
+  __longlong_as_double
+  __uint2double_rn
+  __uint2float_rd
+  __uint2float_rn
+  __uint2float_ru
+  __uint2float_rz
+  __uint_as_float
+  __ull2double_rd
+  __ull2double_rn
+  __ull2double_ru
+  __ull2double_rz
+  __ull2float_rd
+  __ull2float_rn
+  __ull2float_ru
+  __ull2float_rz
+]

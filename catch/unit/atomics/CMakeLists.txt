@@ -27,6 +27,7 @@ set(TEST_SRC
     atomicDec.cc
     unsafeAtomicAdd.cc
     safeAtomicAdd.cc
+    __hip_atomic_fetch_add.cc
 )
 
 if(HIP_PLATFORM MATCHES "nvidia")

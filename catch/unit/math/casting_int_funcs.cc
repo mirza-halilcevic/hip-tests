@@ -36,9 +36,9 @@ THE SOFTWARE.
                                                                                                    \
   TEST_CASE("Unit_Device_" #kern_name "_Positive") {                                               \
     T1 (*ref)(T2) = kern_name##_ref;                                                               \
-    CastIntRangeTest(kern_name##_kernel, ref, EqValidatorBuilderFactory<T1>());   \
+    CastIntRangeTest(kern_name##_kernel, ref, EqValidatorBuilderFactory<T1>());                    \
   }
-/*
+
 CAST_INT2FLOAT_TEST_DEF(float, int, int2float_rd, FE_DOWNWARD)
 CAST_INT2FLOAT_RN_TEST_DEF(float, int, int2float_rn)
 CAST_INT2FLOAT_TEST_DEF(float, int, int2float_ru, FE_UPWARD)
@@ -48,8 +48,8 @@ CAST_INT2FLOAT_TEST_DEF(float, unsigned int, uint2float_rd, FE_DOWNWARD)
 CAST_INT2FLOAT_RN_TEST_DEF(float, unsigned int, uint2float_rn)
 CAST_INT2FLOAT_TEST_DEF(float, unsigned int, uint2float_ru, FE_UPWARD)
 CAST_INT2FLOAT_TEST_DEF(float, unsigned int, uint2float_rz, FE_TOWARDZERO)
-*/
-//CAST_INT2FLOAT_RN_TEST_DEF(double, int, int2double_rn)
+
+CAST_INT2FLOAT_RN_TEST_DEF(double, int, int2double_rn)
 CAST_INT2FLOAT_RN_TEST_DEF(double, unsigned int, uint2double_rn)
 
 #define CAST_LL2FLOAT_TEST_DEF(T1, T2, kern_name, round_dir)                                       \
@@ -101,7 +101,7 @@ TEST_CASE("Unit_Device_int_as_float_Positive") {
 CAST_KERNEL_DEF(uint_as_float, float, unsigned int)
 
 TEST_CASE("Unit_Device_uint_as_float_Positive") {
-   float (*ref)(unsigned int) = type2_as_type1_ref<float, unsigned int>;
+  float (*ref)(unsigned int) = type2_as_type1_ref<float, unsigned int>;
   CastIntRangeTest(uint_as_float_kernel, ref, EqValidatorBuilderFactory<float>());
 }
 
@@ -112,7 +112,8 @@ TEST_CASE("Unit_Device_longlong_as_double_Positive") {
   CastIntBruteForceTest(longlong_as_double_kernel, ref, EqValidatorBuilderFactory<double>());
 }
 
-__global__ void hiloint2double_kernel(double* const ys, const size_t num_xs, int* const x1s, int* const x2s) {
+__global__ void hiloint2double_kernel(double* const ys, const size_t num_xs, int* const x1s,
+                                      int* const x2s) {
   const auto tid = cg::this_grid().thread_rank();
   const auto stride = cg::this_grid().size();
 
@@ -122,15 +123,14 @@ __global__ void hiloint2double_kernel(double* const ys, const size_t num_xs, int
 }
 
 double hiloint2double_ref(int hi, int lo) {
-    uint64_t tmp0 = (static_cast<uint64_t>(hi) << 32ull) | static_cast<uint32_t>(lo);
-    double tmp1;
-    memcpy(&tmp1, &tmp0, sizeof(tmp0));
+  uint64_t tmp0 = (static_cast<uint64_t>(hi) << 32ull) | static_cast<uint32_t>(lo);
+  double tmp1;
+  memcpy(&tmp1, &tmp0, sizeof(tmp0));
 
-    return tmp1;t
+  return tmp1;
 }
 
 TEST_CASE("Unit_Device_hiloint2double_Positive") {
   double (*ref)(int, int) = hiloint2double_ref;
   CastBinaryIntRangeTest(hiloint2double_kernel, ref, EqValidatorBuilderFactory<double>());
 }
-

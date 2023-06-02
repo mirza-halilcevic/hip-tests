@@ -32,7 +32,8 @@ namespace cg = cooperative_groups;
     const auto stride = cg::this_grid().size();                                                    \
                                                                                                    \
     for (auto i = tid; i < num_xs; i += stride) {                                                  \
-        ys[i] = __##func_name(xs[i]);                                                              \
+      ys[i] = __##func_name(xs[i]);                                                                \
+      printf("%lf", ys[i]);                                                                        \
     }                                                                                              \
   }
 
@@ -75,17 +76,15 @@ namespace cg = cooperative_groups;
   }
 
 
-template <typename T1, typename T2>
-T1 type2_as_type1_ref(T2 arg) {
+template <typename T1, typename T2> T1 type2_as_type1_ref(T2 arg) {
   T1 tmp;
-  memcpy(&tmp, &arg, sizeof(tmp)); 
+  memcpy(&tmp, &arg, sizeof(tmp));
   return tmp;
 }
 
 template <typename T, typename ValidatorBuilder>
-void CastDoublePrecisionSpecialValuesTest(kernel_sig<T, double> kernel,
-                                           ref_sig<T, double> ref_func,
-                                           const ValidatorBuilder& validator_builder) {
+void CastDoublePrecisionSpecialValuesTest(kernel_sig<T, double> kernel, ref_sig<T, double> ref_func,
+                                          const ValidatorBuilder& validator_builder) {
   const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(kernel);
   const auto values = std::get<SpecialVals<double>>(kSpecialValRegistry);
   std::vector<double> spec_values;
@@ -99,25 +98,25 @@ void CastDoublePrecisionSpecialValuesTest(kernel_sig<T, double> kernel,
   }
 
   MathTest math_test(kernel, spec_values.size());
-  math_test.template Run<false>(validator_builder, grid_size, block_size, ref_func, spec_values.size(),
-                                spec_values.data());
+  math_test.template Run<false>(validator_builder, grid_size, block_size, ref_func,
+                                spec_values.size(), spec_values.data());
 }
 
 template <typename T, typename ValidatorBuilder>
 void CastDoublePrecisionTest(kernel_sig<T, double> kernel, ref_sig<T, double> ref,
-                              const ValidatorBuilder& validator_builder) {
+                             const ValidatorBuilder& validator_builder) {
   SECTION("Special values") {
     CastDoublePrecisionSpecialValuesTest(kernel, ref, validator_builder);
   }
-/*
-  SECTION("Brute force") { UnaryDoublePrecisionBruteForceTest(kernel, ref, validator_builder); }*/
+
+  SECTION("Brute force") { UnaryDoublePrecisionBruteForceTest(kernel, ref, validator_builder); }
 }
 
 template <typename T1, typename T2, typename ValidatorBuilder>
 void CastIntRangeTest(kernel_sig<T1, T2> kernel, ref_sig<T1, T2> ref_func,
-                                   const ValidatorBuilder& validator_builder,
-                                   const T2 a = std::numeric_limits<T2>::lowest(),
-                                   const T2 b = std::numeric_limits<T2>::max()) {
+                      const ValidatorBuilder& validator_builder,
+                      const T2 a = std::numeric_limits<T2>::lowest(),
+                      const T2 b = std::numeric_limits<T2>::max()) {
   const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(kernel);
   const auto max_batch_size = GetMaxAllowedDeviceMemoryUsage() / (sizeof(T1) + sizeof(T2));
   LinearAllocGuard<T2> values{LinearAllocs::hipHostMalloc, max_batch_size * sizeof(T2)};
@@ -128,7 +127,7 @@ void CastIntRangeTest(kernel_sig<T1, T2> kernel, ref_sig<T1, T2> ref_func,
   const auto num_threads = thread_pool.thread_count();
 
   size_t inserted = 0u;
-  for (T2 v = a; v != b; v++) {
+  for (T2 v = a; v <= b; v++) {
     values.ptr()[inserted++] = v;
     if (inserted < max_batch_size) continue;
 
@@ -139,9 +138,9 @@ void CastIntRangeTest(kernel_sig<T1, T2> kernel, ref_sig<T1, T2> ref_func,
 
 template <typename T1, typename T2, typename ValidatorBuilder>
 void CastIntBruteForceTest(kernel_sig<T1, T2> kernel, ref_sig<T1, T2> ref_func,
-                                        const ValidatorBuilder& validator_builder,
-                                        const T2 a = std::numeric_limits<T2>::lowest(),
-                                        const T2 b = std::numeric_limits<T2>::max()) {
+                           const ValidatorBuilder& validator_builder,
+                           const T2 a = std::numeric_limits<T2>::lowest(),
+                           const T2 b = std::numeric_limits<T2>::max()) {
   const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(kernel);
   const uint64_t num_iterations = GetTestIterationCount();
   const auto max_batch_size =
@@ -180,9 +179,9 @@ void CastIntBruteForceTest(kernel_sig<T1, T2> kernel, ref_sig<T1, T2> ref_func,
 
 template <typename T1, typename T2, typename ValidatorBuilder>
 void CastBinaryIntRangeTest(kernel_sig<T1, T2, T2> kernel, ref_sig<T1, T2, T2> ref_func,
-                                   const ValidatorBuilder& validator_builder,
-                                   const T2 a = std::numeric_limits<T2>::lowest(),
-                                   const T2 b = std::numeric_limits<T2>::max()) {
+                            const ValidatorBuilder& validator_builder,
+                            const T2 a = std::numeric_limits<T2>::lowest(),
+                            const T2 b = std::numeric_limits<T2>::max()) {
   const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(kernel);
   uint64_t stop = std::numeric_limits<uint32_t>::max() + 1ul;
   const auto max_batch_size = GetMaxAllowedDeviceMemoryUsage() / (sizeof(T1) + 2 * sizeof(T2));
@@ -195,12 +194,13 @@ void CastBinaryIntRangeTest(kernel_sig<T1, T2, T2> kernel, ref_sig<T1, T2, T2> r
   const auto num_threads = thread_pool.thread_count();
 
   size_t inserted = 0u;
-  for (T2 v = a; v != b; v++) {
+  for (T2 v = a; v <= b; v++) {
     values1.ptr()[inserted] = v;
     values2.ptr()[inserted++] = b - v;
     if (inserted < max_batch_size) continue;
 
-    math_test.Run(validator_builder, grid_size, block_size, ref_func, inserted, values1.ptr(), values2.ptr());
+    math_test.Run(validator_builder, grid_size, block_size, ref_func, inserted, values1.ptr(),
+                  values2.ptr());
     inserted = 0u;
   }
 }

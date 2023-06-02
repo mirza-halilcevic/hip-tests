@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Advanced Micro Devices, Inc. All Rights Reserved.
+# Copyright (c) 2023 Advanced Micro Devices, Inc. All Rights Reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -48,6 +48,7 @@ set(TEST_SRC
     __hip_atomic_fetch_min.cc
     __hip_atomic_fetch_max.cc
     __hip_atomic_exchange.cc
+    atomic_builtins.cc
 )
 
 if(HIP_PLATFORM MATCHES "nvidia")
@@ -92,3 +93,8 @@ add_test(NAME Unit_atomicCAS_Negative_Parameters
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
          atomicCAS_negative_kernels.cc 48)
+
+add_test(NAME Unit_AtomicBuiltins_Negative_Parameters
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         atomic_builtins_kernels.cc 60 27) # Should be 35 warnings, see EXSWHTEC-309

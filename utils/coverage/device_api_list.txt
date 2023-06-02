@@ -353,3 +353,128 @@ Device math [
   __tanf
   __powf
 ]
+
+Device complex type functions [
+  hipCrealf
+  hipCimagf
+  make_hipFloatComplex
+  hipConjf
+  hipCsqabsf
+  hipCaddf
+  hipCsubf
+  hipCmulf
+  hipCdivf
+  hipCabsf
+  hipCreal
+  hipCimag
+  make_hipDoubleComplex
+  hipConj
+  hipCsqabs
+  hipCadd
+  hipCsub
+  hipCmul
+  hipCdiv
+  hipCabs
+  make_hipComplex
+  hipComplexDoubleToFloat
+  hipComplexFloatToDouble
+  hipCfmaf
+  hipCfma
+]
+
+Device vector types [
+  make_uchar1
+  make_uchar2
+  make_uchar3
+  make_uchar4
+  make_char1
+  make_char2
+  make_char3
+  make_char4
+  make_ushort1
+  make_ushort2
+  make_ushort3
+  make_ushort4
+  make_short1
+  make_short2
+  make_short3
+  make_short4
+  make_uint1
+  make_uint2
+  make_uint3
+  make_uint4
+  make_int1
+  make_int2
+  make_int3
+  make_int4
+  make_float1
+  make_float2
+  make_float3
+  make_float4
+  make_double1
+  make_double2
+  make_double3
+  make_double4
+  make_ulong1
+  make_ulong2
+  make_ulong3
+  make_ulong4
+  make_long1
+  make_long2
+  make_long3
+  make_long4
+  make_ulonglong1
+  make_ulonglong2
+  make_ulonglong3
+  make_ulonglong4
+  make_longlong1
+  make_longlong2
+  make_longlong3
+  make_longlong4
+]
+
+Device surface functions [
+  __hipGetPixelAddr
+  __hipMapToNativeFloat4
+  __hipMapFromNativeFloat4
+  surf1Dread
+  surf1Dwrite
+  surf2Dread
+  surf2Dwrite
+  surf3Dread
+  surf3Dwrite
+  surf1DLayeredread
+  surf1DLayeredwrite
+  surf2DLayeredread
+  surf2DLayeredwrite
+  surfCubemapread
+  surfCubemapwrite
+  surfCubemapLayeredread
+  surfCubemapLayeredwrite
+]
+
+Device texture functions [
+  tex1Dfetch
+  tex1D
+  tex2D
+  tex1DLayered
+  tex2DLayered
+  tex3D
+  texCubemap
+  tex1DLod
+  tex2DLod
+  tex1DLayeredLod
+  tex2DLayeredLod
+  tex3DLod
+  texCubemapLod
+  texCubemapLayered
+  texCubemapLayeredLod
+  texCubemapGrad
+  texCubemapLayeredGrad
+  tex1DGrad
+  tex2DGrad
+  tex1DLayeredGrad
+  tex2DLayeredGrad
+  tex3DGrad
+  tex2Dgather
+]

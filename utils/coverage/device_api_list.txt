@@ -89,6 +89,13 @@ Launch bounds [
   __launch_bounds__
 ]
 
+Channel descriptor [
+  hipCreateChannelDesc
+  hipCreateChannelDescHalf
+  hipCreateChannelDescHalf1
+  hipCreateChannelDescHalf2
+]
+
 Device assert [
   assert
   static_assert

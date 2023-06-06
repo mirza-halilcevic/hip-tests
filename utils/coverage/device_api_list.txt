@@ -304,9 +304,6 @@ Device math [
   copysign
   fmax
   fmin
-  isfinite
-  isin
-  isnan
   nan
   nextafter
   signbit

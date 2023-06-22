@@ -42,6 +42,15 @@ operator<<(std::ostream& os, const std::pair<T, U>& p) {
             << std::setprecision(default_prec);
 }
 
+template <typename T>
+std::enable_if_t<sizeof(T) / sizeof(decltype(T().x)) == 2, std::ostream&>
+operator<<(std::ostream& os, const T& c) {
+  const auto default_prec = os.precision();
+  return os << "<" << std::setprecision(std::numeric_limits<decltype(T().x)>::max_digits10 - 1) << c.x << ", "
+            << std::setprecision(std::numeric_limits<decltype(T().x)>::max_digits10 - 1) << c.y << ">"
+            << std::setprecision(default_prec);
+}
+
 // This class represents a generic numerical accuracy math test. Template parameter T is the output
 // type of the function being tested, and template parameter pack Ts represents the input types. The
 // constructor takes a kernel with the signature void(T*, const size_t, Ts*...). The first kernel

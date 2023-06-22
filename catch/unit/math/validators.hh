@@ -150,3 +150,30 @@ template <typename T> class NopValidator : public MatcherBase<T> {
 template <typename T> auto NopValidatorBuilderFactory() {
   return [](auto&&... args) { return std::make_unique<NopValidator<T>>(); };
 }
+
+template <typename T, typename VB>
+class ComplexValidator : public MatcherBase<T> {
+ public:
+  ComplexValidator(const T& target, const VB& vb)
+      : first_matcher_{vb(target.x)}, second_matcher_{vb(target.y)} {}
+
+  bool match(const T& val) const override {
+    return first_matcher_->match(val.x) && second_matcher_->match(val.y);
+  }
+
+  std::string describe() const override {
+    return "<" + first_matcher_->describe() + ", " + second_matcher_->describe() + ">";
+  }
+
+ private:
+  decltype(std::declval<VB>()(std::declval<decltype(T().x)>())) first_matcher_;
+  decltype(std::declval<VB>()(std::declval<decltype(T().x)>())) second_matcher_;
+};
+
+template <typename T, typename ValidatorBuilder>
+auto ComplexValidatorBuilderFactory(const ValidatorBuilder& vb) {
+  return [=](const T& t, auto&&... args) {
+    return std::make_unique<ComplexValidator<T, ValidatorBuilder>>(t, vb);
+  };
+}
+

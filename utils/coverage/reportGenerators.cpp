@@ -380,7 +380,7 @@ void generateHTMLReportFiles(std::vector<HipAPI>& hip_apis,
   coverage_report << three_tabs << "<td class=\"coverNumHi\"></td>";
   coverage_report << three_tabs
                   << "<td class=\"coverFile\">Percentage of called APIs within a module is larger "
-                     "than 80% and Test Cases are detected</td>";
+                     "than 80% and Test Case implementations are detected</td>";
   coverage_report << two_tabs << "</tr>";
 
   coverage_report << one_tab << "</table>";

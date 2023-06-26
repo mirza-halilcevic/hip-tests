@@ -297,6 +297,11 @@ void generateHTMLReportFiles(std::vector<HipAPI>& hip_apis,
   used as hyperlinks from the main HTML page.
   */
   for (auto const& hip_api_group : hip_api_groups) {
+    if (hip_api_group.getTotalNumberOfAPIs() == 0) {
+      std::cout << "[SKIP_FROM_COV] Couldn't detect any valid HIP API within module "
+                << hip_api_group.getName() << " hence skipping its HTML generation" << std::endl;
+      continue;
+    }
     coverage_report << hip_api_group.getBasicStatsHTML();
 
     std::fstream coverage_module_report;
@@ -330,11 +335,22 @@ void generateHTMLReportFiles(std::vector<HipAPI>& hip_apis,
   coverage_report << one_tab << "</center>";
   coverage_report << one_tab << "<br>";
 
+  coverage_report << one_tab << "<table width=\"100%\" border=0 cellspacing=0 cellpadding=0>";
+  coverage_report
+      << two_tabs
+      << "<tr><td class=\"ruler\"><img src=\"resources/glass.png\" width=3 height=3></td></tr>";
+  coverage_report << one_tab << "</table>";
+  coverage_report << one_tab << "<br>";
+
   coverage_report << one_tab << "<center>";
-  coverage_report << one_tab << "<table width=\"20%\" cellpadding=1 cellspacing=1 border=0>";
+  coverage_report << one_tab << "<table width=\"40%\" cellpadding=1 cellspacing=1 border=0>";
   coverage_report << two_tabs << "<tr>";
-  coverage_report << three_tabs << "<td width=\"10%\"></td>";
-  coverage_report << three_tabs << "<td width=\"90%\"></td>";
+  coverage_report << three_tabs << "<td width=\"3%\"></td>";
+  coverage_report << three_tabs << "<td width=\"97%\"></td>";
+  coverage_report << two_tabs << "</tr>";
+
+  coverage_report << two_tabs << "<tr>";
+  coverage_report << three_tabs << "<td class=\"tableHead\" colspan=2>Color legend</td>";
   coverage_report << two_tabs << "</tr>";
 
   coverage_report << two_tabs << "<tr>";
@@ -356,7 +372,8 @@ void generateHTMLReportFiles(std::vector<HipAPI>& hip_apis,
   coverage_report
       << three_tabs
       << "<td class=\"coverFile\">Percentage of called APIs within a module is larger than 80% but "
-         "there are no detected Test Cases that are marked with Doxygen comments</td>";
+         "there are no detected Test Case implementations that are marked with Doxygen "
+         "comments</td>";
   coverage_report << two_tabs << "</tr>";
 
   coverage_report << two_tabs << "<tr>";

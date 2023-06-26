@@ -94,6 +94,8 @@
 	   "Unit_hipDrvMemcpy3DAsync_Positive_Array",
 	   "Unit_hipMemGetAddressRange_Negative",
 	   "Unit_ChannelDescriptor_Positive_16BitFloatingPoint",
-	   "Unit_hipDeviceSetSharedMemConfig_Negative_Parameters"
+	   "Unit_hipDeviceSetSharedMemConfig_Negative_Parameters",
+	   "NOTE: The following test is disabled due to defect - EXSWHTEC-245",
+	   "Unit_hipFuncGetAttribute_Negative_Parameters"
 	]
 }

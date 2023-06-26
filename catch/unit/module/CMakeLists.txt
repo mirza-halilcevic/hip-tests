@@ -8,6 +8,7 @@ set(TEST_SRC
     hipModuleLaunchKernel.cc
     hipModuleGetGlobal.cc
     hipModuleGetTexRef.cc
+    hipFuncGetAttribute.cc
 )
 
 configure_file(not_a_module.txt not_a_module.txt)

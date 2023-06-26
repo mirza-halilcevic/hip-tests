@@ -251,7 +251,9 @@ std::vector<HipAPI> extractHipAPIs(std::string& hip_api_header_file,
     to track the last defined group, because of the nested cases.
     */
     if (line.find(end_group_definition) != std::string::npos) {
-      api_group_names_tracker.pop_back();
+      if (!api_group_names_tracker.empty()) {
+        api_group_names_tracker.pop_back();
+      }
     }
 
     /*

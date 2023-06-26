@@ -330,6 +330,46 @@ void generateHTMLReportFiles(std::vector<HipAPI>& hip_apis,
   coverage_report << one_tab << "</center>";
   coverage_report << one_tab << "<br>";
 
+  coverage_report << one_tab << "<center>";
+  coverage_report << one_tab << "<table width=\"20%\" cellpadding=1 cellspacing=1 border=0>";
+  coverage_report << two_tabs << "<tr>";
+  coverage_report << three_tabs << "<td width=\"10%\"></td>";
+  coverage_report << three_tabs << "<td width=\"90%\"></td>";
+  coverage_report << two_tabs << "</tr>";
+
+  coverage_report << two_tabs << "<tr>";
+  coverage_report << three_tabs << "<td class=\"coverNumLo\"></td>";
+  coverage_report
+      << three_tabs
+      << "<td class=\"coverFile\">Percentage of called APIs within a module is less than 40%</td>";
+  coverage_report << two_tabs << "</tr>";
+
+  coverage_report << two_tabs << "<tr>";
+  coverage_report << three_tabs << "<td class=\"coverNumMed\"></td>";
+  coverage_report << three_tabs
+                  << "<td class=\"coverFile\">Percentage of called APIs within a module is between "
+                     "40% and 80%</td>";
+  coverage_report << two_tabs << "</tr>";
+
+  coverage_report << two_tabs << "<tr>";
+  coverage_report << three_tabs << "<td class=\"coverNumHiNoTestCases\"></td>";
+  coverage_report
+      << three_tabs
+      << "<td class=\"coverFile\">Percentage of called APIs within a module is larger than 80% but "
+         "there are no detected Test Cases that are marked with Doxygen comments</td>";
+  coverage_report << two_tabs << "</tr>";
+
+  coverage_report << two_tabs << "<tr>";
+  coverage_report << three_tabs << "<td class=\"coverNumHi\"></td>";
+  coverage_report << three_tabs
+                  << "<td class=\"coverFile\">Percentage of called APIs within a module is larger "
+                     "than 80% and Test Cases are detected</td>";
+  coverage_report << two_tabs << "</tr>";
+
+  coverage_report << one_tab << "</table>";
+  coverage_report << one_tab << "</center>";
+  coverage_report << one_tab << "<br>";
+
   coverage_report << one_tab << "<table width=\"100%\" border=0 cellspacing=0 cellpadding=0>";
   coverage_report
       << two_tabs

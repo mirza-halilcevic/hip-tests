@@ -39,6 +39,7 @@ class HipAPIGroup {
   std::string getBasicStatsXML() const;
   std::string getBasicStatsHTML() const;
   std::string createHTMLReport() const;
+  bool isDeprecated() const;
 
  private:
   std::string group_name;

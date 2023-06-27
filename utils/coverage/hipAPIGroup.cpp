@@ -84,6 +84,10 @@ int HipAPIGroup::getNumberOfDeprecatedAPIs() const { return deprecated_apis.size
 
 float HipAPIGroup::getPercentageOfCalledAPIs() const { return percentage_of_called_apis; }
 
+bool HipAPIGroup::isDeprecated() const {
+  return (deprecated_apis.size() == total_number_of_apis) ? true : false;
+}
+
 std::string HipAPIGroup::getBasicStatsXML() const {
   std::stringstream xml_node;
 
@@ -156,6 +160,10 @@ std::string HipAPIGroup::getBasicStatsHTML() const {
       font_class = "coverNumHi";
     }
     color_bar = "resources/emerald.png";
+  }
+
+  if (isDeprecated()) {
+    font_class = "coverDeprecated";
   }
 
   html_object << two_tabs << "<tr>";

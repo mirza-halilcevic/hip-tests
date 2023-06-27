@@ -169,6 +169,17 @@ td.coverBarOutline
   background-color: #000000;
 }
 
+/* Directory view/File view (all): line count entry for files with
+   deprecated functions */
+   td.coverDeprecated
+   {
+     text-align: center;
+     padding-left: 10px;
+     padding-right: 10px;
+     background-color: #6688D4;
+     white-space: nowrap;
+     font-family: sans-serif;
+   }
 
 /* Directory view/File view (all): line count entry for files with
    high coverage rate */

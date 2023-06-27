@@ -224,11 +224,8 @@ std::vector<HipAPI> extractHipAPIs(std::string& hip_api_header_file,
     next line where the API is declared.
     */
     if (line.find(deprecated_line) != std::string::npos) {
-      std::getline(hip_header_file_handler, line);
-      ++line_number;
       deprecated_flag = true;
-    } else {
-      deprecated_flag = false;
+      continue;
     }
 
     if (line.find(group_definition) != std::string::npos) {
@@ -294,6 +291,9 @@ std::vector<HipAPI> extractHipAPIs(std::string& hip_api_header_file,
       } else {
         std::cout << "[SKIP_FROM_COV] Group not detected for \"" << api_name << "\" in file \""
                   << hip_api_header_file << "\", line " << line_number << std::endl;
+      }
+      if (deprecated_flag) {
+        deprecated_flag = false;
       }
     }
   }

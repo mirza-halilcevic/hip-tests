@@ -183,18 +183,6 @@ td.coverDeprecated
 
 /* Directory view/File view (all): line count entry for files with
    high coverage rate */
-td.coverNumHiNoTestCases
-{
-  text-align: center;
-  padding-left: 10px;
-  padding-right: 10px;
-  background-color: #fbbb62;
-  white-space: nowrap;
-  font-family: sans-serif;
-}
-
-/* Directory view/File view (all): line count entry for files with
-   high coverage rate */
 td.coverNumHi
 {
   text-align: center;

@@ -343,7 +343,7 @@ void generateHTMLReportFiles(std::vector<HipAPI>& hip_apis,
   coverage_report << one_tab << "<br>";
 
   coverage_report << one_tab << "<center>";
-  coverage_report << one_tab << "<table width=\"40%\" cellpadding=1 cellspacing=1 border=0>";
+  coverage_report << one_tab << "<table width=\"30%\" cellpadding=1 cellspacing=1 border=0>";
   coverage_report << two_tabs << "<tr>";
   coverage_report << three_tabs << "<td width=\"3%\"></td>";
   coverage_report << three_tabs << "<td width=\"97%\"></td>";
@@ -351,6 +351,11 @@ void generateHTMLReportFiles(std::vector<HipAPI>& hip_apis,
 
   coverage_report << two_tabs << "<tr>";
   coverage_report << three_tabs << "<td class=\"tableHead\" colspan=2>Color legend</td>";
+  coverage_report << two_tabs << "</tr>";
+
+  coverage_report << two_tabs << "<tr>";
+  coverage_report << three_tabs << "<td class=\"coverDeprecated\"></td>";
+  coverage_report << three_tabs << "<td class=\"coverFile\">Module is deprecated</td>";
   coverage_report << two_tabs << "</tr>";
 
   coverage_report << two_tabs << "<tr>";
@@ -368,19 +373,10 @@ void generateHTMLReportFiles(std::vector<HipAPI>& hip_apis,
   coverage_report << two_tabs << "</tr>";
 
   coverage_report << two_tabs << "<tr>";
-  coverage_report << three_tabs << "<td class=\"coverNumHiNoTestCases\"></td>";
-  coverage_report
-      << three_tabs
-      << "<td class=\"coverFile\">Percentage of called APIs within a module is larger than 80% but "
-         "there are no detected Test Case implementations that are marked with Doxygen "
-         "comments</td>";
-  coverage_report << two_tabs << "</tr>";
-
-  coverage_report << two_tabs << "<tr>";
   coverage_report << three_tabs << "<td class=\"coverNumHi\"></td>";
   coverage_report << three_tabs
                   << "<td class=\"coverFile\">Percentage of called APIs within a module is larger "
-                     "than 80% and Test Case implementations are detected</td>";
+                     "than 80%</td>";
   coverage_report << two_tabs << "</tr>";
 
   coverage_report << one_tab << "</table>";

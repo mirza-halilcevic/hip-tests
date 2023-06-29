@@ -2,6 +2,8 @@
 
 #include <hip_test_common.hh>
 
+#include "vec4.hh"
+
 
 template<typename Vec>
 __global__ void kernel(hipTextureObject_t tex_obj) {
@@ -13,17 +15,16 @@ __global__ void kernel(hipTextureObject_t tex_obj) {
 }
 
 TEST_CASE("Bla") {
+  vec4<char> vec;
+  SetVec4<char>(vec, 0);
   const int height = 1;
   const int width = 1024;
 
-  using T = HIP_vector_type<unsigned int, 4>;
+  using T = vec4<unsigned int>;
 
   std::vector<T> h_data(width * height);
   for (auto i = 0u; i < h_data.size(); ++i) {
-    h_data[i].x = i;
-    h_data[i].y = i;
-    h_data[i].z = i;
-    h_data[i].w = i;
+    SetVec4<unsigned int>(h_data[i], i);
   }
 
   hipChannelFormatDesc channel_desc = hipCreateChannelDesc<T>();

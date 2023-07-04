@@ -38,7 +38,13 @@ template <typename TexelType> class TextureReference {
   }
 
   TexelType Fetch1D(int x, hipTextureDesc& tex_desc) {
+    const auto old = x;
     x = ApplyAddressMode(x, tex_desc.addressMode[0]);
+    if (x >= width_) {
+      TexelType ret;
+      memset(&ret, 0, sizeof(ret));
+      return ret;
+    }
     return ptr()[x];
   }
 
@@ -53,9 +59,9 @@ template <typename TexelType> class TextureReference {
   int ApplyAddressMode(int x, hipTextureAddressMode address_mode) const {
     switch (address_mode) {
       case hipAddressModeClamp:
-        return std::min<int>(x, width_);
+        return std::min<int>(x, width_ - 1);
       case hipAddressModeBorder:
-        return (x < width_) * x;
+        return x;
       default:
         throw "Ded";
     }

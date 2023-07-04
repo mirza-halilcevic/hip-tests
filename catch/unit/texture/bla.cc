@@ -23,7 +23,7 @@ THE SOFTWARE.
 #include <vector>
 
 #include <hip_test_common.hh>
-#include <cooperative_groups.h>
+#include <hip/hip_cooperative_groups.h>
 #include <resource_guards.hh>
 
 #include "texture_reference.hh"

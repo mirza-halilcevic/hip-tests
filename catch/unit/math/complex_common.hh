@@ -159,3 +159,35 @@ void ComplexTernaryFloatingPointSpecialValuesTest(kernel_sig<T, T, T, T> kernel,
                                 x2s.ptr(), x3s.ptr());
 }
 
+template <int expected_errors_num> void ComplexTypeRTCWrapper(const char* program_source) {
+  hiprtcProgram program{};
+  HIPRTC_CHECK(hiprtcCreateProgram(&program, program_source, "complex_type_kernels.cc", 0, nullptr,
+                                   nullptr));
+
+#if HT_AMD
+  std::string args = std::string("-ferror-limit=100");
+  const char* options[] = {args.c_str()};
+  hiprtcResult result{hiprtcCompileProgram(program, 1, options)};
+#else
+  hiprtcResult result{hiprtcCompileProgram(program, 0, nullptr)};
+#endif
+
+  size_t log_size{};
+  HIPRTC_CHECK(hiprtcGetProgramLogSize(program, &log_size));
+  std::string log(log_size, ' ');
+  HIPRTC_CHECK(hiprtcGetProgramLog(program, log.data()));
+  int error_count{0};
+
+  std::string error_message{"error:"};
+
+  size_t npos_e = log.find(error_message, 0);
+  while (npos_e != std::string::npos) {
+    ++error_count;
+    npos_e = log.find(error_message, npos_e + 1);
+  }
+
+  HIPRTC_CHECK(hiprtcDestroyProgram(&program));
+  HIPRTC_CHECK_ERROR(result, HIPRTC_ERROR_COMPILATION);
+  REQUIRE(error_count == expected_errors_num);
+}
+

@@ -20,6 +20,9 @@ THE SOFTWARE.
 */
 
 #include "complex_common.hh"
+#include "complex_make_negative_kernels_rtc.hh"
+#include "complex_basic_negative_kernels_rtc.hh"
+
 
 template <typename T>
 __device__ __host__ void complex_make_func(T* const ys, decltype(T().x) const x1s,
@@ -60,6 +63,12 @@ TEMPLATE_TEST_CASE("Unit_Device_make_hipComplex_Host_Positive", "", hipFloatComp
 
   REQUIRE(y.x == x1);
   REQUIRE(y.y == x2);
+}
+
+TEST_CASE("Unit_Device_make_hipComplex_Negative_Parameters_RTC") {
+  ComplexTypeRTCWrapper<18>(kMakeHipComplex);
+  ComplexTypeRTCWrapper<18>(kMakeHipFloatComplex);
+  ComplexTypeRTCWrapper<18>(kMakeHipDoubleComplex);
 }
 
 template <typename T>
@@ -108,6 +117,11 @@ TEMPLATE_TEST_CASE("Unit_Device_hipCreal_hipCimag_Host_Positive", "", hipFloatCo
 
   REQUIRE(real == x1);
   REQUIRE(imag == x2);
+}
+
+TEST_CASE("Unit_Device_hipCreal_hipCimag_Negative_Parameters_RTC") {
+  ComplexTypeRTCWrapper<24>(kReal);
+  ComplexTypeRTCWrapper<24>(kImag);
 }
 
 template <typename T1, typename T2>

@@ -49,3 +49,16 @@ template <typename T> std::enable_if_t<std::is_integral_v<T>, float> NormalizeIn
   xf = std::min<float>(xf, std::numeric_limits<T>::max());
   return std::copysign(xf / std::numeric_limits<T>::max(), x);
 }
+
+template <typename T> std::string inline AddressModeToString(const T address_mode) {
+  switch (address_mode) {
+    case hipAddressModeWrap:
+      return "hipAddressModeWrap";
+    case hipAddressModeClamp:
+      return "hipAddressModeClamp";
+    case hipAddressModeMirror:
+      return "hipAddressModeMirror";
+    case hipAddressModeBorder:
+      return "hipAddressModeBorder";
+  }
+}

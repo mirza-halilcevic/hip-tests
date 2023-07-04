@@ -88,17 +88,19 @@ TEMPLATE_TEST_CASE("Unit_tex1Dfetch_ReadModeElementType_Positive_Basic", "", cha
   tex_desc.normalizedCoords = false;
 
   const auto address_mode = GENERATE(hipAddressModeClamp, hipAddressModeBorder);
-  tex_desc.addressMode[0] = address_mode;
+  DYNAMIC_SECTION("Address mode: " << AddressModeToString(address_mode)) {
+    tex_desc.addressMode[0] = address_mode;
 
-  const auto res =
-      Tex1DFetchTest<vec4<TestType>, vec4<TestType>>(tex_h, tex_desc, tex_h.width() * 2);
-  for (auto i = 0u; i < res.size(); ++i) {
-    INFO("Index: " << i);
-    const auto ref_val = tex_h.Fetch1D(i, tex_desc);
-    REQUIRE(ref_val.x == res[i].x);
-    REQUIRE(ref_val.y == res[i].y);
-    REQUIRE(ref_val.z == res[i].z);
-    REQUIRE(ref_val.w == res[i].w);
+    const auto res =
+        Tex1DFetchTest<vec4<TestType>, vec4<TestType>>(tex_h, tex_desc, tex_h.width() * 2);
+    for (auto i = 0u; i < res.size(); ++i) {
+      INFO("Index: " << i);
+      const auto ref_val = tex_h.Fetch1D(i, tex_desc);
+      REQUIRE(ref_val.x == res[i].x);
+      REQUIRE(ref_val.y == res[i].y);
+      REQUIRE(ref_val.z == res[i].z);
+      REQUIRE(ref_val.w == res[i].w);
+    }
   }
 }
 
@@ -116,16 +118,19 @@ TEMPLATE_TEST_CASE("Unit_tex1Dfetch_ReadModeNormalizedFloat_Positive_Basic", "",
   tex_desc.normalizedCoords = false;
 
   const auto address_mode = GENERATE(hipAddressModeClamp, hipAddressModeBorder);
-  tex_desc.addressMode[0] = address_mode;
+  DYNAMIC_SECTION("Address mode: " << AddressModeToString(address_mode)) {
+    tex_desc.addressMode[0] = address_mode;
 
-  const auto res = Tex1DFetchTest<vec4<TestType>, vec4<float>>(tex_h, tex_desc, tex_h.width() * 2);
-  for (auto i = 0u; i < res.size(); ++i) {
-    INFO("Index: " << i);
-    const auto ref_val = Vec4Map<TestType>(tex_h.Fetch1D(i, tex_desc),
-                                           [](TestType x) { return NormalizeInteger(x); });
-    REQUIRE(ref_val.x == res[i].x);
-    REQUIRE(ref_val.y == res[i].y);
-    REQUIRE(ref_val.z == res[i].z);
-    REQUIRE(ref_val.w == res[i].w);
+    const auto res =
+        Tex1DFetchTest<vec4<TestType>, vec4<float>>(tex_h, tex_desc, tex_h.width() * 2);
+    for (auto i = 0u; i < res.size(); ++i) {
+      INFO("Index: " << i);
+      const auto ref_val = Vec4Map<TestType>(tex_h.Fetch1D(i, tex_desc),
+                                             [](TestType x) { return NormalizeInteger(x); });
+      REQUIRE(ref_val.x == res[i].x);
+      REQUIRE(ref_val.y == res[i].y);
+      REQUIRE(ref_val.z == res[i].z);
+      REQUIRE(ref_val.w == res[i].w);
+    }
   }
 }

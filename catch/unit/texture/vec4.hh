@@ -59,18 +59,26 @@ inline void SetVec4(vec4<T>& vec, const T x, const T y, const T z, const T w) {
   vec.w = w;
 }
 
-template<typename T>
-inline auto MakeVec4(const T val) {
-    vec4<T> vec;
-    SetVec4(vec, val);
+template <typename T> inline auto MakeVec4(const T val) {
+  vec4<T> vec;
+  SetVec4(vec, val);
 
-    return vec;
+  return vec;
 }
 
-template <typename T>
-inline void MakeVec4(const T x, const T y, const T z, const T w) {
-    vec4<T> vec;
-    SetVec4(vec, x, y, z, w);
+template <typename T> inline void MakeVec4(const T x, const T y, const T z, const T w) {
+  vec4<T> vec;
+  SetVec4(vec, x, y, z, w);
 
-    return vec;
+  return vec;
+}
+
+template <typename T, typename F> inline auto Vec4Map(const vec4<T>& vec, F f) {
+  vec4<decltype(f(vec.x))> ret;
+  ret.x = f(vec.x);
+  ret.y = f(vec.y);
+  ret.z = f(vec.z);
+  ret.w = f(vec.w);
+
+  return ret;
 }

@@ -103,8 +103,8 @@ TEMPLATE_TEST_CASE("Unit_tex1Dfetch_ReadModeElementType_Positive_Basic", "", cha
 }
 
 
-TEMPLATE_TEST_CASE("Unit_tex1Dfetch_ReadModeNormalizedFloat", "", char, unsigned char, short,
-                   unsigned short) {
+TEMPLATE_TEST_CASE("Unit_tex1Dfetch_ReadModeNormalizedFloat_Positive_Basic", "", char,
+                   unsigned char, short, unsigned short) {
   TextureReference<vec4<TestType>> tex_h(1024);
   // TODO - Need some negative values for signed types.
   tex_h.Fill([](size_t x) { return MakeVec4<TestType>(x); });

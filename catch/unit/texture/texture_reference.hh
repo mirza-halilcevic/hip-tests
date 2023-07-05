@@ -49,14 +49,14 @@ template <typename TexelType> class TextureReference {
   }
 
   TexelType Tex1D(float x, hipTextureDesc& tex_desc) {
-    x = ApplyAddressMode(x, tex_desc.addressMode[0]);
+    x = ApplyAddressMode(x, tex_desc.addressMode[0], tex_desc.normalizedCoords);
 
-    if (x >= width_) {
-      TexelType ret;
-      memset(&ret, 0, sizeof(ret));
-      return ret;
+    if (std::isnan(x)) {
+      return Zero();
     }
-    return ptr()[static_cast<size_t>(x)];
+
+    size_t coord = DenormalizeCoordinate(x, tex_desc.normalizedCoords);
+    return ptr()[coord];
   }
 
   TexelType* ptr() { return host_alloc_.ptr(); }
@@ -78,14 +78,29 @@ template <typename TexelType> class TextureReference {
     }
   }
 
-  float ApplyAddressMode(float x, hipTextureAddressMode address_mode) const {
+  float ApplyAddressMode(float x, hipTextureAddressMode address_mode,
+                         bool normalized_coords) const {
     switch (address_mode) {
-      case hipAddressModeClamp:
-        return std::min<float>(x, width_);
-      case hipAddressModeBorder:
-        return x;
+      case hipAddressModeClamp: {
+        const float clamp_value = normalized_coords ? 1.0f - 1.0f / width_ : width_ - 1;
+        return std::min<float>(x, clamp_value);
+      }
+      case hipAddressModeBorder: {
+        const float border_value = normalized_coords ? 1.0f - 1.0f / width_ : width_ - 1;
+        return x > border_value ? std::numeric_limits<float>::quiet_NaN() : x;
+      }
       default:
         throw "Ded";
     }
+  }
+
+  size_t DenormalizeCoordinate(float x, bool normalized_coords) {
+    return normalized_coords ? static_cast<size_t>(x * width_) : static_cast<size_t>(x);
+  }
+
+  TexelType Zero() const {
+    TexelType ret;
+    memset(&ret, 0, sizeof(ret));
+    return ret;
   }
 };

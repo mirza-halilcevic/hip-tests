@@ -33,17 +33,19 @@ THE SOFTWARE.
 namespace cg = cooperative_groups;
 
 template <typename TexelType>
-__global__ void tex1DKernel(TexelType* const out, size_t N, hipTextureObject_t tex_obj) {
+__global__ void tex1DKernel(TexelType* const out, size_t N, hipTextureObject_t tex_obj,
+                            size_t width, bool normalized_coord) {
   const auto tid = cg::this_grid().thread_rank();
   if (tid >= N) return;
 
-  out[tid] = tex1D<TexelType>(tex_obj, tid);
+  const float x = normalized_coord ? tid / width : tid;
+  out[tid] = tex1D<TexelType>(tex_obj, x);
 }
 
 TEST_CASE("Unit_tex1D_Positive") {
   using TestType = float;
 
-  const auto num_iters = 1024;
+  const auto num_iters = 2 * 1024;
 
   TextureReference<vec4<TestType>> tex_h(1024);
 
@@ -53,7 +55,7 @@ TEST_CASE("Unit_tex1D_Positive") {
   memset(&tex_desc, 0, sizeof(tex_desc));
   tex_desc.filterMode = hipFilterModePoint;
   tex_desc.readMode = hipReadModeElementType;
-  tex_desc.normalizedCoords = false;
+  tex_desc.normalizedCoords = true;
 
   const auto address_mode = GENERATE(hipAddressModeClamp);
 
@@ -75,8 +77,8 @@ TEST_CASE("Unit_tex1D_Positive") {
   TextureGuard tex(&res_desc, &tex_desc);
   const auto num_threads = std::min<size_t>(1024, num_iters);
   const auto num_blocks = (num_iters + num_threads - 1) / num_threads;
-  tex1DKernel<vec4<TestType>>
-      <<<num_blocks, num_threads>>>(out_alloc_d.ptr(), num_iters, tex.object());
+  tex1DKernel<vec4<TestType>><<<num_blocks, num_threads>>>(
+      out_alloc_d.ptr(), num_iters, tex.object(), tex_h.width(), tex_desc.normalizedCoords);
 
   std::vector<vec4<TestType>> out_alloc_h(num_iters);
   HIP_CHECK(hipMemcpy(out_alloc_h.data(), out_alloc_d.ptr(), num_iters * sizeof(vec4<TestType>),
@@ -85,7 +87,8 @@ TEST_CASE("Unit_tex1D_Positive") {
 
   for (auto i = 0u; i < out_alloc_h.size(); ++i) {
     INFO("Index: " << i);
-    const auto ref_val = tex_h.Tex1D(i, tex_desc);
+    const float x = tex_desc.normalizedCoords ? i / tex_h.width() : i;
+    const auto ref_val = tex_h.Tex1D(x, tex_desc);
     REQUIRE(ref_val.x == out_alloc_h[i].x);
     REQUIRE(ref_val.y == out_alloc_h[i].y);
     REQUIRE(ref_val.z == out_alloc_h[i].z);

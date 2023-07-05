@@ -80,14 +80,21 @@ template <typename TexelType> class TextureReference {
 
   float ApplyAddressMode(float x, hipTextureAddressMode address_mode,
                          bool normalized_coords) const {
+    const auto normalized_width = 1.0f - 1.0f / width_;
     switch (address_mode) {
       case hipAddressModeClamp: {
-        const float clamp_value = normalized_coords ? 1.0f - 1.0f / width_ : width_ - 1;
+        const float clamp_value = normalized_coords ? normalized_width : width_ - 1;
         return std::min<float>(x, clamp_value);
       }
       case hipAddressModeBorder: {
-        const float border_value = normalized_coords ? 1.0f - 1.0f / width_ : width_ - 1;
+        const float border_value = normalized_coords ? normalized_width : width_ - 1;
         return x > border_value ? std::numeric_limits<float>::quiet_NaN() : x;
+      }
+      case hipAddressModeWrap:
+        return x - std::floor(x);
+      case hipAddressModeMirror: {
+        const float frac_x = x - std::floor(x);
+        return static_cast<size_t>(std::floor(x)) % 2 ? normalized_width - frac_x : frac_x;
       }
       default:
         throw "Ded";

@@ -45,7 +45,7 @@ __global__ void tex1DKernel(TexelType* const out, size_t N, hipTextureObject_t t
 TEST_CASE("Unit_tex1D_Positive") {
   using TestType = float;
 
-  const auto num_iters = 2 * 1024;
+  const auto num_iters = 3 * 1024;
 
   TextureReference<vec4<TestType>> tex_h(1024);
 
@@ -57,7 +57,7 @@ TEST_CASE("Unit_tex1D_Positive") {
   tex_desc.readMode = hipReadModeElementType;
   tex_desc.normalizedCoords = true;
 
-  const auto address_mode = GENERATE(hipAddressModeClamp);
+  const auto address_mode = GENERATE(hipAddressModeMirror);
 
   tex_desc.addressMode[0] = address_mode;
 

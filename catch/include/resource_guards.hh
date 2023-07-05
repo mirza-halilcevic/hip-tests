@@ -148,9 +148,9 @@ template <typename T> class LinearAllocGuard3D : public LinearAllocGuardMultiDim
 template <typename T> class ArrayAllocGuard {
  public:
   // extent should contain logical width
-  ArrayAllocGuard(const hipExtent extent, const unsigned int flags = 0u) : extent_{extent} {
-    hipChannelFormatDesc desc = hipCreateChannelDesc<T>();
-    HIP_CHECK(hipMalloc3DArray(&ptr_, &desc, extent_, flags));
+  ArrayAllocGuard(const hipExtent extent, const unsigned int flags = 0u)
+      : extent_{extent}, desc_{hipCreateChannelDesc<T>()} {
+    HIP_CHECK(hipMalloc3DArray(&ptr_, &desc_, extent_, flags));
   }
 
   ~ArrayAllocGuard() { static_cast<void>(hipFreeArray(ptr_)); }
@@ -158,13 +158,16 @@ template <typename T> class ArrayAllocGuard {
   ArrayAllocGuard(const ArrayAllocGuard&) = delete;
   ArrayAllocGuard(ArrayAllocGuard&&) = delete;
 
-  hipArray_t ptr() const { return ptr_; }
-
   hipExtent extent() const { return extent_; }
 
+  hipChannelFormatDesc desc() const { return desc_; }
+
+  hipArray_t ptr() const { return ptr_; }
+
  private:
-  hipArray_t ptr_ = nullptr;
   const hipExtent extent_;
+  const hipChannelFormatDesc desc_;
+  hipArray_t ptr_ = nullptr;
 };
 
 template <typename T> class DrvArrayAllocGuard {
@@ -200,7 +203,8 @@ enum class Streams { nullstream, perThread, created, withFlags, withPriority };
 
 class StreamGuard {
  public:
-  StreamGuard(const Streams stream_type, unsigned int flags = hipStreamDefault, int priority = 0) : stream_type_{stream_type}, flags_{flags}, priority_{priority} {
+  StreamGuard(const Streams stream_type, unsigned int flags = hipStreamDefault, int priority = 0)
+      : stream_type_{stream_type}, flags_{flags}, priority_{priority} {
     switch (stream_type_) {
       case Streams::nullstream:
         stream_ = nullptr;
@@ -237,16 +241,16 @@ class StreamGuard {
 };
 
 class EventsGuard {
-public:
+ public:
   EventsGuard(size_t N) : events_(N) {
-    for (auto &e : events_) HIP_CHECK(hipEventCreate(&e));
+    for (auto& e : events_) HIP_CHECK(hipEventCreate(&e));
   }
 
   EventsGuard(const EventsGuard&) = delete;
   EventsGuard(EventsGuard&&) = delete;
 
   ~EventsGuard() {
-    for (auto &e : events_) static_cast<void>(hipEventDestroy(e));
+    for (auto& e : events_) static_cast<void>(hipEventDestroy(e));
   }
 
   hipEvent_t& operator[](int index) { return events_[index]; }
@@ -255,21 +259,21 @@ public:
 
   std::vector<hipEvent_t>& event_list() { return events_; }
 
-private:
+ private:
   std::vector<hipEvent_t> events_;
 };
 
 class StreamsGuard {
-public:
+ public:
   StreamsGuard(size_t N) : streams_(N) {
-    for (auto &s : streams_) HIP_CHECK(hipStreamCreate(&s));
+    for (auto& s : streams_) HIP_CHECK(hipStreamCreate(&s));
   }
 
   StreamsGuard(const StreamsGuard&) = delete;
   StreamsGuard(StreamsGuard&&) = delete;
 
   ~StreamsGuard() {
-    for (auto &s : streams_) static_cast<void>(hipStreamDestroy(s));
+    for (auto& s : streams_) static_cast<void>(hipStreamDestroy(s));
   }
 
   hipStream_t& operator[](int index) { return streams_[index]; }
@@ -278,6 +282,6 @@ public:
 
   std::vector<hipStream_t>& stream_list() { return streams_; }
 
-private:
+ private:
   std::vector<hipStream_t> streams_;
 };

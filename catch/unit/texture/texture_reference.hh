@@ -45,6 +45,7 @@ template <typename TexelType> class TextureReference {
       memset(&ret, 0, sizeof(ret));
       return ret;
     }
+
     return ptr()[x];
   }
 
@@ -55,7 +56,7 @@ template <typename TexelType> class TextureReference {
       return Zero();
     }
 
-    return ptr()[static_cast<size_t>(x)];
+    return ApplyFiltering(x, tex_desc.filterMode);
   }
 
   TexelType* ptr() { return host_alloc_.ptr(); }
@@ -117,5 +118,21 @@ template <typename TexelType> class TextureReference {
     TexelType ret;
     memset(&ret, 0, sizeof(ret));
     return ret;
+  }
+
+  TexelType ApplyFiltering(float x, decltype(hipFilterModeLinear) filter_mode) {
+    switch (filter_mode) {
+      case hipFilterModePoint:
+        return ptr()[static_cast<size_t>(x)];
+      case hipFilterModeLinear: {
+        float xB = x - 0.5f;
+        xB = std::max(xB, 0.0f);
+        int i = std::floor(xB);
+        float alfa = xB - i;
+        return Vec4Add(Vec4Scale((1 - alfa), ptr()[i]), Vec4Scale(alfa, ptr()[i + 1]));
+      }
+      default:
+        throw "Ded";
+    }
   }
 };

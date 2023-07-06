@@ -55,8 +55,7 @@ template <typename TexelType> class TextureReference {
       return Zero();
     }
 
-    size_t coord = DenormalizeCoordinate(x, tex_desc.normalizedCoords);
-    return ptr()[coord];
+    return ptr()[static_cast<size_t>(x)];
   }
 
   TexelType* ptr() { return host_alloc_.ptr(); }
@@ -81,28 +80,46 @@ template <typename TexelType> class TextureReference {
   float ApplyAddressMode(float x, hipTextureAddressMode address_mode,
                          bool normalized_coords) const {
     const auto normalized_width = 1.0f - 1.0f / width_;
+    // bool denormalize = normalized_coords;
     switch (address_mode) {
       case hipAddressModeClamp: {
         const float clamp_value = normalized_coords ? normalized_width : width_ - 1;
-        return std::min<float>(x, clamp_value);
+        x = std::max(std::min<float>(x, clamp_value), 0.0f);
+        break;
       }
       case hipAddressModeBorder: {
-        const float border_value = normalized_coords ? normalized_width : width_ - 1;
-        return x > border_value ? std::numeric_limits<float>::quiet_NaN() : x;
+        const float border_value = normalized_coords ? 1.0f : width_;
+        x = (x >= border_value && x < 0.0f) ? std::numeric_limits<float>::quiet_NaN() : x;
+        break;
       }
       case hipAddressModeWrap:
-        return x - std::floor(x);
+        x = x - std::floor(x);
+        break;
       case hipAddressModeMirror: {
         const float frac_x = x - std::floor(x);
-        return static_cast<size_t>(std::floor(x)) % 2 ? normalized_width - frac_x : frac_x;
+        const bool is_reversing = static_cast<size_t>(std::floor(x)) % 2;
+        x = is_reversing ? 1.0f - frac_x : frac_x;
+        const auto x_denorm = DenormalizeCoordinate(x, normalized_coords);
+        const auto offset = 1 * (x_denorm == std::trunc(x_denorm)) * is_reversing;
+        return x_denorm - offset;
+        // if (is_reversing) {
+        //   const auto x_denorm = x * width_;
+        //   if (x_denorm == std::trunc(x_denorm)) {
+        //     x = x_denorm - 1.0f;
+        //     denormalize = false;
+        //   }
+        // }
+        // break;
       }
       default:
         throw "Ded";
     }
+
+    return DenormalizeCoordinate(x, normalized_coords);
   }
 
-  size_t DenormalizeCoordinate(float x, bool normalized_coords) {
-    return normalized_coords ? static_cast<size_t>(x * width_) : static_cast<size_t>(x);
+  float DenormalizeCoordinate(float x, bool normalized_coords) const {
+    return normalized_coords ? x * width_ : x;
   }
 
   TexelType Zero() const {

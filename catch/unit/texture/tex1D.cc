@@ -38,7 +38,8 @@ __global__ void tex1DKernel(TexelType* const out, size_t N, hipTextureObject_t t
   const auto tid = cg::this_grid().thread_rank();
   if (tid >= N) return;
 
-  float x = static_cast<float>(tid) / num_subdivisions;
+
+  float x = (static_cast<float>(tid) - N / 2) / num_subdivisions;
   x = normalized_coord ? x / width : x;
   out[tid] = tex1D<TexelType>(tex_obj, x);
 }
@@ -48,7 +49,7 @@ TEST_CASE("Unit_tex1D_Positive") {
 
   const auto width = 1024;
   const auto num_subdivisions = 512;
-  const auto num_iters = 3 * width * num_subdivisions;
+  const auto num_iters = 3 * width * num_subdivisions * 2 + 1;
 
   TextureReference<vec4<TestType>> tex_h(width);
 
@@ -58,9 +59,17 @@ TEST_CASE("Unit_tex1D_Positive") {
   memset(&tex_desc, 0, sizeof(tex_desc));
   tex_desc.filterMode = hipFilterModePoint;
   tex_desc.readMode = hipReadModeElementType;
-  tex_desc.normalizedCoords = true;
 
-  const auto address_mode = GENERATE(hipAddressModeMirror);
+  const bool normalized_coords = GENERATE(true, false);
+  tex_desc.normalizedCoords = normalized_coords;
+
+  decltype(hipAddressModeClamp) address_mode;
+  if (normalized_coords) {
+    address_mode = GENERATE(hipAddressModeClamp, hipAddressModeBorder, hipAddressModeWrap,
+                            hipAddressModeMirror);
+  } else {
+    address_mode = GENERATE(hipAddressModeClamp, hipAddressModeBorder);
+  }
 
   tex_desc.addressMode[0] = address_mode;
 
@@ -91,12 +100,15 @@ TEST_CASE("Unit_tex1D_Positive") {
 
   for (auto i = 0u; i < out_alloc_h.size(); ++i) {
     INFO("Index: " << i);
-    float x = static_cast<float>(i) / num_subdivisions;
+    INFO("Normalized coordinates: " << std::boolalpha << normalized_coords);
+    INFO("Address mode: " << AddressModeToString(address_mode));
+    float x = (static_cast<float>(i) - num_iters / 2) / num_subdivisions;
     x = tex_desc.normalizedCoords ? x / tex_h.width() : x;
+    INFO("Coordinate: " << std::fixed << std::setprecision(15) << x);
     const auto ref_val = tex_h.Tex1D(x, tex_desc);
     CHECK(ref_val.x == out_alloc_h[i].x);
-    // REQUIRE(ref_val.y == out_alloc_h[i].y);
-    // REQUIRE(ref_val.z == out_alloc_h[i].z);
-    // REQUIRE(ref_val.w == out_alloc_h[i].w);
+    REQUIRE(ref_val.y == out_alloc_h[i].y);
+    REQUIRE(ref_val.z == out_alloc_h[i].z);
+    REQUIRE(ref_val.w == out_alloc_h[i].w);
   }
 }

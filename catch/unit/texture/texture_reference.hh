@@ -80,7 +80,6 @@ template <typename TexelType> class TextureReference {
   float ApplyAddressMode(float x, hipTextureAddressMode address_mode,
                          bool normalized_coords) const {
     const auto normalized_width = 1.0f - 1.0f / width_;
-    // bool denormalize = normalized_coords;
     switch (address_mode) {
       case hipAddressModeClamp: {
         const float clamp_value = normalized_coords ? normalized_width : width_ - 1;
@@ -89,7 +88,7 @@ template <typename TexelType> class TextureReference {
       }
       case hipAddressModeBorder: {
         const float border_value = normalized_coords ? 1.0f : width_;
-        x = (x >= border_value && x < 0.0f) ? std::numeric_limits<float>::quiet_NaN() : x;
+        x = (x >= border_value || x < 0.0f) ? std::numeric_limits<float>::quiet_NaN() : x;
         break;
       }
       case hipAddressModeWrap:
@@ -102,14 +101,6 @@ template <typename TexelType> class TextureReference {
         const auto x_denorm = DenormalizeCoordinate(x, normalized_coords);
         const auto offset = 1 * (x_denorm == std::trunc(x_denorm)) * is_reversing;
         return x_denorm - offset;
-        // if (is_reversing) {
-        //   const auto x_denorm = x * width_;
-        //   if (x_denorm == std::trunc(x_denorm)) {
-        //     x = x_denorm - 1.0f;
-        //     denormalize = false;
-        //   }
-        // }
-        // break;
       }
       default:
         throw "Ded";

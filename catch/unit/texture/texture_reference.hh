@@ -54,7 +54,7 @@ template <typename TexelType> class TextureReference {
     if (tex_desc.filterMode == hipFilterModePoint) {
       return ApplyAddressMode(std::floor(x), tex_desc.addressMode[0]);
     } else if (tex_desc.filterMode == hipFilterModeLinear) {
-      throw "Idiot";
+      return LinearFiltering(x, tex_desc.addressMode[0]);
     } else {
       throw "Ded";
     }
@@ -82,7 +82,6 @@ template <typename TexelType> class TextureReference {
   }
 
   TexelType ApplyAddressMode(float x, hipTextureAddressMode address_mode) const {
-    const auto normalized_width = 1.0f - 1.0f / width_;
     switch (address_mode) {
       case hipAddressModeClamp: {
         x = std::max(std::min<float>(x, width_ - 1), 0.0f);
@@ -95,18 +94,17 @@ template <typename TexelType> class TextureReference {
         break;
       }
       case hipAddressModeWrap:
-        x = x / width_;
+        x /= width_;
         x = x - std::floor(x);
-        x = x * width_;
+        x *= width_;
         break;
       case hipAddressModeMirror: {
-        x = x / width_;
+        x /= width_;
         const float frac_x = x - std::floor(x);
         const bool is_reversing = static_cast<size_t>(std::floor(x)) % 2;
         x = is_reversing ? 1.0f - frac_x : frac_x;
-        x = x * width_;
-        const auto offset = (x == std::trunc(x)) * is_reversing;
-        x = x - offset;
+        x *= width_;
+        x -= (x == std::trunc(x)) * is_reversing;
         break;
       }
       default:
@@ -126,19 +124,17 @@ template <typename TexelType> class TextureReference {
     return ret;
   }
 
-  TexelType ApplyFiltering(float x, decltype(hipFilterModeLinear) filter_mode) {
-    switch (filter_mode) {
-      case hipFilterModePoint:
-        return ptr()[static_cast<size_t>(x)];
-      case hipFilterModeLinear: {
-        float xB = x - 0.5f;
-        xB = std::max(xB, 0.0f);
-        int i = std::floor(xB);
-        float alfa = xB - i;
-        return Vec4Add(Vec4Scale((1 - alfa), ptr()[i]), Vec4Scale(alfa, ptr()[i + 1]));
-      }
-      default:
-        throw "Ded";
-    }
+  TexelType LinearFiltering(float x, hipTextureAddressMode address_mode) {
+    const auto xB = x - 0.5f;
+    const auto i = std::floor(xB);
+    const auto alpha = FloatToNBitFractional<8>(xB - i);
+    const auto T_i0 = ApplyAddressMode(i, address_mode);
+    const auto T_i1 = ApplyAddressMode(i + 1, address_mode);
+    return Vec4Add(Vec4Scale((1.0f - alpha), T_i0), Vec4Scale(alpha, T_i1));
+  }
+
+  template <size_t fractional_bits> float FloatToNBitFractional(float x) const {
+    const auto fixed_point = static_cast<uint16_t>(std::round(x * (1 << fractional_bits)));
+    return static_cast<float>(fixed_point) / static_cast<float>(1 << fractional_bits);
   }
 };

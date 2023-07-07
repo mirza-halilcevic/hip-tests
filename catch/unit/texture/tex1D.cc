@@ -57,7 +57,7 @@ TEST_CASE("Unit_tex1D_Positive") {
 
   hipTextureDesc tex_desc;
   memset(&tex_desc, 0, sizeof(tex_desc));
-  tex_desc.filterMode = hipFilterModePoint;
+  tex_desc.filterMode = hipFilterModeLinear;
   tex_desc.readMode = hipReadModeElementType;
 
   const bool normalized_coords = GENERATE(true, false);

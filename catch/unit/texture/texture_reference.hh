@@ -50,16 +50,19 @@ template <typename TexelType> class TextureReference {
   }
 
   TexelType Tex1D(float x, hipTextureDesc& tex_desc) {
-    x = ApplyAddressMode(x, tex_desc.addressMode[0], tex_desc.normalizedCoords);
-
-    if (std::isnan(x)) {
-      return Zero();
+    x = tex_desc.normalizedCoords ? x * width_ : x;
+    if (tex_desc.filterMode == hipFilterModePoint) {
+      return ApplyAddressMode(std::floor(x), tex_desc.addressMode[0]);
+    } else if (tex_desc.filterMode == hipFilterModeLinear) {
+      throw "Idiot";
+    } else {
+      throw "Ded";
     }
-
-    return ApplyFiltering(x, tex_desc.filterMode);
   }
 
   TexelType* ptr() { return host_alloc_.ptr(); }
+
+  TexelType* ptr() const { return host_alloc_.ptr(); }
 
   size_t width() const { return width_; }
 
@@ -78,36 +81,39 @@ template <typename TexelType> class TextureReference {
     }
   }
 
-  float ApplyAddressMode(float x, hipTextureAddressMode address_mode,
-                         bool normalized_coords) const {
+  TexelType ApplyAddressMode(float x, hipTextureAddressMode address_mode) const {
     const auto normalized_width = 1.0f - 1.0f / width_;
     switch (address_mode) {
       case hipAddressModeClamp: {
-        const float clamp_value = normalized_coords ? normalized_width : width_ - 1;
-        x = std::max(std::min<float>(x, clamp_value), 0.0f);
+        x = std::max(std::min<float>(x, width_ - 1), 0.0f);
         break;
       }
       case hipAddressModeBorder: {
-        const float border_value = normalized_coords ? 1.0f : width_;
-        x = (x >= border_value || x < 0.0f) ? std::numeric_limits<float>::quiet_NaN() : x;
+        if (x > width_ - 1 || x < 0.0f) {
+          return Zero();
+        }
         break;
       }
       case hipAddressModeWrap:
+        x = x / width_;
         x = x - std::floor(x);
+        x = x * width_;
         break;
       case hipAddressModeMirror: {
+        x = x / width_;
         const float frac_x = x - std::floor(x);
         const bool is_reversing = static_cast<size_t>(std::floor(x)) % 2;
         x = is_reversing ? 1.0f - frac_x : frac_x;
-        const auto x_denorm = DenormalizeCoordinate(x, normalized_coords);
-        const auto offset = 1 * (x_denorm == std::trunc(x_denorm)) * is_reversing;
-        return x_denorm - offset;
+        x = x * width_;
+        const auto offset = (x == std::trunc(x)) * is_reversing;
+        x = x - offset;
+        break;
       }
       default:
         throw "Ded";
     }
 
-    return DenormalizeCoordinate(x, normalized_coords);
+    return ptr()[static_cast<size_t>(x)];
   }
 
   float DenormalizeCoordinate(float x, bool normalized_coords) const {

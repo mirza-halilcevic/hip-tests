@@ -47,6 +47,7 @@ __global__ void tex1DKernel(TexelType* const out, size_t N, hipTextureObject_t t
 TEST_CASE("Unit_tex1D_Positive") {
   using TestType = float;
 
+  const auto layers = 1;
   const auto width = 1024;
   const auto num_subdivisions = 512;
   const auto num_iters = 3 * width * num_subdivisions * 2 + 1;
@@ -57,7 +58,7 @@ TEST_CASE("Unit_tex1D_Positive") {
     SetVec4<TestType>(host_alloc.ptr()[i], i + 7);
   }
 
-  TextureReference<vec4<TestType>> tex_h(host_alloc.ptr(), width);
+  TextureReference<vec4<TestType>> tex_h(host_alloc.ptr(), width, layers);
 
   hipTextureDesc tex_desc;
   memset(&tex_desc, 0, sizeof(tex_desc));
@@ -80,7 +81,7 @@ TEST_CASE("Unit_tex1D_Positive") {
 
   ArrayAllocGuard<vec4<TestType>> tex_alloc_d(make_hipExtent(tex_h.width(), 0, 0));
   const size_t spitch = tex_h.width() * sizeof(vec4<TestType>);
-  HIP_CHECK(hipMemcpy2DToArray(tex_alloc_d.ptr(), 0, 0, tex_h.ptr(), spitch, spitch, 1,
+  HIP_CHECK(hipMemcpy2DToArray(tex_alloc_d.ptr(), 0, 0, tex_h.ptr(0), spitch, spitch, 1,
                                hipMemcpyHostToDevice));
 
   hipResourceDesc res_desc;
@@ -124,7 +125,7 @@ __global__ void tex1DRefKernel(TexelType* const out, size_t N, TexelType* const 
   const auto tid = cg::this_grid().thread_rank();
   if (tid >= N) return;
 
-  TextureReference<TexelType> tex_ref(tex, width);
+  TextureReference<TexelType> tex_ref(tex, width, 1);
 
   float x = (static_cast<float>(tid) - N / 2) / num_subdivisions;
   x = tex_desc.normalizedCoords ? x / width : x;

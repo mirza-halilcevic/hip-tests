@@ -50,15 +50,28 @@ template <typename T> std::enable_if_t<std::is_integral_v<T>, float> NormalizeIn
   return std::copysign(xf / std::numeric_limits<T>::max(), x);
 }
 
-template <typename T> std::string inline AddressModeToString(const T address_mode) {
+std::string inline AddressModeToString(decltype(hipAddressModeClamp) address_mode) {
   switch (address_mode) {
-    case hipAddressModeWrap:
-      return "hipAddressModeWrap";
     case hipAddressModeClamp:
       return "hipAddressModeClamp";
-    case hipAddressModeMirror:
-      return "hipAddressModeMirror";
     case hipAddressModeBorder:
       return "hipAddressModeBorder";
+    case hipAddressModeWrap:
+      return "hipAddressModeWrap";
+    case hipAddressModeMirror:
+      return "hipAddressModeMirror";
+    default:
+      throw std::invalid_argument("Invalid hipAddressMode value");
+  }
+}
+
+std::string inline FilteringModeToString(decltype(hipFilterModePoint) filter_mode) {
+  switch (filter_mode) {
+    case hipFilterModePoint:
+      return "hipFilterModePoint";
+    case hipFilterModeLinear:
+      return "hipFilterModeLinear";
+    default:
+      throw std::invalid_argument("Invalid hipFilterMode value");
   }
 }

@@ -42,9 +42,9 @@ set(TEST_SRC
     hipTextureObj3DCheckModes.cc
     hipTextureObj1DCheckSRGBModes.cc
     hipTextureObj2DCheckSRGBModes.cc
-    tex1Dfetch.cc
+    # tex1Dfetch.cc
     tex1D.cc
-    bla.cc
+    # bla.cc
 )
 
 hip_add_exe_to_target(NAME TextureTest

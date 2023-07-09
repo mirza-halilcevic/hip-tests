@@ -83,7 +83,7 @@ template <typename T, typename F> inline auto Vec4Map(const vec4<T>& vec, F f) {
   return ret;
 }
 
-template <typename T> inline auto Vec4Scale(float s, const T& vec) {
+template <typename T> inline __host__ __device__ auto Vec4Scale(float s, const T& vec) {
   T ret;
   ret.x = s * vec.x;
   ret.y = s * vec.y;
@@ -93,7 +93,7 @@ template <typename T> inline auto Vec4Scale(float s, const T& vec) {
   return ret;
 }
 
-template <typename T> inline auto Vec4Add(const T& vec1, const T& vec2) {
+template <typename T> inline __host__ __device__ auto Vec4Add(const T& vec1, const T& vec2) {
   T ret;
   ret.x = vec1.x + vec2.x;
   ret.y = vec1.y + vec2.y;

@@ -24,12 +24,17 @@ THE SOFTWARE.
 
 #include <hip/hip_runtime_api.h>
 
+#include <hip/hip_cooperative_groups.h>
+
 #include <resource_guards.hh>
 
 template <typename TexelType> class TextureReference {
  public:
-  TextureReference(size_t width)
-      : width_{width}, host_alloc_{LinearAllocs::hipHostMalloc, width * sizeof(TexelType)} {}
+  //   TextureReference(size_t width)
+  //     : width_{width}, alloc_{LinearAllocs::hipHostMalloc, width * sizeof(TexelType)} {}
+
+  __host__ __device__ TextureReference(TexelType* ptr, size_t width) : width_{width}, alloc_{ptr} {}
+
 
   template <typename F> void Fill(F f) {
     for (auto i = 0u; i < width_; ++i) {
@@ -37,54 +42,51 @@ template <typename TexelType> class TextureReference {
     }
   }
 
-  TexelType Fetch1D(int x, hipTextureDesc& tex_desc) {
-    x = ApplyAddressMode(x, tex_desc.addressMode[0]);
+  // TexelType Fetch1D(int x, hipTextureDesc& tex_desc) {
+  //   x = ApplyAddressMode(x, tex_desc.addressMode[0]);
 
-    if (x >= width_) {
-      TexelType ret;
-      memset(&ret, 0, sizeof(ret));
-      return ret;
-    }
+  //   if (x >= width_) {
+  //     TexelType ret;
+  //     memset(&ret, 0, sizeof(ret));
+  //     return ret;
+  //   }
 
-    return ptr()[x];
-  }
+  //   return ptr()[x];
+  // }
 
-  TexelType Tex1D(float x, hipTextureDesc& tex_desc) {
+  __host__ __device__ TexelType Tex1D(float x, hipTextureDesc& tex_desc) const {
     x = tex_desc.normalizedCoords ? x * width_ : x;
     if (tex_desc.filterMode == hipFilterModePoint) {
-      return ApplyAddressMode(std::floor(x), tex_desc.addressMode[0]);
+      return ApplyAddressMode(floorf(x), tex_desc.addressMode[0]);
     } else if (tex_desc.filterMode == hipFilterModeLinear) {
       return LinearFiltering(x, tex_desc.addressMode[0]);
-    } else {
-      throw "Ded";
     }
   }
 
-  TexelType* ptr() { return host_alloc_.ptr(); }
+  __host__ __device__ TexelType* ptr() { return alloc_; }
 
-  TexelType* ptr() const { return host_alloc_.ptr(); }
+  __host__ __device__ TexelType* ptr() const { return alloc_; }
 
-  size_t width() const { return width_; }
+  __host__ __device__ size_t width() const { return width_; }
 
  private:
   const size_t width_;
-  LinearAllocGuard<TexelType> host_alloc_;
+  TexelType* const alloc_;
 
-  int ApplyAddressMode(int x, hipTextureAddressMode address_mode) const {
+  __host__ __device__ int ApplyAddressMode(int x, hipTextureAddressMode address_mode) const {
     switch (address_mode) {
       case hipAddressModeClamp:
         return (x < width_) * x;
       case hipAddressModeBorder:
         return x;
-      default:
-        throw "Ded";
     }
   }
 
-  TexelType ApplyAddressMode(float x, hipTextureAddressMode address_mode) const {
+  __host__ __device__ TexelType ApplyAddressMode(float x,
+                                                 hipTextureAddressMode address_mode) const {
     switch (address_mode) {
       case hipAddressModeClamp: {
-        x = std::max(std::min<float>(x, width_ - 1), 0.0f);
+        x = max(min(x, static_cast<float>(width_ - 1)), 0.0f);
         break;
       }
       case hipAddressModeBorder: {
@@ -95,46 +97,40 @@ template <typename TexelType> class TextureReference {
       }
       case hipAddressModeWrap:
         x /= width_;
-        x = x - std::floor(x);
+        x = x - floorf(x);
         x *= width_;
         break;
       case hipAddressModeMirror: {
         x /= width_;
-        const float frac_x = x - std::floor(x);
-        const bool is_reversing = static_cast<size_t>(std::floor(x)) % 2;
+        const float frac_x = x - floor(x);
+        const bool is_reversing = static_cast<int64_t>(floorf(x)) % 2;
         x = is_reversing ? 1.0f - frac_x : frac_x;
         x *= width_;
-        x -= (x == std::trunc(x)) * is_reversing;
+        x -= (x == truncf(x)) * is_reversing;
         break;
       }
-      default:
-        throw "Ded";
     }
 
     return ptr()[static_cast<size_t>(x)];
   }
 
-  float DenormalizeCoordinate(float x, bool normalized_coords) const {
-    return normalized_coords ? x * width_ : x;
-  }
-
-  TexelType Zero() const {
+  __host__ __device__ TexelType Zero() const {
     TexelType ret;
     memset(&ret, 0, sizeof(ret));
     return ret;
   }
 
-  TexelType LinearFiltering(float x, hipTextureAddressMode address_mode) {
+  __host__ __device__ TexelType LinearFiltering(float x, hipTextureAddressMode address_mode) const {
     const auto xB = x - 0.5f;
-    const auto i = std::floor(xB);
+    const auto i = floorf(xB);
     const auto alpha = FloatToNBitFractional<8>(xB - i);
     const auto T_i0 = ApplyAddressMode(i, address_mode);
     const auto T_i1 = ApplyAddressMode(i + 1, address_mode);
     return Vec4Add(Vec4Scale((1.0f - alpha), T_i0), Vec4Scale(alpha, T_i1));
   }
 
-  template <size_t fractional_bits> float FloatToNBitFractional(float x) const {
-    const auto fixed_point = static_cast<uint16_t>(std::round(x * (1 << fractional_bits)));
+  template <size_t fractional_bits> __host__ __device__ float FloatToNBitFractional(float x) const {
+    const auto fixed_point = static_cast<uint16_t>(roundf(x * (1 << fractional_bits)));
     return static_cast<float>(fixed_point) / static_cast<float>(1 << fractional_bits);
   }
 };

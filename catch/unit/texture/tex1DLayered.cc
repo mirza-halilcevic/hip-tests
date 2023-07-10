@@ -39,7 +39,6 @@ __global__ void tex1DLayeredKernel(TexelType* const out, size_t N, hipTextureObj
   const auto tid = cg::this_grid().thread_rank();
   if (tid >= N) return;
 
-
   float x = (static_cast<float>(tid) - N / 2) / num_subdivisions;
   x = normalized_coord ? x / width : x;
   for (int i = 0; i < layers; ++i) {
@@ -69,7 +68,7 @@ TEST_CASE("Unit_tex1DLayered_Positive") {
     SetVec4<TestType>(host_alloc.ptr()[i], i + 7);
   }
 
-  TextureReference<vec4<TestType>> tex_h(host_alloc.ptr(), width, layers);
+  TextureReference<vec4<TestType>> tex_h(host_alloc.ptr(), make_hipExtent(width, 0, 0), layers);
 
   hipTextureDesc tex_desc;
   memset(&tex_desc, 0, sizeof(tex_desc));
@@ -91,7 +90,7 @@ TEST_CASE("Unit_tex1DLayered_Positive") {
   tex_desc.addressMode[0] = address_mode;
 
   // Da bi bio 1D layered array, height mora biti 0
-  ArrayAllocGuard<vec4<TestType>> tex_alloc_d(make_hipExtent(tex_h.width(), 0, layers),
+  ArrayAllocGuard<vec4<TestType>> tex_alloc_d(make_hipExtent(tex_h.extent().width, 0, layers),
                                               hipArrayLayered);
   hipMemcpy3DParms memcpy_params = {0};
   memcpy_params.dstArray = tex_alloc_d.ptr();
@@ -100,7 +99,6 @@ TEST_CASE("Unit_tex1DLayered_Positive") {
   memcpy_params.srcPtr = make_hipPitchedPtr(tex_h.ptr(0), width * sizeof(vec4<TestType>), width, 1);
   memcpy_params.kind = hipMemcpyHostToDevice;
   HIP_CHECK(hipMemcpy3D(&memcpy_params));
-
 
   hipResourceDesc res_desc;
   memset(&res_desc, 0, sizeof(res_desc));
@@ -113,9 +111,9 @@ TEST_CASE("Unit_tex1DLayered_Positive") {
   TextureGuard tex(&res_desc, &tex_desc);
   const auto num_threads = std::min<size_t>(1024, num_iters);
   const auto num_blocks = (num_iters + num_threads - 1) / num_threads;
-  tex1DLayeredKernel<vec4<TestType>>
-      <<<num_blocks, num_threads>>>(out_alloc_d.ptr(), num_iters, tex.object(), layers,
-                                    tex_h.width(), num_subdivisions, tex_desc.normalizedCoords);
+  tex1DLayeredKernel<vec4<TestType>><<<num_blocks, num_threads>>>(
+      out_alloc_d.ptr(), num_iters, tex.object(), layers, tex_h.extent().width, num_subdivisions,
+      tex_desc.normalizedCoords);
 
   std::vector<vec4<TestType>> out_alloc_h(layers * num_iters);
   HIP_CHECK(hipMemcpy(out_alloc_h.data(), out_alloc_d.ptr(),
@@ -126,7 +124,7 @@ TEST_CASE("Unit_tex1DLayered_Positive") {
     int layer = i / num_iters;
     float x = i % num_iters;
     x = (x - num_iters / 2) / num_subdivisions;
-    x = tex_desc.normalizedCoords ? x / tex_h.width() : x;
+    x = tex_desc.normalizedCoords ? x / tex_h.extent().width : x;
 
     INFO("Filter mode: " << FilteringModeToString(filter_mode));
     INFO("Address mode: " << AddressModeToString(address_mode));

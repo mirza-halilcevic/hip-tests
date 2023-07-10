@@ -33,8 +33,11 @@ class TextureGuard {
 
   ~TextureGuard() { static_cast<void>(hipDestroyTextureObject(tex_obj_)); }
 
-  TextureGuard(TextureGuard&&) = delete;
   TextureGuard(const TextureGuard&) = delete;
+  TextureGuard(TextureGuard&&) = delete;
+
+  TextureGuard& operator=(const TextureGuard&) = delete;
+  TextureGuard& operator=(TextureGuard&&) = delete;
 
   hipTextureObject_t object() const { return tex_obj_; }
 
@@ -50,7 +53,7 @@ template <typename T> std::enable_if_t<std::is_integral_v<T>, float> NormalizeIn
   return std::copysign(xf / std::numeric_limits<T>::max(), x);
 }
 
-std::string inline AddressModeToString(decltype(hipAddressModeClamp) address_mode) {
+inline std::string AddressModeToString(decltype(hipAddressModeClamp) address_mode) {
   switch (address_mode) {
     case hipAddressModeClamp:
       return "hipAddressModeClamp";
@@ -65,7 +68,7 @@ std::string inline AddressModeToString(decltype(hipAddressModeClamp) address_mod
   }
 }
 
-std::string inline FilteringModeToString(decltype(hipFilterModePoint) filter_mode) {
+inline std::string FilteringModeToString(decltype(hipFilterModePoint) filter_mode) {
   switch (filter_mode) {
     case hipFilterModePoint:
       return "hipFilterModePoint";

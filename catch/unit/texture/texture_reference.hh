@@ -28,7 +28,7 @@ THE SOFTWARE.
 
 template <typename TexelType> class TextureReference {
  public:
-  __host__ __device__ TextureReference(TexelType* alloc, hipExtent extent, size_t layers)
+  TextureReference(TexelType* alloc, hipExtent extent, size_t layers)
       : alloc_{alloc}, extent_{extent}, layers_{layers} {}
 
   // template <typename F> void Fill(F f) {
@@ -37,116 +37,117 @@ template <typename TexelType> class TextureReference {
   //   }
   // }
 
-  __host__ __device__ TexelType Tex1D(float x, const hipTextureDesc& tex_desc) const {
+  TexelType Tex1D(float x, const hipTextureDesc& tex_desc) const {
     return Tex1DLayered(x, 0, tex_desc);
   }
 
-  __host__ __device__ TexelType Tex2D(float x, float y, const hipTextureDesc& tex_desc) const {
+  TexelType Tex2D(float x, float y, const hipTextureDesc& tex_desc) const {
     return Tex2DLayered(x, y, 0, tex_desc);
   }
 
-  __host__ __device__ TexelType Tex1DLayered(float x, int layer,
-                                             const hipTextureDesc& tex_desc) const {
+  TexelType Tex1DLayered(float x, int layer, const hipTextureDesc& tex_desc) const {
     x = tex_desc.normalizedCoords ? x * extent_.width : x;
     if (tex_desc.filterMode == hipFilterModePoint) {
-      return ApplyAddressMode(floorf(x), 0.0f, layer, tex_desc.addressMode[0]);
+      return Sample(floorf(x), layer, tex_desc.addressMode);
     } else if (tex_desc.filterMode == hipFilterModeLinear) {
-      return LinearFiltering(x, layer, tex_desc.addressMode[0]);
+      return LinearFiltering(x, layer, tex_desc.addressMode);
     } else {
-#ifndef __HIP_DEVICE_COMPILE__
       throw std::invalid_argument("Invalid hipFilterMode value");
-#endif
     }
   }
 
-  __host__ __device__ TexelType Tex2DLayered(float x, float y, int layer,
-                                             const hipTextureDesc& tex_desc) const {
+  TexelType Tex2DLayered(float x, float y, int layer, const hipTextureDesc& tex_desc) const {
     x = tex_desc.normalizedCoords ? x * extent_.width : x;
     y = tex_desc.normalizedCoords ? y * extent_.height : y;
     if (tex_desc.filterMode == hipFilterModePoint) {
-      return ApplyAddressMode(floorf(x), floorf(y), layer, tex_desc.addressMode[0]);
+      return Sample(floorf(x), floorf(y), layer, tex_desc.addressMode);
     } else if (tex_desc.filterMode == hipFilterModeLinear) {
-      return LinearFiltering(x, y, layer, tex_desc.addressMode[0]);
+      return LinearFiltering(x, y, layer, tex_desc.addressMode);
     } else {
-#ifndef __HIP_DEVICE_COMPILE__
       throw std::invalid_argument("Invalid hipFilterMode value");
-#endif
     }
   }
 
-  __host__ __device__ TexelType* ptr(size_t layer) { return alloc_ + layer * extent_.width; }
+  TexelType* ptr(size_t layer) { return alloc_ + layer * extent_.width * (extent_.height ?: 1); }
 
-  __host__ __device__ const TexelType* ptr(size_t layer) const {
-    return alloc_ + layer * extent_.width;
+  const TexelType* ptr(size_t layer) const {
+    return alloc_ + layer * extent_.width * (extent_.height ?: 1);
   }
 
-  __host__ __device__ hipExtent extent() const { return extent_; }
+  hipExtent extent() const { return extent_; }
 
  private:
   TexelType* const alloc_;
   const hipExtent extent_;
   const size_t layers_;
 
-  template <size_t fractional_bits> __host__ __device__ float FloatToNBitFractional(float x) const {
+  template <size_t fractional_bits> float FloatToNBitFractional(float x) const {
     const auto fixed_point = static_cast<uint16_t>(roundf(x * (1 << fractional_bits)));
     return static_cast<float>(fixed_point) / static_cast<float>(1 << fractional_bits);
   }
 
-  __host__ __device__ TexelType Zero() const {
+  TexelType Zero() const {
     TexelType ret;
     memset(&ret, 0, sizeof(ret));
     return ret;
   }
 
-  __host__ __device__ TexelType ApplyAddressMode(float x, float y, int layer,
-                                                 hipTextureAddressMode address_mode) const {
+  float ApplyAddressMode(float coord, size_t dim, hipTextureAddressMode address_mode) const {
     switch (address_mode) {
       case hipAddressModeClamp:
-        x = ApplyClamp(x, extent_.width);
-        y = ApplyClamp(y, extent_.height);
-        break;
+        return ApplyClamp(coord, dim);
       case hipAddressModeBorder:
-        if (ApplyBorder(x, extent_.width) || ApplyBorder(y, extent_.height)) {
-          return Zero();
+        if (CheckBorder(coord, dim)) {
+          return std::numeric_limits<float>::quiet_NaN();
         }
-        break;
       case hipAddressModeWrap:
-        x = ApplyWrap(x, extent_.width);
-        y = ApplyWrap(y, extent_.height);
-        break;
+        return ApplyWrap(coord, dim);
       case hipAddressModeMirror:
-        x = ApplyMirror(x, extent_.width);
-        y = ApplyMirror(y, extent_.height);
-        break;
+        return ApplyMirror(coord, dim);
       default:
-#ifndef __HIP_DEVICE_COMPILE__
         throw std::invalid_argument("Invalid hipAddressMode value");
-#endif
-        break;
+    }
+  }
+
+  TexelType Sample(float x, int layer, const hipTextureAddressMode* address_mode) const {
+    x = ApplyAddressMode(x, extent_.width, address_mode[0]);
+
+    if (std::isnan(x)) {
+      return Zero();
+    }
+
+    return ptr(layer)[static_cast<size_t>(x)];
+  }
+
+  TexelType Sample(float x, float y, int layer, const hipTextureAddressMode* address_mode) const {
+    x = ApplyAddressMode(x, extent_.width, address_mode[0]);
+    y = ApplyAddressMode(y, extent_.height, address_mode[1]);
+
+    if (std::isnan(x) || std::isnan(y)) {
+      return Zero();
     }
 
     return ptr(layer)[static_cast<size_t>(y) * extent_.width + static_cast<size_t>(x)];
   }
 
-  __host__ __device__ TexelType LinearFiltering(float x, int layer,
-                                                hipTextureAddressMode address_mode) const {
+  TexelType LinearFiltering(float x, int layer, const hipTextureAddressMode* address_mode) const {
     const auto [xB, i, alpha] = GetLinearFilteringParams(x);
 
-    const auto T_i0 = ApplyAddressMode(i, 0.0f, layer, address_mode);
-    const auto T_i1 = ApplyAddressMode(i + 1.0f, 0.0f, layer, address_mode);
+    const auto T_i0 = Sample(i, layer, address_mode);
+    const auto T_i1 = Sample(i + 1.0f, layer, address_mode);
 
     return Vec4Add(Vec4Scale((1.0f - alpha), T_i0), Vec4Scale(alpha, T_i1));
   }
 
-  __host__ __device__ TexelType LinearFiltering(float x, float y, int layer,
-                                                hipTextureAddressMode address_mode) const {
+  TexelType LinearFiltering(float x, float y, int layer,
+                            const hipTextureAddressMode* address_mode) const {
     const auto [xB, i, alpha] = GetLinearFilteringParams(x);
     const auto [yB, j, beta] = GetLinearFilteringParams(y);
 
-    const auto T_i0j0 = ApplyAddressMode(i, j, layer, address_mode);
-    const auto T_i1j0 = ApplyAddressMode(i + 1.0f, j, layer, address_mode);
-    const auto T_i0j1 = ApplyAddressMode(i, j + 1.0f, layer, address_mode);
-    const auto T_i1j1 = ApplyAddressMode(i + 1.0f, j + 1.0f, layer, address_mode);
+    const auto T_i0j0 = Sample(i, j, layer, address_mode);
+    const auto T_i1j0 = Sample(i + 1.0f, j, layer, address_mode);
+    const auto T_i0j1 = Sample(i, j + 1.0f, layer, address_mode);
+    const auto T_i1j1 = Sample(i + 1.0f, j + 1.0f, layer, address_mode);
 
     return Vec4Add(
         Vec4Add(Vec4Scale((1.0f - alpha) * (1.0f - beta), T_i0j0),
@@ -154,15 +155,13 @@ template <typename TexelType> class TextureReference {
         Vec4Add(Vec4Scale((1.0f - alpha) * beta, T_i0j1), Vec4Scale(alpha * beta, T_i1j1)));
   }
 
-  __host__ __device__ float ApplyClamp(float coord, size_t dim) const {
+  float ApplyClamp(float coord, size_t dim) const {
     return max(min(coord, static_cast<float>(dim - 1)), 0.0f);
   }
 
-  __host__ __device__ bool ApplyBorder(float coord, size_t dim) const {
-    return coord > dim - 1 || coord < 0.0f;
-  }
+  bool CheckBorder(float coord, size_t dim) const { return coord > dim - 1 || coord < 0.0f; }
 
-  __host__ __device__ float ApplyWrap(float coord, size_t dim) const {
+  float ApplyWrap(float coord, size_t dim) const {
     coord /= dim;
     coord = coord - floorf(coord);
     coord *= dim;
@@ -170,7 +169,7 @@ template <typename TexelType> class TextureReference {
     return coord;
   }
 
-  __host__ __device__ float ApplyMirror(float coord, size_t dim) const {
+  float ApplyMirror(float coord, size_t dim) const {
     coord /= dim;
     const float frac = coord - floor(coord);
     const bool is_reversing = static_cast<ssize_t>(floorf(coord)) % 2;
@@ -181,7 +180,7 @@ template <typename TexelType> class TextureReference {
     return coord;
   }
 
-  __host__ __device__ std::tuple<float, float, float> GetLinearFilteringParams(float coord) const {
+  std::tuple<float, float, float> GetLinearFilteringParams(float coord) const {
     const auto coordB = coord - 0.5f;
     const auto index = floorf(coordB);
     const auto coeff = FloatToNBitFractional<8>(coordB - index);

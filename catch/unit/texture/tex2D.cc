@@ -48,13 +48,22 @@ __global__ void tex2DKernel(TexelType* const out, size_t N_x, size_t N_y,
   float y = (static_cast<float>(tid_y) - N_y / 2) / num_subdivisions;
   y = normalized_coords ? y / height : y;
 
-  auto res = tex2D<TexelType>(tex_obj, x, y);
-  auto index = tid_y * N_x + tid_x;
+  out[tid_y * N_x + tid_x] = tex2D<TexelType>(tex_obj, x, y);
+}
 
-  // printf("tid_x: %d tid_y: %d x: %f y: %f res: %f index: %d\n", tid_x, tid_y, x, y, res.x,
-  // index);
-
-  out[index] = res;
+static auto GenerateAddressModes(bool normalized_coords) {
+  auto address_mode_x = hipAddressModeClamp;
+  auto address_mode_y = address_mode_x;
+  if (normalized_coords) {
+    address_mode_x = GENERATE(hipAddressModeClamp, hipAddressModeBorder, hipAddressModeWrap,
+                              hipAddressModeMirror);
+    address_mode_y = GENERATE(hipAddressModeClamp, hipAddressModeBorder, hipAddressModeWrap,
+                              hipAddressModeMirror);
+  } else {
+    address_mode_x = GENERATE(hipAddressModeClamp, hipAddressModeBorder);
+    address_mode_y = GENERATE(hipAddressModeClamp, hipAddressModeBorder);
+  }
+  return std::make_tuple(address_mode_x, address_mode_y);
 }
 
 TEST_CASE("Unit_tex2D_Positive") {
@@ -62,14 +71,14 @@ TEST_CASE("Unit_tex2D_Positive") {
 
   const auto width = 16;
   const auto height = 4;
-  const auto num_subdivisions = 5;
+  const auto num_subdivisions = 4;
   const auto num_iters_x = 3 * width * num_subdivisions * 2 + 1;
   const auto num_iters_y = 3 * height * num_subdivisions * 2 + 1;
 
   LinearAllocGuard<vec4<TestType>> host_alloc(LinearAllocs::hipHostMalloc,
                                               width * height * sizeof(vec4<TestType>));
   for (auto i = 0u; i < width * height; ++i) {
-    SetVec4<TestType>(host_alloc.ptr()[i], i + 1);
+    SetVec4<TestType>(host_alloc.ptr()[i], i + 7);
   }
 
   TextureReference<vec4<TestType>> tex_h(host_alloc.ptr(), make_hipExtent(width, height, 0), 0);
@@ -78,22 +87,13 @@ TEST_CASE("Unit_tex2D_Positive") {
   memset(&tex_desc, 0, sizeof(tex_desc));
   tex_desc.readMode = hipReadModeElementType;
 
-  const auto filter_mode = GENERATE(hipFilterModeLinear);
+  const auto filter_mode = GENERATE(hipFilterModePoint, hipFilterModeLinear);
   tex_desc.filterMode = filter_mode;
 
-  const bool normalized_coords = GENERATE(false);
+  const bool normalized_coords = GENERATE(false, true);
   tex_desc.normalizedCoords = normalized_coords;
 
-  auto address_mode_x = hipAddressModeMirror, address_mode_y = hipAddressModeMirror;
-  // if (normalized_coords) {
-  //   address_mode_x = GENERATE(hipAddressModeClamp, hipAddressModeBorder, hipAddressModeWrap,
-  //                           hipAddressModeMirror);
-  //   address_mode_y = GENERATE(hipAddressModeClamp, hipAddressModeBorder, hipAddressModeWrap,
-  //                           hipAddressModeMirror);
-  // } else {
-  //   address_mode_x = GENERATE(hipAddressModeClamp, hipAddressModeBorder);
-  //   address_mode_y = GENERATE(hipAddressModeClamp, hipAddressModeBorder);
-  // }
+  const auto [address_mode_x, address_mode_y] = GenerateAddressModes(normalized_coords);
   tex_desc.addressMode[0] = address_mode_x;
   tex_desc.addressMode[1] = address_mode_y;
 
@@ -133,10 +133,6 @@ TEST_CASE("Unit_tex2D_Positive") {
                       num_iters_x * num_iters_y * sizeof(vec4<TestType>), hipMemcpyDeviceToHost));
   HIP_CHECK(hipDeviceSynchronize());
 
-  // for (auto v : out_alloc_h) {
-  //   std::cout << v.x << std::endl;
-  // }
-
   for (auto j = 0u; j < num_iters_y; ++j) {
     for (auto i = 0u; i < num_iters_x; ++i) {
       INFO("i: " << i);
@@ -147,61 +143,164 @@ TEST_CASE("Unit_tex2D_Positive") {
 
       float x = (static_cast<float>(i) - num_iters_x / 2) / num_subdivisions;
       x = tex_desc.normalizedCoords ? x / tex_h.extent().width : x;
-      INFO("x: " << std::fixed << std::setprecision(15) << x);
+      INFO("x: " << std::fixed << std::setprecision(30) << x);
 
       float y = (static_cast<float>(j) - num_iters_y / 2) / num_subdivisions;
       y = tex_desc.normalizedCoords ? y / tex_h.extent().height : y;
-      INFO("y: " << std::fixed << std::setprecision(15) << y);
+      INFO("y: " << std::fixed << std::setprecision(30) << y);
 
       auto index = j * num_iters_x + i;
 
       const auto ref_val = tex_h.Tex2D(x, y, tex_desc);
-      CHECK(ref_val.x == out_alloc_h[index].x);
-      //   REQUIRE(ref_val.y == out_alloc_h[index].y);
-      //   REQUIRE(ref_val.z == out_alloc_h[index].z);
-      //   REQUIRE(ref_val.w == out_alloc_h[index].w);
+      REQUIRE(ref_val.x == out_alloc_h[index].x);
+      REQUIRE(ref_val.y == out_alloc_h[index].y);
+      REQUIRE(ref_val.z == out_alloc_h[index].z);
+      REQUIRE(ref_val.w == out_alloc_h[index].w);
     }
   }
 }
 
-__global__ void kernel2D(hipTextureObject_t tex_obj) {
-  const auto v = tex2D<float2>(tex_obj, 0, 0);
-  printf("x:%1.10f, y:%1.10f\n", v.x, v.y);
-}
+// __global__ void kernel2D(hipTextureObject_t tex_obj, float x, float y) {
+//   const auto v = tex2D<float2>(tex_obj, x, y);
 
-TEST_CASE("BLA") {
-  const int width = 2;
-  const int height = 2;
+//   printf("x:%1.10f, y:%1.10f\n", v.x, v.y);
+// }
 
-  std::vector<float2> vec(width * height);
-  for (auto i = 0u; i < vec.size(); ++i) {
-    vec[i].x = i + 1;
-    vec[i].y = i + 1;
-  }
+// template <size_t fractional_bits> float FloatToNBitFractional(float x) {
+//   const auto fixed_point = static_cast<uint16_t>(roundf(x * (1 << fractional_bits)));
 
-  hipArray_t array;
-  const auto desc = hipCreateChannelDesc<float2>();
-  HIP_CHECK(hipMalloc3DArray(&array, &desc, make_hipExtent(width, height, 0), 0));
-  const auto spitch = width * sizeof(float2);
-  HIP_CHECK(
-      hipMemcpy2DToArray(array, 0, 0, vec.data(), spitch, spitch, height, hipMemcpyHostToDevice));
+//   return static_cast<float>(fixed_point) / static_cast<float>(1 << fractional_bits);
+// }
 
-  hipResourceDesc res_desc;
-  memset(&res_desc, 0, sizeof(res_desc));
-  res_desc.resType = hipResourceTypeArray;
-  res_desc.res.array.array = array;
+// std::tuple<int, FixedPoint<8>, float> blahem(float x) {
+//   const auto xB = x - 0.5f;
 
-  hipTextureDesc tex_desc;
-  memset(&tex_desc, 0, sizeof(tex_desc));
-  tex_desc.normalizedCoords = false;
-  tex_desc.filterMode = hipFilterModePoint;
-  tex_desc.addressMode[0] = hipAddressModeClamp;
-  tex_desc.addressMode[1] = hipAddressModeClamp;
-  tex_desc.readMode = hipReadModeElementType;
+//   const auto i = static_cast<int>(floorf(xB));
 
-  hipTextureObject_t tex;
-  HIP_CHECK(hipCreateTextureObject(&tex, &res_desc, &tex_desc, nullptr));
+//   const FixedPoint<8> alpha = xB - i;
 
-  kernel2D<<<1, 1>>>(tex);
-  HIP_CHECK(hipDeviceSynchronize());
-}
+//   return {i, alpha, xB};
+// }
+
+// TEST_CASE("BLA") {
+//   const int width = 2;
+
+//   const int height = 2;
+
+
+//   std::vector<float2> vec(width * height);
+
+//   for (auto i = 0u; i < vec.size(); ++i) {
+//     vec[i].x = i + 1;
+
+//     vec[i].y = i + 1;
+//   }
+
+
+//   hipArray_t array;
+
+//   const auto desc = hipCreateChannelDesc<float2>();
+
+//   HIP_CHECK(hipMalloc3DArray(&array, &desc, make_hipExtent(width, height, 0), 0));
+
+//   const auto spitch = width * sizeof(float2);
+
+//   HIP_CHECK(
+
+//       hipMemcpy2DToArray(array, 0, 0, vec.data(), spitch, spitch, height, hipMemcpyHostToDevice));
+
+
+//   hipResourceDesc res_desc;
+
+//   memset(&res_desc, 0, sizeof(res_desc));
+
+//   res_desc.resType = hipResourceTypeArray;
+
+//   res_desc.res.array.array = array;
+
+
+//   hipTextureDesc tex_desc;
+
+//   memset(&tex_desc, 0, sizeof(tex_desc));
+
+//   tex_desc.normalizedCoords = true;
+
+//   tex_desc.filterMode = hipFilterModeLinear;
+
+//   tex_desc.addressMode[0] = hipAddressModeBorder;
+
+//   tex_desc.addressMode[1] = hipAddressModeBorder;
+
+//   tex_desc.readMode = hipReadModeElementType;
+
+
+//   hipTextureObject_t tex;
+
+//   HIP_CHECK(hipCreateTextureObject(&tex, &res_desc, &tex_desc, nullptr));
+
+
+//   float x_og = 0.500000000000000000000000000000;
+
+//   float y_og = -0.100000001490116119384765625000;
+
+//   float x = x_og * width;
+
+//   float y = y_og * height;
+
+//   const auto bla = [&](int x, int y) {
+//     if (0 > x || x > width - 1) return 0.f;
+
+//     if (0 > y || y > height - 1) return 0.f;
+
+//     return vec[y * width + x].x;
+//   };
+
+
+//   auto [i, alpha, xB] = blahem(x);
+
+//   auto [j, beta, xY] = blahem(y);
+
+//   float values[] = {0, 1, 2, 3, 4};
+
+//   // for (auto i = 0; i < 5; ++i) {
+//   //   for (auto j = 0; j < 5; ++j) {
+//   //     for (auto k = 0; k < 5; ++k) {
+//   //       for (auto l = 0; l < 5; ++l) {
+//   //         // const auto res = ((1.0f - alpha) * (1.0f - beta)) * values[i] +
+//   //         //     (alpha * (1.0f - beta)) * values[j] + ((1.0f - alpha) * beta) * values[k] +
+//   //         //     (alpha * beta) * values[l];
+//   //         if (res == 0.125f) {
+//   //           std::cout << values[i] << " " << values[j] << " " << values[k] << " " << values[l]
+//   //                     << std::endl;
+//   //         }
+//   //       }
+//   //     }
+//   //   }
+//   // }
+
+//   const auto T_i0j0 = bla(i, j);
+
+//   const auto T_i1j0 = bla(i + 1, j);
+
+//   const auto T_i0j1 = bla(i, j + 1);
+
+//   const auto T_i1j1 = bla(i + 1, j + 1);
+
+//   const FixedPoint<8> one{1.0f};
+
+//   const auto res = ((one - alpha) * (one - beta)).GetFloat() * T_i0j0 +
+//       (alpha * (one - beta)).GetFloat() * T_i1j0 + ((one - alpha) * beta).GetFloat() * T_i0j1 +
+//       (alpha * beta).GetFloat() * T_i1j1;
+
+//   kernel2D<<<1, 1>>>(tex, x_og, y_og);
+
+//   HIP_CHECK(hipDeviceSynchronize());
+
+//   std::cout << i << " " << j << std::endl;
+
+//   std::cout << alpha.GetFloat() << " " << beta.GetFloat() << std::endl;
+
+//   std::cout << T_i0j0 << " " << T_i0j1 << " " << T_i1j0 << " " << T_i1j1 << std::endl;
+
+//   std::cout << std::fixed << std::setprecision(10) << res << std::endl;
+// }

@@ -45,7 +45,9 @@ set(TEST_SRC
     # tex1Dfetch.cc
     tex1D.cc
     tex2D.cc
+    tex3D.cc
     tex1DLayered.cc
+    tex2DLayered.cc
     # bla.cc
 )
 

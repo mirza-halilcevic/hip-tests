@@ -89,12 +89,10 @@ TEST_CASE("Unit_tex1DLayered_Positive") {
   }
   tex_desc.addressMode[0] = address_mode;
 
-  // Da bi bio 1D layered array, height mora biti 0
   ArrayAllocGuard<vec4<TestType>> tex_alloc_d(make_hipExtent(tex_h.extent().width, 0, layers),
                                               hipArrayLayered);
   hipMemcpy3DParms memcpy_params = {0};
   memcpy_params.dstArray = tex_alloc_d.ptr();
-  // Premda kod kreiranja array-a height mora biti nula, u naredne dvije linije mora biti 1
   memcpy_params.extent = make_hipExtent(width, 1, layers);
   memcpy_params.srcPtr = make_hipPitchedPtr(tex_h.ptr(0), width * sizeof(vec4<TestType>), width, 1);
   memcpy_params.kind = hipMemcpyHostToDevice;

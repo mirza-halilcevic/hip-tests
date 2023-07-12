@@ -58,21 +58,21 @@ __global__ void tex3DKernel(TexelType* const out, size_t N_x, size_t N_y, size_t
 }
 
 static auto GenerateAddressModes(bool normalized_coords) {
-  auto address_mode_x = hipAddressModeWrap;
+  auto address_mode_x = hipAddressModeMirror;
   auto address_mode_y = address_mode_x;
   auto address_mode_z = address_mode_y;
-  //   if (normalized_coords) {
-  //     address_mode_x = GENERATE(hipAddressModeClamp, hipAddressModeBorder, hipAddressModeWrap,
-  //                               hipAddressModeMirror);
-  //     address_mode_y = GENERATE(hipAddressModeClamp, hipAddressModeBorder, hipAddressModeWrap,
-  //                               hipAddressModeMirror);
-  //     address_mode_z = GENERATE(hipAddressModeClamp, hipAddressModeBorder, hipAddressModeWrap,
-  //                               hipAddressModeMirror);
-  //   } else {
-  //     address_mode_x = GENERATE(hipAddressModeClamp, hipAddressModeBorder);
-  //     address_mode_y = GENERATE(hipAddressModeClamp, hipAddressModeBorder);
-  //     address_mode_z = GENERATE(hipAddressModeClamp, hipAddressModeBorder);
-  //   }
+  if (normalized_coords) {
+    address_mode_x = GENERATE(hipAddressModeClamp, hipAddressModeBorder, hipAddressModeWrap,
+                              hipAddressModeMirror);
+    address_mode_y = GENERATE(hipAddressModeClamp, hipAddressModeBorder, hipAddressModeWrap,
+                              hipAddressModeMirror);
+    address_mode_z = GENERATE(hipAddressModeClamp, hipAddressModeBorder, hipAddressModeWrap,
+                              hipAddressModeMirror);
+  } else {
+    address_mode_x = GENERATE(hipAddressModeClamp, hipAddressModeBorder);
+    address_mode_y = GENERATE(hipAddressModeClamp, hipAddressModeBorder);
+    address_mode_z = GENERATE(hipAddressModeClamp, hipAddressModeBorder);
+  }
   return std::make_tuple(address_mode_x, address_mode_y, address_mode_z);
 }
 
@@ -99,10 +99,10 @@ TEST_CASE("Unit_tex3D_Positive") {
   memset(&tex_desc, 0, sizeof(tex_desc));
   tex_desc.readMode = hipReadModeElementType;
 
-  const auto filter_mode = GENERATE(hipFilterModeLinear);
+  const auto filter_mode = GENERATE(hipFilterModePoint, hipFilterModeLinear);
   tex_desc.filterMode = filter_mode;
 
-  const bool normalized_coords = GENERATE(true);
+  const bool normalized_coords = GENERATE(false, true);
   tex_desc.normalizedCoords = normalized_coords;
 
   const auto [address_mode_x, address_mode_y, address_mode_z] =

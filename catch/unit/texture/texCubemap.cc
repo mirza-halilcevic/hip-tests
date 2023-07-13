@@ -73,7 +73,8 @@ TEST_CASE("Unit_texCubemap_Positive_Basic") {
   for (int k = 0; k < faces; ++k) {
     for (int j = 0; j < width; ++j) {
       for (int i = 0; i < width; ++i) {
-        input_h.host_ptr()[width * width * k + j * width + i] = width * width * k + j * width + i;
+        auto index = width * width * k + j * width + i;
+        input_h.host_ptr()[index] = index;
       }
     }
   }
@@ -116,9 +117,8 @@ TEST_CASE("Unit_texCubemap_Positive_Basic") {
   for (int k = 0; k < faces; ++k) {
     for (int j = 0; j < width; ++j) {
       for (int i = 0; i < width; ++i) {
-        std::cout << std::setw(8) << std::setprecision(3)
-                  << output_h.host_ptr()[width * width * k + j * width + i] << "/"
-                  << input_h.host_ptr()[width * width * k + j * width + i];
+        auto index = width * width * k + j * width + i;
+        std::cout << std::setw(8) << output_h.host_ptr()[index] << "/" << input_h.host_ptr()[index];
       }
       std::cout << std::endl;
     }

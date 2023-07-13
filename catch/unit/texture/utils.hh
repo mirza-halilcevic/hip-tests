@@ -20,6 +20,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+#pragma once
+
 #include <algorithm>
 #include <cmath>
 
@@ -34,10 +36,7 @@ class TextureGuard {
   ~TextureGuard() { static_cast<void>(hipDestroyTextureObject(tex_obj_)); }
 
   TextureGuard(const TextureGuard&) = delete;
-  TextureGuard(TextureGuard&&) = delete;
-
   TextureGuard& operator=(const TextureGuard&) = delete;
-  TextureGuard& operator=(TextureGuard&&) = delete;
 
   hipTextureObject_t object() const { return tex_obj_; }
 
@@ -48,9 +47,18 @@ class TextureGuard {
 template <typename T> std::enable_if_t<std::is_integral_v<T>, float> NormalizeInteger(const T x) {
   // On the GPU, -1.0 will be returned both  for the minimum value of a signed type and its
   // successor e.g. for char, -1.0 will be returned for both -128 and -127.
-  auto xf = std::abs(static_cast<float>(x));
-  xf = std::min<float>(xf, std::numeric_limits<T>::max());
-  return std::copysign(xf / std::numeric_limits<T>::max(), x);
+  // auto xf = std::abs(static_cast<float>(x));
+  // xf = std::min<float>(xf, std::numeric_limits<T>::max());
+  // return std::copysign(xf / std::numeric_limits<T>::max(), x);
+
+  return x < 0 ? -static_cast<float>(x) / std::numeric_limits<T>::min()
+               : static_cast<float>(x) / std::numeric_limits<T>::max();
+}
+
+inline std::tuple<size_t, size_t> GetLaunchConfig(size_t max_num_threads, size_t num_iters) {
+  auto num_threads = std::min<size_t>(max_num_threads, num_iters);
+  auto num_blocks = (num_iters + num_threads - 1) / num_threads;
+  return {num_threads, num_blocks};
 }
 
 inline std::string AddressModeToString(decltype(hipAddressModeClamp) address_mode) {

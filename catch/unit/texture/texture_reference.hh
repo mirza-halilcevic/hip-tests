@@ -20,11 +20,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-#include <algorithm>
+#pragma once
 
-#include <hip/hip_cooperative_groups.h>
-#include <hip/hip_runtime_api.h>
-#include <resource_guards.hh>
+#include <cmath>
+
+#include "fixed_point.hpp"
 
 template <typename TexelType> class TextureReference {
  public:
@@ -75,22 +75,25 @@ template <typename TexelType> class TextureReference {
     }
   }
 
-  TexelType* ptr(size_t layer) { return alloc_ + layer * extent_.width * (extent_.height ?: 1); }
-
-  const TexelType* ptr(size_t layer) const {
+  TexelType* ptr(size_t layer) const {
     return alloc_ + layer * extent_.width * (extent_.height ?: 1);
   }
 
-  hipExtent extent() const { return extent_; }
+  size_t width() const { return extent_.width; }
+
+  size_t height() const { return extent_.height; }
+
+  size_t depth() const { return extent_.depth; }
 
  private:
   TexelType* const alloc_;
   const hipExtent extent_;
   const size_t layers_;
 
-  template <size_t fractional_bits> float FloatToNBitFractional(float x) const {
-    const auto fixed_point = static_cast<uint16_t>(roundf(x * (1 << fractional_bits)));
-    return static_cast<float>(fixed_point) / static_cast<float>(1 << fractional_bits);
+  template <typename T> TexelType Vec4Sum(T arg) const { return Vec4Add(arg, Zero()); }
+
+  template <typename T, typename... Ts> TexelType Vec4Sum(T arg, Ts... args) const {
+    return Vec4Add(arg, Vec4Sum(args...));
   }
 
   TexelType Zero() const {
@@ -156,7 +159,10 @@ template <typename TexelType> class TextureReference {
     const auto T_i0 = Sample(i, layer, address_mode);
     const auto T_i1 = Sample(i + 1.0f, layer, address_mode);
 
-    return Vec4Add(Vec4Scale((1.0f - alpha), T_i0), Vec4Scale(alpha, T_i1));
+    const auto term_i0 = Vec4Scale((1.0f - alpha), T_i0);
+    const auto term_i1 = Vec4Scale(alpha, T_i1);
+
+    return Vec4Sum(term_i0, term_i1);
   }
 
   TexelType LinearFiltering(float x, float y, int layer,
@@ -169,16 +175,12 @@ template <typename TexelType> class TextureReference {
     const auto T_i0j1 = Sample(i, j + 1.0f, layer, address_mode);
     const auto T_i1j1 = Sample(i + 1.0f, j + 1.0f, layer, address_mode);
 
-    return Vec4Add(
-        Vec4Add(Vec4Scale((1.0f - alpha) * (1.0f - beta), T_i0j0),
-                Vec4Scale(alpha * (1.0f - beta), T_i1j0)),
-        Vec4Add(Vec4Scale((1.0f - alpha) * beta, T_i0j1), Vec4Scale(alpha * beta, T_i1j1)));
-  }
+    const auto term_i0j0 = Vec4Scale((1.0f - alpha) * (1.0f - beta), T_i0j0);
+    const auto term_i1j0 = Vec4Scale(alpha * (1.0f - beta), T_i1j0);
+    const auto term_i0j1 = Vec4Scale((1.0f - alpha) * beta, T_i0j1);
+    const auto term_i1j1 = Vec4Scale(alpha * beta, T_i1j1);
 
-  template <typename T> TexelType Vec4Sum(T arg) const { return Vec4Add(arg, Zero()); }
-
-  template <typename T, typename... Ts> TexelType Vec4Sum(T arg, Ts... args) const {
-    return Vec4Add(arg, Vec4Sum(args...));
+    return Vec4Sum(term_i0j0, term_i1j0, term_i0j1, term_i1j1);
   }
 
   TexelType LinearFiltering(float x, float y, float z,
@@ -204,10 +206,6 @@ template <typename TexelType> class TextureReference {
     const auto term_i1j0k1 = Vec4Scale(alpha * (1.0f - beta) * gamma, T_i1j0k1);
     const auto term_i0j1k1 = Vec4Scale((1.0f - alpha) * beta * gamma, T_i0j1k1);
     const auto term_i1j1k1 = Vec4Scale(alpha * beta * gamma, T_i1j1k1);
-
-    // return Vec4Add(Vec4Add(Vec4Add(term_i0j0k0, term_i1j0k0), Vec4Add(term_i0j1k0, term_i1j1k0)),
-    //                Vec4Add(Vec4Add(term_i0j0k1, term_i1j0k1), Vec4Add(term_i0j1k1,
-    //                term_i1j1k1)));
 
     return Vec4Sum(term_i0j0k0, term_i1j0k0, term_i0j1k0, term_i1j1k0, term_i0j0k1, term_i1j0k1,
                    term_i0j1k1, term_i1j1k1);
@@ -241,7 +239,7 @@ template <typename TexelType> class TextureReference {
   std::tuple<float, float> GetLinearFilteringParams(float coord) const {
     const auto coordB = coord - 0.5f;
     const auto index = floorf(coordB);
-    const auto coeff = FloatToNBitFractional<8>(coordB - index);
+    const FixedPoint<8> coeff = coordB - index;
 
     return {index, coeff};
   }

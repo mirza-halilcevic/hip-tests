@@ -48,6 +48,7 @@ set(TEST_SRC
     tex3D.cc
     tex1DLayered.cc
     tex2DLayered.cc
+    texCubemap.cc
     # bla.cc
 )
 

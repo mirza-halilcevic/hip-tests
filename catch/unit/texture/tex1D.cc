@@ -37,14 +37,10 @@ __global__ void tex1DKernel(TexelType* const out, int64_t offset, size_t N,
                             hipTextureObject_t tex_obj, size_t width, size_t num_subdivisions,
                             bool normalized_coords) {
   const auto tid = cg::this_grid().thread_rank();
-  // if (tid == 0) {
-  //   printf("Kernel, N: %lu, offset: %ld\n", N, offset);
-  // }
   if (tid >= N) return;
 
   float x = (static_cast<float>(tid) + offset) / num_subdivisions;
   x = normalized_coords ? x / width : x;
-  // printf("tid: %lu, x:%f\n", tid, x);
   out[tid] = tex1D<TexelType>(tex_obj, x);
 }
 
@@ -69,11 +65,9 @@ TEST_CASE("Unit_tex1D_Positive") {
   tex_desc.readMode = hipReadModeElementType;
 
   const auto filter_mode = GENERATE(hipFilterModePoint, hipFilterModeLinear);
-  // const auto filter_mode = GENERATE(hipFilterModePoint);
   tex_desc.filterMode = filter_mode;
 
   const bool normalized_coords = GENERATE(false, true);
-  // const bool normalized_coords = GENERATE(false);
   tex_desc.normalizedCoords = normalized_coords;
 
   auto address_mode = hipAddressModeClamp;
@@ -82,7 +76,6 @@ TEST_CASE("Unit_tex1D_Positive") {
                             hipAddressModeMirror);
   } else {
     address_mode = GENERATE(hipAddressModeClamp, hipAddressModeBorder);
-    // address_mode = GENERATE(hipAddressModeClamp);
   }
   tex_desc.addressMode[0] = address_mode;
 
@@ -91,7 +84,7 @@ TEST_CASE("Unit_tex1D_Positive") {
   HIP_CHECK(hipMemcpy2DToArray(tex_alloc_d.ptr(), 0, 0, tex_h.ptr(0), spitch, spitch, 1,
                                hipMemcpyHostToDevice));
 
-  hipDeviceProp_t props = {};
+  hipDeviceProp_t props = {0};
   HIP_CHECK(hipGetDeviceProperties(&props, 0));
   uint64_t device_memory = props.totalGlobalMem * 0.80 - width * sizeof(vec4<TestType>);
 
@@ -127,7 +120,7 @@ TEST_CASE("Unit_tex1D_Positive") {
         hipMemcpy(out_alloc_h.data(), out_alloc_d.ptr(), out_alloc_d_size, hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
 
-    for (auto i = 0u; i < out_alloc_h.size(); ++i) {
+    for (auto i = 0u; i < N; ++i) {
       float x = (static_cast<float>(i) + offset) / num_subdivisions;
       x = tex_desc.normalizedCoords ? x / tex_h.extent().width : x;
       const auto ref_val = tex_h.Tex1D(x, tex_desc);

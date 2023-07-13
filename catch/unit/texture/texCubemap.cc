@@ -66,11 +66,11 @@ __global__ void transformKernelCubemap(T* output, hipTextureObject_t texture, in
 TEST_CASE("Unit_texCubemap_Positive_Basic") {
   using TestType = unsigned short;
   const int width{4};
-  const int depth{6};
-  const int allocation_size{width * width * depth * sizeof(TestType)};
+  const int faces{6};
+  const int allocation_size{width * width * faces * sizeof(TestType)};
 
   LinearAllocGuard<TestType> input_h(LinearAllocs::malloc, allocation_size);
-  for (int k = 0; k < depth; ++k) {
+  for (int k = 0; k < faces; ++k) {
     for (int j = 0; j < width; ++j) {
       for (int i = 0; i < width; ++i) {
         input_h.host_ptr()[width * width * k + j * width + i] = width * width * k + j * width + i;
@@ -80,13 +80,13 @@ TEST_CASE("Unit_texCubemap_Positive_Basic") {
 
   LinearAllocGuard<TestType> output_h(LinearAllocs::malloc, allocation_size);
   LinearAllocGuard<TestType> output_d(LinearAllocs::hipMalloc, allocation_size);
-  ArrayAllocGuard<TestType> array_d(make_hipExtent(width, width, depth), hipArrayCubemap);
+  ArrayAllocGuard<TestType> array_d(make_hipExtent(width, width, faces), hipArrayCubemap);
   hipMemcpy3DParms params{};
   params.srcPos = make_hipPos(0, 0, 0);
   params.dstPos = make_hipPos(0, 0, 0);
   params.srcPtr = make_hipPitchedPtr(input_h.host_ptr(), width * sizeof(TestType), width, width);
   params.dstArray = array_d.ptr();
-  params.extent = make_hipExtent(width, width, depth);
+  params.extent = make_hipExtent(width, width, faces);
   params.kind = hipMemcpyHostToDevice;
   HIP_CHECK(hipMemcpy3D(&params));
 
@@ -113,9 +113,7 @@ TEST_CASE("Unit_texCubemap_Positive_Basic") {
 
   HIP_CHECK(hipMemcpy(output_h.host_ptr(), output_d.ptr(), allocation_size, hipMemcpyDeviceToHost));
 
-  std::cout << "==============================================================================="
-            << std::endl;
-  for (int k = 0; k < depth; ++k) {
+  for (int k = 0; k < faces; ++k) {
     for (int j = 0; j < width; ++j) {
       for (int i = 0; i < width; ++i) {
         std::cout << std::setw(8) << std::setprecision(3)
@@ -126,9 +124,6 @@ TEST_CASE("Unit_texCubemap_Positive_Basic") {
     }
     std::cout << std::endl;
   }
-
-  std::cout << "==============================================================================="
-            << std::endl;
 
   HIP_CHECK(hipDestroyTextureObject(texture));
 }

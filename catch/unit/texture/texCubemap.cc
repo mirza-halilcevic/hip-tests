@@ -44,7 +44,7 @@ __global__ void transformKernelCubemap(T* output, hipTextureObject_t texture, in
     } else if (face == 2) {
       cx = u;
       cy = 1;
-      cz = v + 0.5f;
+      cz = v;
     } else if (face == 3) {
       cx = u;
       cy = -1;

@@ -69,7 +69,7 @@ static auto GenerateAddressModes(bool normalized_coords) {
 TEST_CASE("Unit_tex2D_Positive") {
   using TestType = float;
 
-  const auto width = 8;
+  const auto width = 16;
   const auto height = 4;
   const auto num_subdivisions = 4;
   const int64_t total_samples_x = 3 * width * num_subdivisions * 2 + 1;
@@ -136,50 +136,53 @@ TEST_CASE("Unit_tex2D_Positive") {
   const dim3 dim_block{num_threads_x, num_threads_y};
 
   int64_t offset_y = -static_cast<int64_t>(total_samples_y) / 2;
-  for (auto batch_y = 0u; batch_y < num_batches_y; ++batch_y) {
-    offset_y += batch_y * batch_samples;
-    int64_t offset_x = -static_cast<int64_t>(total_samples_x) / 2;
-    for (auto batch_x = 0u; batch_x < num_batches_x; ++batch_x) {
-      offset_x += batch_x * batch_samples;
-      const size_t N_x = (batch_x == num_batches_x - 1) && (total_samples_x % batch_samples)
-          ? total_samples_x % batch_samples
-          : batch_samples;
+  int64_t offset_x = -static_cast<int64_t>(total_samples_x) / 2;
+  for (auto batch = 0u; batch < num_batches_x * num_batches_y; ++batch) {
+    const auto batch_x = batch % num_batches_x;
+    const auto batch_y = batch / num_batches_x;
 
-      const size_t N_y = (batch_y == num_batches_y - 1) && (total_samples_y % batch_samples)
-          ? total_samples_y % batch_samples
-          : batch_samples;
+    offset_x = (batch_x == 0) ? -static_cast<int64_t>(total_samples_x) / 2
+                              : offset_x + batch_x * batch_samples;
+    offset_y = (batch_x == 0) ? offset_y + batch_y * batch_samples : offset_y;
 
-      tex2DKernel<vec4<TestType>><<<dim_grid, dim_block>>>(
-          out_alloc_d.ptr(), offset_x, offset_y, N_x, N_y, tex.object(), tex_h.extent().width,
-          tex_h.extent().height, num_subdivisions, tex_desc.normalizedCoords);
-      HIP_CHECK(hipGetLastError());
+    const size_t N_x = (batch_x == num_batches_x - 1) && (total_samples_x % batch_samples)
+        ? total_samples_x % batch_samples
+        : batch_samples;
 
-      HIP_CHECK(hipMemcpy(out_alloc_h.data(), out_alloc_d.ptr(), N_x * N_y * sizeof(vec4<TestType>),
-                          hipMemcpyDeviceToHost));
-      HIP_CHECK(hipDeviceSynchronize());
+    const size_t N_y = (batch_y == num_batches_y - 1) && (total_samples_y % batch_samples)
+        ? total_samples_y % batch_samples
+        : batch_samples;
 
-      for (auto i = 0u; i < N_x * N_y; ++i) {
-        float x = i % N_x;
-        x = (x + offset_x) / num_subdivisions;
-        x = tex_desc.normalizedCoords ? x / tex_h.extent().width : x;
+    tex2DKernel<vec4<TestType>><<<dim_grid, dim_block>>>(
+        out_alloc_d.ptr(), offset_x, offset_y, N_x, N_y, tex.object(), tex_h.extent().width,
+        tex_h.extent().height, num_subdivisions, tex_desc.normalizedCoords);
+    HIP_CHECK(hipGetLastError());
 
-        float y = i / N_x;
-        y = (y + offset_y) / num_subdivisions;
-        y = tex_desc.normalizedCoords ? y / tex_h.extent().height : y;
+    HIP_CHECK(hipMemcpy(out_alloc_h.data(), out_alloc_d.ptr(), N_x * N_y * sizeof(vec4<TestType>),
+                        hipMemcpyDeviceToHost));
+    HIP_CHECK(hipDeviceSynchronize());
 
-        INFO("Filtering  mode: " << FilteringModeToString(filter_mode));
-        INFO("Normalized coordinates: " << std::boolalpha << normalized_coords);
-        INFO("Address mode X: " << AddressModeToString(address_mode_x));
-        INFO("Address mode Y: " << AddressModeToString(address_mode_y));
-        INFO("x: " << std::fixed << std::setprecision(30) << x);
-        INFO("y: " << std::fixed << std::setprecision(30) << y);
+    for (auto i = 0u; i < N_x * N_y; ++i) {
+      float x = i % N_x;
+      x = (x + offset_x) / num_subdivisions;
+      x = tex_desc.normalizedCoords ? x / tex_h.extent().width : x;
 
-        const auto ref_val = tex_h.Tex2D(x, y, tex_desc);
-        REQUIRE(ref_val.x == out_alloc_h[i].x);
-        REQUIRE(ref_val.y == out_alloc_h[i].y);
-        REQUIRE(ref_val.z == out_alloc_h[i].z);
-        REQUIRE(ref_val.w == out_alloc_h[i].w);
-      }
+      float y = i / N_x;
+      y = (y + offset_y) / num_subdivisions;
+      y = tex_desc.normalizedCoords ? y / tex_h.extent().height : y;
+
+      INFO("Filtering  mode: " << FilteringModeToString(filter_mode));
+      INFO("Normalized coordinates: " << std::boolalpha << normalized_coords);
+      INFO("Address mode X: " << AddressModeToString(address_mode_x));
+      INFO("Address mode Y: " << AddressModeToString(address_mode_y));
+      INFO("x: " << std::fixed << std::setprecision(30) << x);
+      INFO("y: " << std::fixed << std::setprecision(30) << y);
+
+      const auto ref_val = tex_h.Tex2D(x, y, tex_desc);
+      REQUIRE(ref_val.x == out_alloc_h[i].x);
+      REQUIRE(ref_val.y == out_alloc_h[i].y);
+      REQUIRE(ref_val.z == out_alloc_h[i].z);
+      REQUIRE(ref_val.w == out_alloc_h[i].w);
     }
   }
 }

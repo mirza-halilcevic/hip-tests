@@ -45,6 +45,7 @@ set(TEST_SRC
     hipTexObjectTests.cc
     hipTextureObjectTests.cc
     hipBindTextureToMipmappedArray.cc
+    tex1Dfetch.cc
     tex1D.cc
     tex1DLayered.cc
     tex2D.cc

@@ -310,6 +310,10 @@
 		 "Unit_tex2DLayeredGrad_Positive_ReadModeNormalizedFloat - char",
 		 "Unit_tex2DLayeredGrad_Positive_ReadModeNormalizedFloat - unsigned char",
 		 "Unit_tex2DLayeredGrad_Positive_ReadModeNormalizedFloat - short",
-		 "Unit_tex2DLayeredGrad_Positive_ReadModeNormalizedFloat - unsigned short"
+		 "Unit_tex2DLayeredGrad_Positive_ReadModeNormalizedFloat - unsigned short",
+	   "Unit_tex3DLod_Positive_ReadModeElementType",
+	   "Unit_tex3DLod_Positive_ReadModeNormalizedFloat",
+	   "Unit_tex3DGrad_Positive_ReadModeElementType",
+	   "Unit_tex3DGrad_Positive_ReadModeNormalizedFloat"
 	]
 }

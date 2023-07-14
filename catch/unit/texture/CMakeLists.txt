@@ -47,6 +47,8 @@ set(TEST_SRC
     hipBindTextureToMipmappedArray.cc
     tex1D.cc
     tex1DLayered.cc
+    tex2D.cc
+    tex2DLayered.cc
 )
 
 hip_add_exe_to_target(NAME TextureTest

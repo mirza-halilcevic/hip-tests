@@ -1472,3 +1472,10 @@ TEST_CASE("Unit_CalculateAssignUnsigned4D_Negative_Parameters") {}
  * End doxygen group VectorTypeTest.
  * @}
  */
+
+/**
+ * @defgroup VectorTypeTest Vector types
+ * @{
+ * This section describes tests for the Vector type functions and operators.
+ * @}
+ */

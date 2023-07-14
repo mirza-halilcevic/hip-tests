@@ -50,6 +50,8 @@ set(TEST_SRC
     tex2D.cc
     tex2DLayered.cc
     tex3D.cc
+    texCubemap.cc
+    texCubemapLayered.cc
 )
 
 hip_add_exe_to_target(NAME TextureTest

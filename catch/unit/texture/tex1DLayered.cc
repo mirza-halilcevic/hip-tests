@@ -25,32 +25,29 @@ THE SOFTWARE.
 #include "kernels.hh"
 #include "test_fixture.hh"
 
-TEST_CASE("Unit_tex1DLayered_Positive") {
-  using TestType = float;
-
-  TextureTestParams<TestType> params = {0};
-  params.extent = make_hipExtent(1024, 0, 0);
-  params.layers = 2;
-  params.num_subdivisions = 4;
+TEMPLATE_TEST_CASE("Unit_tex1DLayered_Positive", "", char, unsigned char, short, unsigned short,
+                   int, unsigned int, float) {
+  TextureTestParams<TestType> params{make_hipExtent(1024, 0, 0), 2, 4};
   params.GenerateTextureDesc();
 
   TextureTestFixture<TestType> fixture{params};
 
-  const auto [num_threads, num_blocks] = GetLaunchConfig(1024, params.NumItersX());
+  const auto [num_threads, num_blocks] = GetLaunchConfig(1024, params.TotalSamplesX());
 
   for (auto layer = 0u; layer < params.layers; ++layer) {
     tex1DLayeredKernel<vec4<TestType>><<<num_blocks, num_threads>>>(
-        fixture.out_alloc_d.ptr(), params.NumItersX(), fixture.tex.object(), params.Width(),
+        fixture.out_alloc_d.ptr(), params.TotalSamplesX(), fixture.tex.object(), params.Width(),
         params.num_subdivisions, params.tex_desc.normalizedCoords, layer);
 
     fixture.LoadOutput();
 
-    for (auto i = 0u; i < params.NumItersX(); ++i) {
-      float x = GetCoordinate(i, params.NumItersX(), params.Width(), params.num_subdivisions,
+    for (auto i = 0u; i < params.TotalSamplesX(); ++i) {
+      float x = GetCoordinate(i, params.TotalSamplesX(), params.Width(), params.num_subdivisions,
                               params.tex_desc.normalizedCoords);
 
       INFO("Layer: " << layer);
       INFO("Index: " << i);
+      INFO("Filtering  mode: " << FilteringModeToString(params.tex_desc.filterMode));
       INFO("Normalized coordinates: " << std::boolalpha << params.tex_desc.normalizedCoords);
       INFO("Address mode: " << AddressModeToString(params.tex_desc.addressMode[0]));
       INFO("x: " << std::fixed << std::setprecision(16) << x);

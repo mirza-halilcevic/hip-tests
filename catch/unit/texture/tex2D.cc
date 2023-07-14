@@ -25,56 +25,74 @@ THE SOFTWARE.
 #include "kernels.hh"
 #include "test_fixture.hh"
 
-TEST_CASE("Unit_tex2D_Positive") {
-  using TestType = float;
-
-  TextureTestParams<TestType> params = {0};
-  params.extent = make_hipExtent(16, 4, 0);
-  params.num_subdivisions = 4;
+TEMPLATE_TEST_CASE("Unit_tex2D_Positive", "", char, unsigned char, short, unsigned short, int,
+                   unsigned int, float) {
+  TextureTestParams<TestType> params{make_hipExtent(16, 4, 0), 0, 4};
   params.GenerateTextureDesc();
 
   TextureTestFixture<TestType> fixture{params};
 
-  const auto [num_threads_x, num_blocks_x] = GetLaunchConfig(32, params.NumItersX());
-  const auto [num_threads_y, num_blocks_y] = GetLaunchConfig(32, params.NumItersY());
+  size_t num_batches_x = (params.TotalSamplesX() + params.batch_samples - 1) / params.batch_samples;
+  size_t num_batches_y = (params.TotalSamplesY() + params.batch_samples - 1) / params.batch_samples;
+
+  const auto [num_threads, num_blocks] = GetLaunchConfig(32, params.batch_samples);
 
   dim3 dim_grid;
-  dim_grid.x = num_blocks_x;
-  dim_grid.y = num_blocks_y;
+  dim_grid.x = num_blocks;
+  dim_grid.y = num_blocks;
 
   dim3 dim_block;
-  dim_block.x = num_threads_x;
-  dim_block.y = num_threads_y;
+  dim_block.x = num_threads;
+  dim_block.y = num_threads;
 
-  tex2DKernel<vec4<TestType>><<<dim_grid, dim_block>>>(
-      fixture.out_alloc_d.ptr(), params.NumItersX(), params.NumItersY(), fixture.tex.object(),
-      params.Width(), params.Height(), params.num_subdivisions, params.tex_desc.normalizedCoords);
-  HIP_CHECK(hipGetLastError());
+  int64_t offset_y = -static_cast<int64_t>(params.TotalSamplesY()) / 2;
+  int64_t offset_x = -static_cast<int64_t>(params.TotalSamplesX()) / 2;
+  for (auto batch = 0u; batch < num_batches_x * num_batches_y; ++batch) {
+    const auto batch_x = batch % num_batches_x;
+    const auto batch_y = batch / num_batches_x;
 
-  fixture.LoadOutput();
+    offset_x = (batch_x == 0) ? -static_cast<int64_t>(params.TotalSamplesX()) / 2
+                              : offset_x + batch_x * params.batch_samples;
+    offset_y = (batch_x == 0) ? offset_y + batch_y * params.batch_samples : offset_y;
 
-  for (auto j = 0u; j < params.NumItersY(); ++j) {
-    for (auto i = 0u; i < params.NumItersX(); ++i) {
-      float x = GetCoordinate(i, params.NumItersX(), params.Width(), params.num_subdivisions,
-                              params.tex_desc.normalizedCoords);
-      float y = GetCoordinate(j, params.NumItersY(), params.Height(), params.num_subdivisions,
-                              params.tex_desc.normalizedCoords);
+    const size_t N_x =
+        (batch_x == num_batches_x - 1) && (params.TotalSamplesX() % params.batch_samples)
+        ? params.TotalSamplesX() % params.batch_samples
+        : params.batch_samples;
 
-      INFO("i: " << i);
-      INFO("j: " << j);
+    const size_t N_y =
+        (batch_y == num_batches_y - 1) && (params.TotalSamplesY() % params.batch_samples)
+        ? params.TotalSamplesY() % params.batch_samples
+        : params.batch_samples;
+
+    tex2DKernel<vec4<TestType>><<<dim_grid, dim_block>>>(
+        fixture.out_alloc_d.ptr(), offset_x, offset_y, N_x, N_y, fixture.tex.object(),
+        params.Width(), params.Height(), params.num_subdivisions, params.tex_desc.normalizedCoords);
+    HIP_CHECK(hipGetLastError());
+
+    fixture.LoadOutput();
+
+    for (auto i = 0u; i < N_x * N_y; ++i) {
+      float x = i % N_x;
+      x = GetCoordinate(x, offset_x, params.Width(), params.num_subdivisions,
+                        params.tex_desc.normalizedCoords);
+
+      float y = i / N_x;
+      y = GetCoordinate(y, offset_y, params.Height(), params.num_subdivisions,
+                        params.tex_desc.normalizedCoords);
+
+      INFO("Filtering  mode: " << FilteringModeToString(params.tex_desc.filterMode));
       INFO("Normalized coordinates: " << std::boolalpha << params.tex_desc.normalizedCoords);
       INFO("Address mode X: " << AddressModeToString(params.tex_desc.addressMode[0]));
       INFO("Address mode Y: " << AddressModeToString(params.tex_desc.addressMode[1]));
       INFO("x: " << std::fixed << std::setprecision(16) << x);
       INFO("y: " << std::fixed << std::setprecision(16) << y);
 
-      auto index = j * params.NumItersX() + i;
-
       const auto ref_val = fixture.tex_h.Tex2D(x, y, params.tex_desc);
-      REQUIRE(ref_val.x == fixture.out_alloc_h[index].x);
-      REQUIRE(ref_val.y == fixture.out_alloc_h[index].y);
-      REQUIRE(ref_val.z == fixture.out_alloc_h[index].z);
-      REQUIRE(ref_val.w == fixture.out_alloc_h[index].w);
+      REQUIRE(ref_val.x == fixture.out_alloc_h[i].x);
+      REQUIRE(ref_val.y == fixture.out_alloc_h[i].y);
+      REQUIRE(ref_val.z == fixture.out_alloc_h[i].z);
+      REQUIRE(ref_val.w == fixture.out_alloc_h[i].w);
     }
   }
 }

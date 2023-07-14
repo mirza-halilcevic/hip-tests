@@ -31,21 +31,35 @@ THE SOFTWARE.
 
 template <typename TestType> struct TextureTestParams {
   hipExtent extent;
-  size_t layers;
+  size_t layers = 0;
   size_t num_subdivisions;
   hipTextureDesc tex_desc;
+  const unsigned int batch_samples = BatchSamples();
+
+  unsigned int BatchSamples() const {
+    hipDeviceProp_t props = {};
+    HIP_CHECK(hipGetDeviceProperties(&props, 0));
+    uint64_t device_memory = props.totalGlobalMem * 0.80 - Size() * sizeof(vec4<TestType>);
+
+    const uint64_t max_samples = device_memory / sizeof(vec4<TestType>);
+    return std::pow(std::min(TotalSamples(), max_samples), 1.f / NumDims());
+  }
+
+  size_t OutputSize() const { return std::pow(batch_samples, NumDims()); }
+
+  size_t NumDims() const { return (extent.width > 0) + (extent.height > 0) + (extent.depth > 0); }
 
   size_t Size() const {
     return extent.width * (extent.height ?: 1) * (extent.depth ?: 1) * (layers ?: 1);
   }
 
-  size_t NumItersX() const { return 3 * extent.width * num_subdivisions * 2 + 1; }
+  size_t TotalSamplesX() const { return 3 * extent.width * num_subdivisions * 2 + 1; }
 
-  size_t NumItersY() const { return 3 * extent.height * num_subdivisions * 2 + 1; }
+  size_t TotalSamplesY() const { return 3 * extent.height * num_subdivisions * 2 + 1; }
 
-  size_t NumItersZ() const { return 3 * extent.depth * num_subdivisions * 2 + 1; }
+  size_t TotalSamplesZ() const { return 3 * extent.depth * num_subdivisions * 2 + 1; }
 
-  size_t NumIters() const { return NumItersX() * NumItersY() * NumItersZ(); }
+  size_t TotalSamples() const { return TotalSamplesX() * TotalSamplesY() * TotalSamplesZ(); }
 
   size_t Width() const { return extent.width; }
 
@@ -117,8 +131,8 @@ template <typename TestType, bool normalized_read = false> struct TextureTestFix
         tex_h{host_alloc.ptr(), params.extent, params.layers},
         tex_alloc_d{params.LayeredExtent(), params.Layered() ? hipArrayLayered : 0u},
         tex{ResDesc(), &params.tex_desc},
-        out_alloc_d{LinearAllocs::hipMalloc, sizeof(OutType) * params.NumIters()},
-        out_alloc_h(params.NumIters()) {}
+        out_alloc_d{LinearAllocs::hipMalloc, sizeof(OutType) * params.OutputSize()},
+        out_alloc_h(params.OutputSize()) {}
 
   hipResourceDesc* ResDesc() {
     constexpr int test_value_offset = 7;
@@ -143,8 +157,8 @@ template <typename TestType, bool normalized_read = false> struct TextureTestFix
   }
 
   void LoadOutput() {
-    HIP_CHECK(hipMemcpy(out_alloc_h.data(), out_alloc_d.ptr(), sizeof(OutType) * params.NumIters(),
-                        hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(out_alloc_h.data(), out_alloc_d.ptr(),
+                        sizeof(OutType) * params.OutputSize(), hipMemcpyDeviceToHost));
     HIP_CHECK(hipDeviceSynchronize());
   }
 };

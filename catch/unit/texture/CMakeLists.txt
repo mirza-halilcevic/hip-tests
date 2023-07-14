@@ -56,6 +56,10 @@ set(TEST_SRC
     tex1DLayeredGrad.cc
     tex1DLayeredLod.cc
     tex1DLod.cc
+    tex2DGrad.cc
+    tex2DLayeredGrad.cc
+    tex2DLod.cc
+    tex2DLayeredLod.cc
 )
 
 hip_add_exe_to_target(NAME TextureTest

@@ -25,8 +25,31 @@ THE SOFTWARE.
 #include "kernels.hh"
 #include "test_fixture.hh"
 
+/**
+ * @addtogroup tex1D tex1D
+ * @{
+ * @ingroup TextureTest
+ */
+
+/**
+ * Test Description
+ * ------------------------
+ *    - Test texture fetching with `tex1D` and read mode set to `hipReadModeElementType`. The test
+ * is performed with:
+ *      - normalized coordinates
+ *      - non-normalized coordinates
+ *      - Nearest-point sampling
+ *      - Linear filtering
+ *      - All combinations of different addressing modes.
+ * Test source
+ * ------------------------
+ *    - unit/texture/tex1D.cc
+ * Test requirements
+ * ------------------------
+ *    - HIP_VERSION >= 5.2
+ */
 TEMPLATE_TEST_CASE("Unit_tex1D_Positive_ReadModeElementType", "", char, unsigned char, short,
-                   unsigned short, float) {
+                   unsigned short, int, unsigned int, float) {
   TextureTestParams<TestType> params = {0};
   params.extent = make_hipExtent(1024, 0, 0);
   params.num_subdivisions = 4;
@@ -46,6 +69,7 @@ TEMPLATE_TEST_CASE("Unit_tex1D_Positive_ReadModeElementType", "", char, unsigned
                             params.tex_desc.normalizedCoords);
 
     INFO("Index: " << i);
+    INFO("Filtering mode: " << FilteringModeToString(params.tex_desc.filterMode));
     INFO("Normalized coordinates: " << std::boolalpha << params.tex_desc.normalizedCoords);
     INFO("Address mode: " << AddressModeToString(params.tex_desc.addressMode[0]));
     INFO("x: " << std::fixed << std::setprecision(16) << x);
@@ -58,6 +82,23 @@ TEMPLATE_TEST_CASE("Unit_tex1D_Positive_ReadModeElementType", "", char, unsigned
   }
 }
 
+/**
+ * Test Description
+ * ------------------------
+ *    - Test texture fetching with `tex1D` and read mode set to `hipReadModeNormalizedFloat`. The
+ * test is performed with:
+ *      - normalized coordinates
+ *      - non-normalized coordinates
+ *      - Nearest-point sampling
+ *      - Linear filtering
+ *      - All combinations of different addressing modes.
+ * Test source
+ * ------------------------
+ *    - unit/texture/tex1D.cc
+ * Test requirements
+ * ------------------------
+ *    - HIP_VERSION >= 5.2
+ */
 TEMPLATE_TEST_CASE("Unit_tex1D_Positive_ReadModeNormalizedFloat", "", char, unsigned char, short,
                    unsigned short) {
   TextureTestParams<TestType> params = {0};
@@ -78,7 +119,8 @@ TEMPLATE_TEST_CASE("Unit_tex1D_Positive_ReadModeNormalizedFloat", "", char, unsi
     float x = GetCoordinate(i, params.NumItersX(), params.Width(), params.num_subdivisions,
                             params.tex_desc.normalizedCoords);
 
-    INFO("Index: " << i);
+    INFO("i: " << i);
+    INFO("Filtering mode: " << FilteringModeToString(params.tex_desc.filterMode));
     INFO("Normalized coordinates: " << std::boolalpha << params.tex_desc.normalizedCoords);
     INFO("Address mode: " << AddressModeToString(params.tex_desc.addressMode[0]));
     INFO("Filter mode: " << FilteringModeToString(params.tex_desc.filterMode));

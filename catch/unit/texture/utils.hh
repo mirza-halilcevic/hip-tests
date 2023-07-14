@@ -47,12 +47,9 @@ class TextureGuard {
 template <typename T> std::enable_if_t<std::is_integral_v<T>, float> NormalizeInteger(const T x) {
   // On the GPU, -1.0 will be returned both  for the minimum value of a signed type and its
   // successor e.g. for char, -1.0 will be returned for both -128 and -127.
-  // auto xf = std::abs(static_cast<float>(x));
-  // xf = std::min<float>(xf, std::numeric_limits<T>::max());
-  // return std::copysign(xf / std::numeric_limits<T>::max(), x);
-
-  return x < 0 ? -static_cast<float>(x) / std::numeric_limits<T>::min()
-               : static_cast<float>(x) / std::numeric_limits<T>::max();
+  auto xf = std::abs(static_cast<float>(x));
+  xf = std::min<float>(xf, std::numeric_limits<T>::max());
+  return std::copysign(xf / std::numeric_limits<T>::max(), x);
 }
 
 inline std::tuple<size_t, size_t> GetLaunchConfig(size_t max_num_threads, size_t num_iters) {

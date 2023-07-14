@@ -68,9 +68,12 @@ template <typename T> inline auto MakeVec4(const T val) {
   return vec;
 }
 
-template <typename T> inline void MakeVec4(const T x, const T y, const T z, const T w) {
+template <typename T> inline auto MakeVec4(const T x, const T y, const T z, const T w) {
   vec4<T> vec;
-  SetVec4(vec, x, y, z, w);
+  vec.x = x;
+  vec.y = y; 
+  vec.z = z;
+  vec.w = w;
 
   return vec;
 }

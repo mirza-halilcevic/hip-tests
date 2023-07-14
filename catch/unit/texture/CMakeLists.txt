@@ -44,6 +44,7 @@ set(TEST_SRC
     hipTextureObj2DCheckSRGBModes.cc
     tex2D.cc
     tex2DLayered.cc
+    tex2Dgather.cc
 )
 
 hip_add_exe_to_target(NAME TextureTest

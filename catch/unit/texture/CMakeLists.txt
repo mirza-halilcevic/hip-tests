@@ -51,6 +51,8 @@ set(TEST_SRC
     tex2DLayered.cc
     tex3D.cc
     texCubemap.cc
+    texCubemapLod.cc
+    texCubemapGrad.cc
     texCubemapLayered.cc
     tex1DGrad.cc
     tex1DLayeredGrad.cc
@@ -62,6 +64,8 @@ set(TEST_SRC
     tex2DLayeredLod.cc
     tex3DLod.cc
     tex3DGrad.cc
+    texCubemapLayeredLod.cc
+    texCubemapLayeredGrad.cc
 )
 
 hip_add_exe_to_target(NAME TextureTest

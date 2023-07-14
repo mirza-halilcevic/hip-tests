@@ -3,6 +3,7 @@ set(TEST_SRC
   hipOccupancyMaxActiveBlocksPerMultiprocessor.cc
   hipOccupancyMaxActiveBlocksPerMultiprocessor_old.cc
   hipOccupancyMaxPotentialBlockSize.cc
+  hipOccupancyMaxPotentialBlockSize_old.cc
   hipOccupancyMaxPotentialBlockSizeVariableSMemWithFlags.cc
   hipOccupancyMaxPotentialBlockSize_old.cc
   hipModuleOccupancyMaxPotentialBlockSize.cc

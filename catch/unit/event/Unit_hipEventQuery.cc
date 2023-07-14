@@ -81,19 +81,14 @@ TEST_CASE("Unit_hipEventQuery_DifferentDevice") {
   HIP_CHECK(hipStreamCreate(&stream));
   REQUIRE(stream != nullptr);
 
-  hipDeviceProp_t prop{};
-  HIP_CHECK(hipGetDeviceProperties(&prop, 0));
-  auto clockRate = prop.clockRate;
-
-  // Start kernel on 1st device
+  HipTest::BlockingContext b_context1{stream};  // og context
+  // Block stream
   {
     HIP_CHECK(hipSetDevice(0));
     HIP_CHECK(hipEventRecord(event1, stream));
 
-    auto waitKernel_used = IsGfx11() ? waitKernel_gfx11 : waitKernel;
-    // Start kernel and wait for 3 seconds
-    // Make sure you increase this time if you add more tests here
-    waitKernel_used<<<1, 1, 0, stream>>>(clockRate, 3);
+    b_context1.block_stream();  // blocked stream
+    REQUIRE(b_context1.is_blocked());
 
     HIP_CHECK(hipEventRecord(event2, stream));
 
@@ -101,7 +96,7 @@ TEST_CASE("Unit_hipEventQuery_DifferentDevice") {
     HIP_CHECK(hipEventQuery(event1));  // Should be done
 
     HIP_CHECK_ERROR(hipEventQuery(event2),
-                    hipErrorNotReady);  // Wont be done since kernel is waiting
+                    hipErrorNotReady);  // Wont be done since stream is blocked
   }
 
   // If other devices are available, set it
@@ -114,8 +109,8 @@ TEST_CASE("Unit_hipEventQuery_DifferentDevice") {
     HIP_CHECK(hipEventQuery(event1));
     HIP_CHECK_ERROR(hipEventQuery(event2), hipErrorNotReady);
 
-    // Sync
-    // if it hangs here it means GPU kernel cant see the value update by atomic store
+    b_context1.unblock_stream();
+
     HIP_CHECK(hipEventSynchronize(event2));
 
     // Query, should be done now

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021 - 2022 Advanced Micro Devices, Inc. All rights reserved.
+Copyright (c) 2021 - 2023 Advanced Micro Devices, Inc. All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -1469,13 +1469,37 @@ TEST_CASE("Unit_CalculateAssignUnsigned4D_Negative_Parameters") {}
  */
 
 /**
- * End doxygen group VectorTypeTest.
+ * @defgroup DynamicLoadingTest Kernel Loading Management
+ * @{
+ * This section describes the different kernel launch approaches.
  * @}
  */
+
+/**
+ * @defgroup MemoryTest memory Management APIs
+ * @{
+ * This section describes the memory management types & functions of HIP runtime API.
+ * @}
+ */
+
 
 /**
  * @defgroup VectorTypeTest Vector types
  * @{
  * This section describes tests for the Vector type functions and operators.
+ * @}
+ */
+
+/**
+ * @defgroup KernelTest Kernel Functions Management
+ * @{
+ * This section describes the various kernel functions invocation.
+ * @}
+ */
+
+/**
+ * @defgroup ComplexTest Complex type
+ * @{
+ * This section describes tests for the Complex type functions.
  * @}
  */

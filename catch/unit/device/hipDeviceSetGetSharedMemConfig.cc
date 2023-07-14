@@ -54,11 +54,7 @@ TEST_CASE("Unit_hipDeviceSetSharedMemConfig_Positive_Basic") {
   HIP_CHECK(hipSetDevice(device));
   INFO("Current device is " << device);
 
-#if HT_AMD
-  HIP_CHECK_ERROR(hipDeviceSetSharedMemConfig(mem_config), hipErrorNotSupported);
-#elif HT_NVIDIA
   HIP_CHECK(hipDeviceSetSharedMemConfig(mem_config));
-#endif
 }
 
 /**

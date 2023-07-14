@@ -1,6 +1,5 @@
 /*
-Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
-
+Copyright (c) 2023 Advanced Micro Devices, Inc. All rights reserved.
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
@@ -304,4 +303,49 @@ TEST_CASE("Unit_hipGraphAddMemcpyNode_Negative_Parameters") {
     NegativeTests(dst_alloc.pitched_ptr(), make_hipPos(0, 0, 0), src_alloc.pitched_ptr(),
                   make_hipPos(0, 0, 0), extent, hipMemcpyDeviceToDevice);
   }
+}
+/*
+ * Create two host pointers, copy the data between them by the api
+ * hipGraphAddMemcpyNode with data transfer kind hipMemcpyHostToHost.
+ * Validate the output.
+ */
+TEST_CASE("Unit_hipGraphAddMemcpyNode_HostToHost") {
+  constexpr size_t size = 1024;
+  size_t numW = size * sizeof(int);
+  // Host Vectors
+  std::vector<int> A_h(numW);
+  std::vector<int> B_h(numW);
+  // Initialization
+  std::iota(A_h.begin(), A_h.end(), 0);
+  std::fill_n(B_h.begin(), size, 0);
+
+  hipGraph_t graph;
+  hipStream_t streamForGraph;
+  hipGraphExec_t graphExec;
+  hipGraphNode_t memcpyH2H;
+  HIP_CHECK(hipGraphCreate(&graph, 0));
+  HIP_CHECK(hipStreamCreate(&streamForGraph));
+
+  hipMemcpy3DParms myparms{};
+  myparms.srcPos = make_hipPos(0, 0, 0);
+  myparms.dstPos = make_hipPos(0, 0, 0);
+  myparms.srcPtr = make_hipPitchedPtr(A_h.data(), numW, numW, 1);
+  myparms.dstPtr = make_hipPitchedPtr(B_h.data(), numW, numW, 1);
+  myparms.extent = make_hipExtent(numW, 1, 1);
+  myparms.kind = hipMemcpyHostToHost;
+
+  // Host to Host
+  HIP_CHECK(hipGraphAddMemcpyNode(&memcpyH2H, graph, nullptr, 0, &myparms));
+
+  // Instantiate and launch the graph
+  HIP_CHECK(hipGraphInstantiate(&graphExec, graph, nullptr, nullptr, 0));
+  HIP_CHECK(hipGraphLaunch(graphExec, streamForGraph));
+  HIP_CHECK(hipStreamSynchronize(streamForGraph));
+
+  HIP_CHECK(hipGraphExecDestroy(graphExec));
+  HIP_CHECK(hipGraphDestroy(graph));
+  HIP_CHECK(hipStreamDestroy(streamForGraph));
+
+  // Validation
+  REQUIRE(memcmp(A_h.data(), B_h.data(), numW) == 0);
 }

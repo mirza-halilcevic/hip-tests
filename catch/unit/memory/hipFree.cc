@@ -361,6 +361,10 @@ TEMPLATE_TEST_CASE("Unit_hipFreeImplicitSyncArray", "", char, float, float2, flo
     HIP_CHECK(hipStreamQuery(nullptr));
   }
 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> f5a6a2b8d5021afcb9e97af2abd4019d4a048094
 #endif
 
 /**

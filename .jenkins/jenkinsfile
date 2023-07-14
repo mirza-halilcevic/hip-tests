@@ -35,6 +35,14 @@ def hipBuildTest(String backendLabel) {
                    env.ROCclr_DIR = "${WORKSPACE}" + "/ROCclr"
                }
             }
+
+            // Clone hipcc repspoitory
+            dir("${WORKSPACE}/hipcc") {
+              git branch: 'develop',
+              credentialsId: 'branch-credentials',
+              url: 'https://github.com/ROCm-Developer-Tools/hipcc'
+              env.HIPCC_DIR = "${WORKSPACE}" + "/hipcc"
+            }
         }
 
         stage("BUILD HIP - ${backendLabel}") {

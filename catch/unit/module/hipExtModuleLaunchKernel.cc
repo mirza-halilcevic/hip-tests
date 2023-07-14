@@ -1,5 +1,6 @@
 /*
-Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
+Copyright (c) 2023 Advanced Micro Devices, Inc. All rights reserved.
+
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
@@ -28,7 +29,7 @@ THE SOFTWARE.
  * @addtogroup hipExtModuleLaunchKernel hipExtModuleLaunchKernel
  * @{
  * @ingroup ModuleTest
- * `hipExtModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX, 
+ * `hipExtModuleLaunchKernel(hipFunction_t f, uint32_t globalWorkSizeX,
  * uint32_t globalWorkSizeY, uint32_t globalWorkSizeZ,
  * uint32_t localWorkSizeX, uint32_t localWorkSizeY,
  * uint32_t localWorkSizeZ, size_t sharedMemBytes,

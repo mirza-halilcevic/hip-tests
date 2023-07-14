@@ -88,7 +88,7 @@ TEST_CASE("Unit_hipGraphHostNodeGetParams_Negative") {
     HIP_CHECK_ERROR(hipGraphHostNodeGetParams(hostNode, nullptr), hipErrorInvalidValue);
   }
 
-#if HT_NVIDIA // segfaults on AMD
+#if HT_NVIDIA  // segfaults on AMD
   SECTION("node is not a host node") {
     hipGraphNode_t empty_node;
     HIP_CHECK(hipGraphAddEmptyNode(&empty_node, graph, nullptr, 0));
@@ -268,12 +268,6 @@ void hipGraphHostNodeGetParams_func(bool setparams) {
  */
 TEST_CASE("Unit_hipGraphHostNodeGetParams_BasicFunc") { hipGraphHostNodeGetParams_func(false); }
 
-/*
-This test case verifies hipGraphHostNodeGetParams API by
-adding host node to graph, updates host node params
-using hipGraphHostNodeSetParams  and gets the host params
-validates it
-*/
 /**
  * Test Description
  * ------------------------

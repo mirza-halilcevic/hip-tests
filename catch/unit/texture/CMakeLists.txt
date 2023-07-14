@@ -49,6 +49,7 @@ set(TEST_SRC
     tex1DLayered.cc
     tex2D.cc
     tex2DLayered.cc
+    tex3D.cc
 )
 
 hip_add_exe_to_target(NAME TextureTest

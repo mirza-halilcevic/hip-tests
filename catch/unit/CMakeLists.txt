@@ -48,7 +48,6 @@ add_subdirectory(vulkan_interop)
 add_subdirectory(gl_interop) # Disabled on NVIDIA due to defect - EXSWHTEC-246
 add_subdirectory(virtualMemory)
 endif()
-<<<<<<< HEAD
 add_subdirectory(executionControl)
 add_subdirectory(atomics)
 add_subdirectory(launchBounds)
@@ -56,6 +55,5 @@ add_subdirectory(assertion)
 add_subdirectory(channelDescriptor)
 add_subdirectory(syncthreads)
 add_subdirectory(threadfence)
-=======
 add_subdirectory(atomicBuiltins)
->>>>>>> 9c0cbb47b2652862800aec5889b36c028df59d55
+add_subdirectory(vector_types)

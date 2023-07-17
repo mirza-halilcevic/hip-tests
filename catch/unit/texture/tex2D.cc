@@ -50,51 +50,66 @@ THE SOFTWARE.
  */
 TEMPLATE_TEST_CASE("Unit_tex2D_Positive_ReadModeElementType", "", char, unsigned char, short,
                    unsigned short, int, unsigned int, float) {
-  TextureTestParams<TestType> params = {0};
-  params.extent = make_hipExtent(16, 4, 0);
-  params.num_subdivisions = 4;
+  TextureTestParams<TestType> params{make_hipExtent(16, 4, 0), 0, 4};
   params.GenerateTextureDesc();
 
   TextureTestFixture<TestType> fixture{params};
 
-  const auto [num_threads_x, num_blocks_x] = GetLaunchConfig(32, params.NumItersX());
-  const auto [num_threads_y, num_blocks_y] = GetLaunchConfig(32, params.NumItersY());
+  const auto [num_threads, num_blocks] = GetLaunchConfig(32, params.batch_samples);
+  dim3 dim_grid(num_blocks, num_blocks);
+  dim3 dim_block(num_threads, num_threads);
 
-  dim3 dim_grid;
-  dim_grid.x = num_blocks_x;
-  dim_grid.y = num_blocks_y;
+  size_t num_batches_x = (params.TotalSamplesX() + params.batch_samples - 1) / params.batch_samples;
+  size_t num_batches_y = (params.TotalSamplesY() + params.batch_samples - 1) / params.batch_samples;
 
-  dim3 dim_block;
-  dim_block.x = num_threads_x;
-  dim_block.y = num_threads_y;
+  int64_t offset_y = -static_cast<int64_t>(params.TotalSamplesY()) / 2;
+  int64_t offset_x = -static_cast<int64_t>(params.TotalSamplesX()) / 2;
+  for (auto batch = 0u; batch < num_batches_x * num_batches_y; ++batch) {
+    const auto batch_x = batch % num_batches_x;
+    const auto batch_y = batch / num_batches_x;
 
-  tex2DKernel<vec4<TestType>><<<dim_grid, dim_block>>>(
-      fixture.out_alloc_d.ptr(), params.NumItersX(), params.NumItersY(), fixture.tex.object(),
-      params.Width(), params.Height(), params.num_subdivisions, params.tex_desc.normalizedCoords);
-  HIP_CHECK(hipGetLastError());
+    offset_x = (batch_x == 0) ? -static_cast<int64_t>(params.TotalSamplesX()) / 2
+                              : offset_x + batch_x * params.batch_samples;
+    offset_y = (batch_x == 0) ? offset_y + batch_y * params.batch_samples : offset_y;
 
-  fixture.LoadOutput();
+    const size_t N_x =
+        (batch_x == num_batches_x - 1) && (params.TotalSamplesX() % params.batch_samples)
+        ? params.TotalSamplesX() % params.batch_samples
+        : params.batch_samples;
 
-  for (auto i = 0u; i < params.NumItersX() * params.NumItersY(); ++i) {
-    float x = i % params.NumItersX();
-    float y = i / params.NumItersX();
+    const size_t N_y =
+        (batch_y == num_batches_y - 1) && (params.TotalSamplesY() % params.batch_samples)
+        ? params.TotalSamplesY() % params.batch_samples
+        : params.batch_samples;
 
-    x = GetCoordinate(x, params.NumItersX(), params.Width(), params.num_subdivisions,
-                      params.tex_desc.normalizedCoords);
-    y = GetCoordinate(y, params.NumItersY(), params.Height(), params.num_subdivisions,
-                      params.tex_desc.normalizedCoords);
+    tex2DKernel<vec4<TestType>><<<dim_grid, dim_block>>>(
+        fixture.out_alloc_d.ptr(), offset_x, offset_y, N_x, N_y, fixture.tex.object(),
+        params.Width(), params.Height(), params.num_subdivisions, params.tex_desc.normalizedCoords);
+    HIP_CHECK(hipGetLastError());
 
-    INFO("Normalized coordinates: " << std::boolalpha << params.tex_desc.normalizedCoords);
-    INFO("Address mode X: " << AddressModeToString(params.tex_desc.addressMode[0]));
-    INFO("Address mode Y: " << AddressModeToString(params.tex_desc.addressMode[1]));
-    INFO("x: " << std::fixed << std::setprecision(16) << x);
-    INFO("y: " << std::fixed << std::setprecision(16) << y);
+    fixture.LoadOutput();
 
-    const auto ref_val = fixture.tex_h.Tex2D(x, y, params.tex_desc);
-    REQUIRE(ref_val.x == fixture.out_alloc_h[i].x);
-    REQUIRE(ref_val.y == fixture.out_alloc_h[i].y);
-    REQUIRE(ref_val.z == fixture.out_alloc_h[i].z);
-    REQUIRE(ref_val.w == fixture.out_alloc_h[i].w);
+    for (auto i = 0u; i < N_x * N_y; ++i) {
+      float x = i % N_x;
+      float y = i / N_x;
+
+      x = GetCoordinate(x, offset_x, params.Width(), params.num_subdivisions,
+                        params.tex_desc.normalizedCoords);
+      y = GetCoordinate(y, offset_y, params.Height(), params.num_subdivisions,
+                        params.tex_desc.normalizedCoords);
+
+      INFO("Normalized coordinates: " << std::boolalpha << params.tex_desc.normalizedCoords);
+      INFO("Address mode X: " << AddressModeToString(params.tex_desc.addressMode[0]));
+      INFO("Address mode Y: " << AddressModeToString(params.tex_desc.addressMode[1]));
+      INFO("x: " << std::fixed << std::setprecision(16) << x);
+      INFO("y: " << std::fixed << std::setprecision(16) << y);
+
+      const auto ref_val = fixture.tex_h.Tex2D(x, y, params.tex_desc);
+      REQUIRE(ref_val.x == fixture.out_alloc_h[i].x);
+      REQUIRE(ref_val.y == fixture.out_alloc_h[i].y);
+      REQUIRE(ref_val.z == fixture.out_alloc_h[i].z);
+      REQUIRE(ref_val.w == fixture.out_alloc_h[i].w);
+    }
   }
 }
 
@@ -117,52 +132,67 @@ TEMPLATE_TEST_CASE("Unit_tex2D_Positive_ReadModeElementType", "", char, unsigned
  */
 TEMPLATE_TEST_CASE("Unit_tex2D_Positive_ReadModeNormalizedFloat", "", char, unsigned char, short,
                    unsigned short) {
-  TextureTestParams<TestType> params = {0};
-  params.extent = make_hipExtent(16, 4, 0);
-  params.num_subdivisions = 4;
+  TextureTestParams<TestType> params{make_hipExtent(16, 4, 0), 0, 4};
   params.GenerateTextureDesc(hipReadModeNormalizedFloat);
 
   TextureTestFixture<TestType, true> fixture{params};
 
-  const auto [num_threads_x, num_blocks_x] = GetLaunchConfig(32, params.NumItersX());
-  const auto [num_threads_y, num_blocks_y] = GetLaunchConfig(32, params.NumItersY());
+  const auto [num_threads, num_blocks] = GetLaunchConfig(32, params.batch_samples);
+  dim3 dim_grid(num_blocks, num_blocks);
+  dim3 dim_block(num_threads, num_threads);
 
-  dim3 dim_grid;
-  dim_grid.x = num_blocks_x;
-  dim_grid.y = num_blocks_y;
+  size_t num_batches_x = (params.TotalSamplesX() + params.batch_samples - 1) / params.batch_samples;
+  size_t num_batches_y = (params.TotalSamplesY() + params.batch_samples - 1) / params.batch_samples;
 
-  dim3 dim_block;
-  dim_block.x = num_threads_x;
-  dim_block.y = num_threads_y;
+  int64_t offset_y = -static_cast<int64_t>(params.TotalSamplesY()) / 2;
+  int64_t offset_x = -static_cast<int64_t>(params.TotalSamplesX()) / 2;
+  for (auto batch = 0u; batch < num_batches_x * num_batches_y; ++batch) {
+    const auto batch_x = batch % num_batches_x;
+    const auto batch_y = batch / num_batches_x;
 
-  tex2DKernel<vec4<float>><<<dim_grid, dim_block>>>(
-      fixture.out_alloc_d.ptr(), params.NumItersX(), params.NumItersY(), fixture.tex.object(),
-      params.Width(), params.Height(), params.num_subdivisions, params.tex_desc.normalizedCoords);
-  HIP_CHECK(hipGetLastError());
+    offset_x = (batch_x == 0) ? -static_cast<int64_t>(params.TotalSamplesX()) / 2
+                              : offset_x + batch_x * params.batch_samples;
+    offset_y = (batch_x == 0) ? offset_y + batch_y * params.batch_samples : offset_y;
 
-  fixture.LoadOutput();
+    const size_t N_x =
+        (batch_x == num_batches_x - 1) && (params.TotalSamplesX() % params.batch_samples)
+        ? params.TotalSamplesX() % params.batch_samples
+        : params.batch_samples;
 
-  for (auto i = 0u; i < params.NumItersX() * params.NumItersY(); ++i) {
-    float x = i % params.NumItersX();
-    float y = i / params.NumItersY();
+    const size_t N_y =
+        (batch_y == num_batches_y - 1) && (params.TotalSamplesY() % params.batch_samples)
+        ? params.TotalSamplesY() % params.batch_samples
+        : params.batch_samples;
 
-    x = GetCoordinate(x, params.NumItersX(), params.Width(), params.num_subdivisions,
-                      params.tex_desc.normalizedCoords);
-    y = GetCoordinate(y, params.NumItersY(), params.Height(), params.num_subdivisions,
-                      params.tex_desc.normalizedCoords);
+    tex2DKernel<vec4<float>><<<dim_grid, dim_block>>>(
+        fixture.out_alloc_d.ptr(), offset_x, offset_y, N_x, N_y, fixture.tex.object(),
+        params.Width(), params.Height(), params.num_subdivisions, params.tex_desc.normalizedCoords);
+    HIP_CHECK(hipGetLastError());
 
-    INFO("Filtering mode: " << FilteringModeToString(params.tex_desc.filterMode));
-    INFO("Normalized coordinates: " << std::boolalpha << params.tex_desc.normalizedCoords);
-    INFO("Address mode X: " << AddressModeToString(params.tex_desc.addressMode[0]));
-    INFO("Address mode Y: " << AddressModeToString(params.tex_desc.addressMode[1]));
-    INFO("x: " << std::fixed << std::setprecision(16) << x);
-    INFO("y: " << std::fixed << std::setprecision(16) << y);
+    fixture.LoadOutput();
 
-    auto ref_val =
-        Vec4Map<TestType>(fixture.tex_h.Tex2D(x, y, params.tex_desc), NormalizeInteger<TestType>);
-    REQUIRE(ref_val.x == fixture.out_alloc_h[i].x);
-    REQUIRE(ref_val.y == fixture.out_alloc_h[i].y);
-    REQUIRE(ref_val.z == fixture.out_alloc_h[i].z);
-    REQUIRE(ref_val.w == fixture.out_alloc_h[i].w);
+    for (auto i = 0u; i < N_x * N_y; ++i) {
+      float x = i % N_x;
+      float y = i / N_x;
+
+      x = GetCoordinate(x, offset_x, params.Width(), params.num_subdivisions,
+                        params.tex_desc.normalizedCoords);
+      y = GetCoordinate(y, offset_y, params.Height(), params.num_subdivisions,
+                        params.tex_desc.normalizedCoords);
+
+      INFO("Filtering mode: " << FilteringModeToString(params.tex_desc.filterMode));
+      INFO("Normalized coordinates: " << std::boolalpha << params.tex_desc.normalizedCoords);
+      INFO("Address mode X: " << AddressModeToString(params.tex_desc.addressMode[0]));
+      INFO("Address mode Y: " << AddressModeToString(params.tex_desc.addressMode[1]));
+      INFO("x: " << std::fixed << std::setprecision(16) << x);
+      INFO("y: " << std::fixed << std::setprecision(16) << y);
+
+      auto ref_val =
+          Vec4Map<TestType>(fixture.tex_h.Tex2D(x, y, params.tex_desc), NormalizeInteger<TestType>);
+      REQUIRE(ref_val.x == fixture.out_alloc_h[i].x);
+      REQUIRE(ref_val.y == fixture.out_alloc_h[i].y);
+      REQUIRE(ref_val.z == fixture.out_alloc_h[i].z);
+      REQUIRE(ref_val.w == fixture.out_alloc_h[i].w);
+    }
   }
 }

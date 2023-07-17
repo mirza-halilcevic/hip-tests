@@ -27,9 +27,9 @@ THE SOFTWARE.
 
 namespace cg = cooperative_groups;
 
-__host__ __device__ inline float GetCoordinate(size_t iteration, size_t N, size_t dim,
+__host__ __device__ inline float GetCoordinate(size_t iteration, int64_t offset, size_t dim,
                                                size_t num_subdivisions, bool normalized_coords) {
-  float x = (static_cast<float>(iteration) - N / 2) / num_subdivisions;
+  float x = (static_cast<float>(iteration) + offset) / num_subdivisions;
   return normalized_coords ? x / dim : x;
 }
 
@@ -60,8 +60,8 @@ __global__ void tex2DgatherKernel(TexelType* const out, int comp, size_t N_x, si
 }
 
 template <typename TexelType>
-__global__ void tex2DKernel(TexelType* const out, size_t N_x, size_t N_y,
-                            hipTextureObject_t tex_obj, size_t width, size_t height,
+__global__ void tex2DKernel(TexelType* const out, int64_t offset_x, int64_t offset_y, size_t N_x,
+                            size_t N_y, hipTextureObject_t tex_obj, size_t width, size_t height,
                             size_t num_subdivisions, bool normalized_coords) {
   const auto tid_x = blockIdx.x * blockDim.x + threadIdx.x;
   if (tid_x >= N_x) return;
@@ -69,8 +69,8 @@ __global__ void tex2DKernel(TexelType* const out, size_t N_x, size_t N_y,
   const auto tid_y = blockIdx.y * blockDim.y + threadIdx.y;
   if (tid_y >= N_y) return;
 
-  float x = GetCoordinate(tid_x, N_x, width, num_subdivisions, normalized_coords);
-  float y = GetCoordinate(tid_y, N_y, height, num_subdivisions, normalized_coords);
+  float x = GetCoordinate(tid_x, offset_x, width, num_subdivisions, normalized_coords);
+  float y = GetCoordinate(tid_y, offset_y, height, num_subdivisions, normalized_coords);
 
   out[tid_y * N_x + tid_x] = tex2D<TexelType>(tex_obj, x, y);
 }

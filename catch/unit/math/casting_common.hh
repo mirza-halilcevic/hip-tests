@@ -230,6 +230,10 @@ void CastBinaryIntRangeTest(kernel_sig<T1, T2, T2> kernel, ref_sig<T1, T2, T2> r
                             const T2 b = std::numeric_limits<T2>::max()) {
   const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(kernel);
   const auto max_batch_size = GetMaxAllowedDeviceMemoryUsage() / (sizeof(T1) + 2 * sizeof(T2));
+  LinearAllocGuard<T2> values1{LinearAllocs::hipHostMalloc, max_batch_size * sizeof(T2)};
+  LinearAllocGuard<T2> values2{LinearAllocs::hipHostMalloc, max_batch_size * sizeof(T2)};
+
+  MathTest math_test(kernel, max_batch_size);
 
   size_t inserted = 0u;
   for (T2 v = a; v <= b; v++) {

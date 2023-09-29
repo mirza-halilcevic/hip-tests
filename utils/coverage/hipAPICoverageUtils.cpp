@@ -47,7 +47,8 @@ void findAPICallInFile(HipAPI& hip_api, std::string test_module_file) {
   std::string api_member{"." + hip_api.getName() + "("};
   std::string api_newline{"  " + hip_api.getName() + "("};
   std::string api_templated{" " + hip_api.getName() + "<"};
-  std::string api_kernel_def_macro{"_KERNEL_DEF(" + hip_api.getName() + ")"};
+  std::string api_kernel_def_macro{"_KERNEL_DEF(" + hip_api.getName()};
+  std::string api_test_def_macro{"_TEST_DEF(" + hip_api.getName()};
 
   std::string api_restriction{hip_api.getFileRestriction()};
   bool found_restriction{false};
@@ -68,7 +69,8 @@ void findAPICallInFile(HipAPI& hip_api, std::string test_module_file) {
         (line.find(api_newline) != std::string::npos) ||
         (line.find(hip_api.getName() + "(") == 0) ||
         (line.find(api_templated) != std::string::npos) ||
-        (line.find(api_kernel_def_macro) != std::string::npos)) {
+        (line.find(api_kernel_def_macro) != std::string::npos) ||
+        (line.find(api_test_def_macro) != std::string::npos)) {
       if (api_restriction == "" || found_restriction) {
         hip_api.addFileOccurrence(FileOccurrence(test_module_file, line_number));
       }

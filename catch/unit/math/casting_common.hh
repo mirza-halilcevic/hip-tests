@@ -32,28 +32,25 @@ namespace cg = cooperative_groups;
     const auto stride = cg::this_grid().size();                                                    \
                                                                                                    \
     for (auto i = tid; i < num_xs; i += stride) {                                                  \
-      ys[i] = __##func_name(xs[i]);                                                                \
+      ys[i] = func_name(xs[i]);                                                                    \
     }                                                                                              \
   }
 
-#define CAST_RND_RINT_REF_DEF(func_name, T1, T2, round_dir)                                        \
+#define CAST_F2I_REF_DEF(func_name, T1, T2, ref_func)                                              \
   T1 func_name##_ref(T2 arg) {                                                                     \
-    int curr_direction = fegetround();                                                             \
     if (arg >= static_cast<T2>(std::numeric_limits<T1>::max()))                                    \
       return std::numeric_limits<T1>::max();                                                       \
     else if (arg <= static_cast<T2>(std::numeric_limits<T1>::min()))                               \
       return std::numeric_limits<T1>::min();                                                       \
-    fesetround(round_dir);                                                                         \
-    T2 result = std::rint(arg);                                                                    \
-    fesetround(curr_direction);                                                                    \
+    T2 result = ref_func(arg);                                                                     \
     return result;                                                                                 \
   }
 
-#define CAST_RND_RZ_REF_DEF(func_name, T1, T2)                                                     \
+#define CAST_F2I_RZ_REF_DEF(func_name, T1, T2)                                                     \
   T1 func_name##_ref(T2 arg) {                                                                     \
-    if (arg >= static_cast<T2>(std::numeric_limits<T1>::max()))                                    \
+    if (arg >= static_cast<double>(std::numeric_limits<T1>::max()))                                \
       return std::numeric_limits<T1>::max();                                                       \
-    else if (arg <= static_cast<T2>(std::numeric_limits<T1>::min()))                               \
+    else if (arg <= static_cast<double>(std::numeric_limits<T1>::min()))                           \
       return std::numeric_limits<T1>::min();                                                       \
     T1 result = static_cast<T1>(arg);                                                              \
     return result;                                                                                 \
@@ -74,12 +71,65 @@ namespace cg = cooperative_groups;
     return result;                                                                                 \
   }
 
-
 template <typename T1, typename T2> T1 type2_as_type1_ref(T2 arg) {
   T1 tmp;
   memcpy(&tmp, &arg, sizeof(tmp));
   return tmp;
 }
+
+template <typename T, typename RT, typename RTArg, typename ValidatorBuilder>
+void CastUnaryHalfPrecisionBruteForceTest(kernel_sig<T, Float16> kernel,
+                                          ref_sig<RT, RTArg> ref_func,
+                                          const ValidatorBuilder& validator_builder) {
+  const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(kernel);
+  uint64_t stop = std::numeric_limits<uint16_t>::max() + 1ul;
+  const auto max_batch_size =
+      std::min(GetMaxAllowedDeviceMemoryUsage() / (sizeof(Float16) + sizeof(T)), stop);
+  LinearAllocGuard<Float16> values{LinearAllocs::hipHostMalloc, max_batch_size * sizeof(Float16)};
+
+  MathTest math_test(kernel, max_batch_size);
+
+  auto batch_size = max_batch_size;
+  const auto num_threads = thread_pool.thread_count();
+
+  for (uint64_t v = 0u; v < stop;) {
+    batch_size = std::min<uint64_t>(max_batch_size, stop - v);
+
+    const auto min_sub_batch_size = batch_size / num_threads;
+    const auto tail = batch_size % num_threads;
+
+    auto base_idx = 0u;
+    for (auto i = 0u; i < num_threads; ++i) {
+      const auto sub_batch_size = min_sub_batch_size + (i < tail);
+
+      thread_pool.Post([=, &values] {
+        auto t = v;
+        uint16_t val;
+        for (auto j = 0u; j < sub_batch_size; ++j) {
+          val = static_cast<uint16_t>(t++);
+          values.ptr()[base_idx + j] = *reinterpret_cast<Float16*>(&val);
+          if (std::isnan(values.ptr()[base_idx + j]) || std::isinf(values.ptr()[base_idx + j])) {
+            values.ptr()[base_idx + j] = 0;
+          }
+        }
+      });
+
+      v += sub_batch_size;
+      base_idx += sub_batch_size;
+    }
+
+    thread_pool.Wait();
+
+    math_test.Run(validator_builder, grid_size, block_size, ref_func, batch_size, values.ptr());
+  }
+}
+
+template <typename T, typename RT, typename RTArg, typename ValidatorBuilder>
+void CastUnaryHalfPrecisionTest(kernel_sig<T, Float16> kernel, ref_sig<RT, RTArg> ref,
+                                const ValidatorBuilder& validator_builder) {
+  SECTION("Brute force") { CastUnaryHalfPrecisionBruteForceTest(kernel, ref, validator_builder); }
+}
+
 
 template <typename T, typename ValidatorBuilder>
 void CastDoublePrecisionSpecialValuesTest(kernel_sig<T, double> kernel, ref_sig<T, double> ref_func,
@@ -111,22 +161,19 @@ void CastDoublePrecisionTest(kernel_sig<T, double> kernel, ref_sig<T, double> re
   SECTION("Brute force") { UnaryDoublePrecisionBruteForceTest(kernel, ref, validator_builder); }
 }
 
-template <typename T1, typename T2, typename ValidatorBuilder>
-void CastIntRangeTest(kernel_sig<T1, T2> kernel, ref_sig<T1, T2> ref_func,
+template <typename T, typename TArg, typename RT, typename RTArg, typename ValidatorBuilder>
+void CastIntRangeTest(kernel_sig<T, TArg> kernel, ref_sig<RT, RTArg> ref_func,
                       const ValidatorBuilder& validator_builder,
-                      const T2 a = std::numeric_limits<T2>::lowest(),
-                      const T2 b = std::numeric_limits<T2>::max()) {
+                      const TArg a = std::numeric_limits<TArg>::lowest(),
+                      const TArg b = std::numeric_limits<TArg>::max()) {
   const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(kernel);
-  const auto max_batch_size = GetMaxAllowedDeviceMemoryUsage() / (sizeof(T1) + sizeof(T2));
-  LinearAllocGuard<T2> values{LinearAllocs::hipHostMalloc, max_batch_size * sizeof(T2)};
+  const auto max_batch_size = GetMaxAllowedDeviceMemoryUsage() / (sizeof(T) + sizeof(TArg));
+  LinearAllocGuard<TArg> values{LinearAllocs::hipHostMalloc, max_batch_size * sizeof(TArg)};
 
   MathTest math_test(kernel, max_batch_size);
 
-  uint32_t val = 0u;
-  const auto num_threads = thread_pool.thread_count();
-
   size_t inserted = 0u;
-  for (T2 v = a; v <= b; v++) {
+  for (TArg v = a; v <= b; v++) {
     values.ptr()[inserted++] = v;
     if (inserted < max_batch_size) continue;
 
@@ -135,16 +182,16 @@ void CastIntRangeTest(kernel_sig<T1, T2> kernel, ref_sig<T1, T2> ref_func,
   }
 }
 
-template <typename T1, typename T2, typename ValidatorBuilder>
-void CastIntBruteForceTest(kernel_sig<T1, T2> kernel, ref_sig<T1, T2> ref_func,
+template <typename T, typename TArg, typename RT, typename RTArg, typename ValidatorBuilder>
+void CastIntBruteForceTest(kernel_sig<T, TArg> kernel, ref_sig<RT, RTArg> ref_func,
                            const ValidatorBuilder& validator_builder,
-                           const T2 a = std::numeric_limits<T2>::lowest(),
-                           const T2 b = std::numeric_limits<T2>::max()) {
+                           const TArg a = std::numeric_limits<TArg>::lowest(),
+                           const TArg b = std::numeric_limits<TArg>::max()) {
   const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(kernel);
   const uint64_t num_iterations = GetTestIterationCount();
   const auto max_batch_size =
-      std::min(GetMaxAllowedDeviceMemoryUsage() / (sizeof(T1) + sizeof(T2)), num_iterations);
-  LinearAllocGuard<T2> values{LinearAllocs::hipHostMalloc, max_batch_size * sizeof(T2)};
+      std::min(GetMaxAllowedDeviceMemoryUsage() / (sizeof(T) + sizeof(TArg)), num_iterations);
+  LinearAllocGuard<TArg> values{LinearAllocs::hipHostMalloc, max_batch_size * sizeof(TArg)};
 
   MathTest math_test(kernel, max_batch_size);
 
@@ -162,8 +209,8 @@ void CastIntBruteForceTest(kernel_sig<T1, T2> kernel, ref_sig<T1, T2> ref_func,
       thread_pool.Post([=, &values] {
         const auto generator = [=] {
           static thread_local std::mt19937 rng(std::random_device{}());
-          std::uniform_int_distribution<T2> unif_dist(a, b);
-          return static_cast<T2>(unif_dist(rng));
+          std::uniform_int_distribution<TArg> unif_dist(a, b);
+          return static_cast<TArg>(unif_dist(rng));
         };
         std::generate(values.ptr() + base_idx, values.ptr() + base_idx + sub_batch_size, generator);
       });
@@ -182,15 +229,7 @@ void CastBinaryIntRangeTest(kernel_sig<T1, T2, T2> kernel, ref_sig<T1, T2, T2> r
                             const T2 a = std::numeric_limits<T2>::lowest(),
                             const T2 b = std::numeric_limits<T2>::max()) {
   const auto [grid_size, block_size] = GetOccupancyMaxPotentialBlockSize(kernel);
-  uint64_t stop = std::numeric_limits<uint32_t>::max() + 1ul;
   const auto max_batch_size = GetMaxAllowedDeviceMemoryUsage() / (sizeof(T1) + 2 * sizeof(T2));
-  LinearAllocGuard<T2> values1{LinearAllocs::hipHostMalloc, max_batch_size * sizeof(T2)};
-  LinearAllocGuard<T2> values2{LinearAllocs::hipHostMalloc, max_batch_size * sizeof(T2)};
-
-  MathTest math_test(kernel, max_batch_size);
-
-  uint32_t val = 0u;
-  const auto num_threads = thread_pool.thread_count();
 
   size_t inserted = 0u;
   for (T2 v = a; v <= b; v++) {

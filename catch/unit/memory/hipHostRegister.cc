@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
+Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -20,9 +20,19 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+/**
+ * @addtogroup hipHostRegister hipHostRegister
+ * @{
+ * @ingroup MemoryTest
+ * `hipError_t hipHostRegister (void *hostPtr, size_t sizeBytes, unsigned int flags)` -
+ * register host memory so it can be accessed from the current device.
+ */
+
 #include "hip/hip_runtime_api.h"
 #include <hip_test_common.hh>
 #include <hip_test_helper.hh>
+#include <hip_test_process.hh>
+#include <hip_test_defgroups.hh>
 #include <utils.hh>
 
 /**
@@ -34,7 +44,24 @@ THE SOFTWARE.
  */
 
 #define OFFSET 128
+#define INITIAL_VAL 1
+#define EXPECTED_VAL 2
+#define ITERATION 100
+#define ADDITIONAL_MEMORY_PERCENT 10
+
 static constexpr auto LEN{1024 * 1024};
+static constexpr auto LARGE_CHUNK_LEN{100 * LEN};
+static constexpr auto SMALL_CHUNK_LEN{10 * LEN};
+
+#if HT_AMD
+#define TEST_SKIP(arch, msg) \
+  if (std::string::npos == arch.find("xnack+")) {\
+    HipTest::HIP_SKIP_TEST(msg);\
+    return;\
+  }
+#else
+#define TEST_SKIP(arch, msg)
+#endif
 
 template <typename T> __global__ void Inc(T* Ad) {
   int tx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -42,7 +69,8 @@ template <typename T> __global__ void Inc(T* Ad) {
 }
 
 template <typename T>
-void doMemCopy(size_t numElements, int offset, T* A, T* Bh, T* Bd, bool internalRegister) {
+void doMemCopy(size_t numElements, int offset, T* A, T* Bh, T* Bd,
+               bool internalRegister) {
   constexpr auto memsetval = 13.0f;
   A = A + offset;
   numElements -= offset;
@@ -92,7 +120,7 @@ void doMemCopy(size_t numElements, int offset, T* A, T* Bh, T* Bd, bool internal
 TEMPLATE_TEST_CASE("Unit_hipHostRegister_ReferenceFromKernelandhipMemset", "", int, float, double) {
   size_t sizeBytes{LEN * sizeof(TestType)};
   TestType *A, **Ad;
-  int num_devices;
+  int num_devices = 0;
   HIP_CHECK(hipGetDeviceCount(&num_devices));
   Ad = new TestType*[num_devices];
   A = reinterpret_cast<TestType*>(malloc(sizeBytes));
@@ -144,7 +172,6 @@ TEMPLATE_TEST_CASE("Unit_hipHostRegister_Memcpy", "", int, float, double) {
   // 0 refers to malloc
   auto mem_type = GENERATE(0, 1);
   HIP_CHECK(hipSetDevice(0));
-
 
   size_t sizeBytes = LEN * sizeof(TestType);
   TestType* A = reinterpret_cast<TestType*>(malloc(sizeBytes));
@@ -216,9 +243,9 @@ TEMPLATE_TEST_CASE("Unit_hipHostRegister_Flags", "", int, float, double) {
     HIP_CHECK(hipHostRegister(hostPtr, sizeBytes, flags.value));
     HIP_CHECK(hipHostUnregister(hostPtr));
   } else {
-    HIP_CHECK_ERROR(hipHostRegister(hostPtr, sizeBytes, flags.value), hipErrorInvalidValue);
+    HIP_CHECK_ERROR(hipHostRegister(hostPtr, sizeBytes, flags.value),
+    hipErrorInvalidValue);
   }
-
   free(hostPtr);
 }
 
@@ -256,12 +283,14 @@ TEMPLATE_TEST_CASE("Unit_hipHostRegister_Negative", "", int, float, double) {
 
   size_t devMemAvail{0}, devMemFree{0};
   HIP_CHECK(hipMemGetInfo(&devMemFree, &devMemAvail));
-  auto hostMemFree = HipTest::getMemoryAmount() /* In MB */ * 1024 * 1024;  // In bytes
+  auto hostMemFree =
+  HipTest::getMemoryAmount() /* In MB */ * 1024 * 1024;  // In bytes
   REQUIRE(devMemFree > 0);
   REQUIRE(devMemAvail > 0);
   REQUIRE(hostMemFree > 0);
 
-  size_t memFree = (std::max)(devMemFree, hostMemFree);  // which is the limiter cpu or gpu
+  // which is the limiter cpu or gpu
+  size_t memFree = (std::max)(devMemFree, hostMemFree);
 
   SECTION("hipHostRegister Negative Test - invalid memory size") {
     HIP_CHECK_ERROR(hipHostRegister(hostPtr, memFree, 0), hipErrorInvalidValue);

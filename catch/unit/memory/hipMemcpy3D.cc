@@ -36,6 +36,8 @@ THE SOFTWARE.
  * Copies data between host and device.
  */
 
+#pragma clang diagnostic ignored "-Wunused-variable"
+
 /**
  * Test Description
  * ------------------------

@@ -33,6 +33,22 @@ THE SOFTWARE.
  * Free memory allocated by the hcc hip memory allocation API.
  */
 
+#include <utils.hh>
+/*
+ * This testcase verifies [ hipFree || hipFreeArray || hipFreeType::ArrayDestroy ||
+ * hipFreeType::HostFree with hipHostMalloc ]
+ * 1. Check that hipFree implicitly synchronises the device.
+ * 2. Perform multiple allocations and then call hipFree on each pointer concurrently (from unique
+ * threads) for different memory types and different allocation sizes.
+ * 3. Pass nullptr as argument and check that no operation is performed and hipSuccess is returned.
+ * 4. Pass an invalid ptr and check that hipErrorInvalidValue is returned.
+ * 5. Call hipFree twice on the same pointer and check that the implementation handles the second
+ * call correctly.
+ * 6. HipFreeType::HostFree only:
+ *    Try to free memory that has been registered with hipHostRegister and check that
+ * hipErrorInvalidValue is returned.
+ */
+
 enum class FreeType { DevFree, ArrayFree, ArrayDestroy, HostFree };
 
 // Amount of time kernel should wait
@@ -58,7 +74,7 @@ TEST_CASE("Unit_hipFreeImplicitSyncDev") {
   size_t size_mult = GENERATE(1, 32, 64, 128, 256);
   HIP_CHECK(hipMalloc(&devPtr, sizeof(*devPtr) * size_mult));
 
-  HipTest::runKernelForDuration(delay);
+  LaunchDelayKernel(delay);
   // make sure device is busy
   HIP_CHECK_ERROR(hipStreamQuery(nullptr), hipErrorNotReady);
   HIP_CHECK(hipFree(devPtr));
@@ -177,7 +193,7 @@ TEST_CASE("Unit_hipFreeImplicitSyncHost") {
 
   HIP_CHECK(hipHostMalloc(&hostPtr, sizeof(*hostPtr) * size_mult));
 
-  HipTest::runKernelForDuration(delay);
+  LaunchDelayKernel(delay);
   // make sure device is busy
   HIP_CHECK_ERROR(hipStreamQuery(nullptr), hipErrorNotReady);
   HIP_CHECK(hipHostFree(hostPtr));
@@ -317,7 +333,7 @@ TEMPLATE_TEST_CASE("Unit_hipFreeImplicitSyncArray", "", char, float, float2, flo
     hipChannelFormatDesc desc = hipCreateChannelDesc<TestType>();
 
     HIP_CHECK(hipMallocArray(&arrayPtr, &desc, width, height, hipArrayDefault));
-    HipTest::runKernelForDuration(delay);
+    LaunchDelayKernel(delay);
     // make sure device is busy
     HIP_CHECK_ERROR(hipStreamQuery(nullptr), hipErrorNotReady);
     HIP_CHECK(hipFreeArray(arrayPtr));
@@ -332,7 +348,7 @@ TEMPLATE_TEST_CASE("Unit_hipFreeImplicitSyncArray", "", char, float, float2, flo
     cuDesc.Format = vec_info::format;
     cuDesc.NumChannels = vec_info::size;
     HIP_CHECK(hipArrayCreate(&cuArrayPtr, &cuDesc));
-    HipTest::runKernelForDuration(delay);
+    LaunchDelayKernel(delay);
     // make sure device is busy
     HIP_CHECK_ERROR(hipStreamQuery(nullptr), hipErrorNotReady);
     HIP_CHECK(hipArrayDestroy(cuArrayPtr));
@@ -348,7 +364,7 @@ TEMPLATE_TEST_CASE("Unit_hipFreeImplicitSyncArray", "", char, float, float2, flo
   hipChannelFormatDesc desc = hipCreateChannelDesc<TestType>();
 
   HIP_CHECK(hipMallocArray(&arrayPtr, &desc, extent.width, extent.height, hipArrayDefault));
-  HipTest::runKernelForDuration(delay);
+  LaunchDelayKernel(delay);
   // make sure device is busy
   HIP_CHECK_ERROR(hipStreamQuery(nullptr), hipErrorNotReady);
   // Second free segfaults

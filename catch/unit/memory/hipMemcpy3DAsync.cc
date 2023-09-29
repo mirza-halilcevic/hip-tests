@@ -28,6 +28,8 @@ THE SOFTWARE.
 #include <resource_guards.hh>
 #include <utils.hh>
 
+#pragma clang diagnostic ignored "-Wunused-variable"
+
 /**
  * @addtogroup hipMemcpy3DAsync hipMemcpy3DAsync
  * @{
@@ -164,7 +166,7 @@ TEST_CASE("Unit_hipMemcpy3DAsync_Positive_Parameters") {
 TEST_CASE("Unit_hipMemcpy3DAsync_Positive_Array") {
   constexpr bool async = true;
   SECTION("Array from/to Host") { Memcpy3DArrayHostShell<async>(Memcpy3DWrapper<async>); }
-#if HT_NVIDIA  // Disabled on AMD due to defect - EXSWHTEC-238
+#if HT_NVIDIA // Disabled on AMD due to defect - EXSWHTEC-238
   SECTION("Array from/to Device") { Memcpy3DArrayDeviceShell<async>(Memcpy3DWrapper<async>); }
 #endif
 }

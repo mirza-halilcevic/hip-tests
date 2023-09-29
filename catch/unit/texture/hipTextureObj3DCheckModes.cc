@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
+Copyright (c) 2023 Advanced Micro Devices, Inc. All rights reserved.
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
@@ -17,6 +17,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+#pragma clang diagnostic ignored "-Wunused-parameter"
 #include <hip_test_common.hh>
 #include <hip_test_features.hh>
 #include <hip_test_checkers.hh>
@@ -50,8 +51,8 @@ static void runTest(const int width, const int height, const int depth, const fl
                     const float offsetY, const float offsetZ) {
   // printf("%s(addressMode=%d, filterMode=%d, normalizedCoords=%d, width=%d, height=%d, depth=%d,
   // offsetX=%f, offsetY=%f, offsetZ=%f)\n",
-  //    __FUNCTION__, addressMode, filterMode, normalizedCoords, width, height,
-  //    depth, offsetX, offsetY, offsetZ);
+  //     __FUNCTION__, addressMode, filterMode, normalizedCoords, width, height,
+  //     depth, offsetX, offsetY, offsetZ);
   bool result = true;
   unsigned int size = width * height * depth * sizeof(float);
   float* hData = (float*)malloc(size);

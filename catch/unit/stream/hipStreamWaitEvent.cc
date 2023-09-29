@@ -18,6 +18,7 @@ THE SOFTWARE.
 */
 
 #include <hip_test_common.hh>
+#include <utils.hh>
 
 /**
  * @addtogroup hipStreamWaitEvent hipStreamWaitEvent
@@ -224,7 +225,7 @@ TEST_CASE("Unit_hipStreamWaitEvent_DifferentStreams") {
 
   HIP_CHECK(hipStreamWaitEvent(streamBlockedOnStreamA, waitEvent, 0));
 
-  waitKernel_used<<<1, 1, 0, streamBlockedOnStreamA>>>(clockRate, 2);  // Wait for 2 seconds
+  LaunchDelayKernel(std::chrono::milliseconds(2000), streamBlockedOnStreamA);
 
   HIP_CHECK(hipStreamSynchronize(unblockingStream));
 

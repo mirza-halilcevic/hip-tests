@@ -30,9 +30,17 @@ THE SOFTWARE.
  */
 
 /**
- * @defgroup GraphTest Graph Management
+ * @defgroup ContextTest Context Management
  * @{
- * This section describes tests for the graph management types & functions of HIP runtime API.
+ * This section describes tests for the context management functions of HIP runtime API.
+ * @warning All Context Management APIs are **deprecated** and shall not be implemented.
+ * @}
+ */
+
+/**
+ * @defgroup DeviceLanguageTest Device Language
+ * @{
+ * This section describes tests for the Device Language API.
  * @}
  */
 
@@ -44,9 +52,16 @@ THE SOFTWARE.
  */
 
 /**
- * @defgroup EventTest Event Management
+ * @defgroup DriverTest Initialization and Version
  * @{
- * This section describes tests for the event management functions of HIP runtime API.
+ * This section describes tests for the initialization and version functions of HIP runtime API.
+ * @}
+ */
+
+/**
+ * @defgroup DynamicLoadingTest Kernel Loading Management
+ * @{
+ * This section describes the different kernel launch approaches.
  * @}
  */
 
@@ -1166,9 +1181,9 @@ TEST_CASE("Unit_atomicOr_Negative_Parameters") {}
  */
 
 /**
- * @defgroup DeviceLanguageTest Device Language
+ * @defgroup GraphTest Graph Management
  * @{
- * This section describes tests for the Device Language API.
+ * This section describes tests for the graph management types & functions of HIP runtime API.
  * @}
  */
 
@@ -1271,9 +1286,9 @@ TEST_CASE("Unit_StaticAssert_Negative_Basic")
  */
 
 /**
- * @defgroup ShflTest warp shuffle function Management
+ * @defgroup MemoryTest memory Management APIs
  * @{
- * This section describes the warp shuffle types & functions of HIP runtime API.
+ * This section describes the memory management types & functions of HIP runtime API.
  * @}
  */
 
@@ -1469,16 +1484,16 @@ TEST_CASE("Unit_CalculateAssignUnsigned4D_Negative_Parameters") {}
  */
 
 /**
- * @defgroup DynamicLoadingTest Kernel Loading Management
+ * @defgroup StreamTest Stream Management
  * @{
- * This section describes the different kernel launch approaches.
+ * This section describes the stream management types & functions of HIP runtime API.
  * @}
  */
 
 /**
- * @defgroup MemoryTest memory Management APIs
+ * @defgroup TextureTest Texture Management
  * @{
- * This section describes the memory management types & functions of HIP runtime API.
+ * This section describes tests for the texture management functions of HIP runtime API.
  * @}
  */
 
@@ -1493,7 +1508,7 @@ TEST_CASE("Unit_CalculateAssignUnsigned4D_Negative_Parameters") {}
 /**
  * @defgroup KernelTest Kernel Functions Management
  * @{
- * This section describes the various kernel functions invocation.
+ * This section describes tests for the Vector type functions and operators.
  * @}
  */
 

@@ -17,7 +17,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-#include "warp_common.hh"
+#include "warp_shfl_common.hh"
 
 #include <bitset>
 
@@ -43,7 +43,7 @@ __global__ void shfl(T* const out, const T* const in, const uint64_t* const acti
   out[grid.thread_rank()] = __shfl(var, src_lanes[block.thread_rank() % width], width);
 }
 
-template <typename T> class WarpShfl : public WarpTest<WarpShfl<T>, T> {
+template <typename T> class WarpShfl : public WarpShflTest<WarpShfl<T>, T> {
  public:
   void launch_kernel(T* const arr_dev, T* const input_dev, const uint64_t* const active_masks) {
     width_ = generate_width(this->warp_size_);
@@ -99,9 +99,8 @@ template <typename T> class WarpShfl : public WarpTest<WarpShfl<T>, T> {
  *  - HIP_VERSION >= 5.2
  *  - Device supports warp shuffle
  */
-#if HT_NVIDIA  // EXSWHTEC-274
 TEMPLATE_TEST_CASE("Unit_Warp_Shfl_Positive_Basic", "", int, unsigned int, long, unsigned long,
-                   long long, unsigned long long, float, double) {
+                   long long, unsigned long long, float, double, __half, __half2) {
   int device;
   hipDeviceProp_t device_properties;
   HIP_CHECK(hipGetDevice(&device));
@@ -112,12 +111,7 @@ TEMPLATE_TEST_CASE("Unit_Warp_Shfl_Positive_Basic", "", int, unsigned int, long,
     return;
   }
 
-  SECTION("Shfl with specified active mask and input values") {
-    WarpShfl<TestType>().run(false);
-  }
+  SECTION("Shfl with specified active mask and input values") { WarpShfl<TestType>().run(false); }
 
-  SECTION("Shfl with random active mask and input values") {
-    WarpShfl<TestType>().run(true);
-  }
+  SECTION("Shfl with random active mask and input values") { WarpShfl<TestType>().run(true); }
 }
-#endif

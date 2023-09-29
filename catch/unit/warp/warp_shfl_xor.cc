@@ -17,7 +17,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-#include "warp_common.hh"
+#include "warp_shfl_common.hh"
 
 #include <bitset>
 
@@ -43,7 +43,7 @@ __global__ void shfl_xor(T* const out, const T* const in, const uint64_t* const 
   out[grid.thread_rank()] = __shfl_xor(var, lane_mask, width);
 }
 
-template <typename T> class WarpShflXOR : public WarpTest<WarpShflXOR<T>, T> {
+template <typename T> class WarpShflXOR : public WarpShflTest<WarpShflXOR<T>, T> {
  public:
   void launch_kernel(T* const arr_dev, T* const input_dev, const uint64_t* const active_masks) {
     width_ = generate_width(this->warp_size_);
@@ -97,7 +97,7 @@ template <typename T> class WarpShflXOR : public WarpTest<WarpShflXOR<T>, T> {
  *  - Device supports warp shuffle
  */
 TEMPLATE_TEST_CASE("Unit_Warp_Shfl_XOR_Positive_Basic", "", int, unsigned int, long, unsigned long,
-                   long long, unsigned long long, float, double) {
+                   long long, unsigned long long, float, double, __half, __half2) {
   int device;
   hipDeviceProp_t device_properties;
   HIP_CHECK(hipGetDevice(&device));

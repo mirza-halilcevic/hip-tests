@@ -33,6 +33,7 @@ set(TEST_SRC
   casting_float_funcs.cc
   casting_int_funcs.cc
   half_precision_arithmetic.cc
+  half_precision_math.cc
 )
 
 if(HIP_PLATFORM MATCHES "nvidia")
@@ -65,6 +66,7 @@ add_test(NAME Unit_Device_log_Negative
          math_log_negative_kernels.cc 24)
                       TEST_TARGET_NAME build_tests COMMON_SHARED_SRC ${COMMON_SHARED_SRC})
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -134,3 +136,9 @@ add_test(NAME Unit_Half_Precision_Arithmetic_Negative
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
          half_precision_arithmetic_negative_kernels.cc 88)
 >>>>>>> origin/fp16_arithmetic_tests
+=======
+add_test(NAME Unit_Half_Precision_Math_Negative
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         half_precision_math_negative_kernels.cc 60)
+>>>>>>> origin/fp16_math_tests

@@ -84,7 +84,9 @@ if(HIP_PLATFORM MATCHES "amd")
       hipExtMallocWithFlags.cc
       hipMallocMngdMultiThread.cc
       hipArray.cc
-      hipMemVmm.cc)
+      hipMemVmm.cc
+      hipPointerSetAttribute.cc # Should be compiled for NVIDIA as well after EXSWHTEC-346 is addressed
+  )
 else()
   set(TEST_SRC ${TEST_SRC} hipGetSymbolSizeAddress.cc)
 endif()

@@ -269,6 +269,15 @@ if(UNIX)
                hipMemoryAllocateCoherent.cc)
 endif()
 
-hip_add_exe_to_target(NAME MemoryTest
+if(HIP_PLATFORM MATCHES "amd")
+  set(TEST_SRC
+      ${TEST_SRC}
+      # Below 3 tests should be compiled for NVIDIA as well after EXSWHTEC-349 is addressed
+      hipArrayGetInfo.cc
+      hipArrayGetDescriptor.cc
+      hipArray3DGetDescriptor.cc)
+endif()
+
+hip_add_exe_to_target(NAME MemoryTest2
   TEST_SRC ${TEST_SRC}
   TEST_TARGET_NAME build_tests COMMON_SHARED_SRC ${COMMON_SHARED_SRC})

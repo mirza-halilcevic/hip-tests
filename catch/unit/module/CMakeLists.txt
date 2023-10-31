@@ -22,6 +22,10 @@
 if(HIP_PLATFORM MATCHES "amd")
 set(TEST_SRC
     hipExtModuleLaunchKernel.cc
+    hip_module_common.cc
+    hipModuleLaunchKernel.cc
+    hipModuleLaunchCooperativeKernel.cc
+    hipModuleLaunchCooperativeKernelMultiDevice.cc
 )
 
 # Note to pass arch use format like -DOFFLOAD_ARCH_STR="--offload-arch=gfx900  --offload-arch=gfx906"

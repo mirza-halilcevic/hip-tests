@@ -241,6 +241,11 @@
         "Unit_hipStreamCreate_WithPriorityPerformance_Default_high",
         "=== Below test is disabled due to defect EXSWHTEC-347 ===",
         "Unit_hipPointerSetAttribute_Positive_SyncMemops",
+        "=== Below 4 tests are disable due to defect EXSWHTEC-355 ===",
+        "Unit_Device___hadd_Sanity_Positive",
+        "Unit_Device___uhadd_Sanity_Positive",
+        "Unit_Device___rhadd_Sanity_Positive",
+        "Unit_Device___urhadd_Sanity_Positive",
     #endif
         "End of json"
     ]

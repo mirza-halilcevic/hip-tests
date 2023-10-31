@@ -321,6 +321,8 @@ TEST_CASE("Unit_hipFreeNegativeHost") {
  */
 #if HT_NVIDIA
 TEMPLATE_TEST_CASE("Unit_hipFreeImplicitSyncArray", "", char, float, float2, float4) {
+  CHECK_IMAGE_SUPPORT
+
   using vec_info = vector_info<TestType>;
   DriverContext ctx;
 
@@ -340,7 +342,7 @@ TEMPLATE_TEST_CASE("Unit_hipFreeImplicitSyncArray", "", char, float, float2, flo
     HIP_CHECK(hipStreamQuery(nullptr));
   }
   SECTION("ArrayDestroy") {
-    hiparray cuArrayPtr{};
+    hipArray_t cuArrayPtr{};
 
     HIP_ARRAY_DESCRIPTOR cuDesc;
     cuDesc.Width = width;
@@ -357,6 +359,8 @@ TEMPLATE_TEST_CASE("Unit_hipFreeImplicitSyncArray", "", char, float, float2, flo
 }
 #else  // AMD
 TEMPLATE_TEST_CASE("Unit_hipFreeImplicitSyncArray", "", char, float, float2, float4) {
+  CHECK_IMAGE_SUPPORT
+
   hipArray_t arrayPtr{};
   hipExtent extent{};
   extent.width = GENERATE(32, 128, 256, 512, 1024);
@@ -377,10 +381,6 @@ TEMPLATE_TEST_CASE("Unit_hipFreeImplicitSyncArray", "", char, float, float2, flo
     HIP_CHECK(hipStreamQuery(nullptr));
   }
 }
-<<<<<<< HEAD
-=======
-
->>>>>>> f5a6a2b8d5021afcb9e97af2abd4019d4a048094
 #endif
 
 /**
@@ -481,7 +481,7 @@ TEST_CASE("Unit_hipFreeDoubleArrayDestroy") {
   size_t height = GENERATE(0, 32, 512, 1024);
   DriverContext ctx{};
 
-  hiparray ArrayPtr{};
+  hipArray_t ArrayPtr{};
   HIP_ARRAY_DESCRIPTOR cuDesc;
   cuDesc.Width = width;
   cuDesc.Height = height;
@@ -520,7 +520,7 @@ TEMPLATE_TEST_CASE("Unit_hipFreeMultiTArray", "", char, int, float2, float4) {
 
 
   SECTION("ArrayDestroy") {
-    std::vector<hiparray> ptrs(numAllocs);
+    std::vector<hipArray_t> ptrs(numAllocs);
     HIP_ARRAY_DESCRIPTOR cuDesc;
     cuDesc.Width = width;
     cuDesc.Height = height;
@@ -571,6 +571,8 @@ TEMPLATE_TEST_CASE("Unit_hipFreeMultiTArray", "", char, int, float2, float4) {
 #else
 
 TEMPLATE_TEST_CASE("Unit_hipFreeMultiTArray", "", char, int, float2, float4) {
+  CHECK_IMAGE_SUPPORT
+
   using vec_info = vector_info<TestType>;
 
   hipExtent extent{};
@@ -591,7 +593,7 @@ TEMPLATE_TEST_CASE("Unit_hipFreeMultiTArray", "", char, int, float2, float4) {
     }
   }
   SECTION("ArrayDestroy") {
-    std::vector<hiparray> cuArrayPtrs(numAllocs);
+    std::vector<hipArray_t> cuArrayPtrs(numAllocs);
 
     HIP_ARRAY_DESCRIPTOR cuDesc;
     cuDesc.Width = extent.width;

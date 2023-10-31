@@ -71,6 +71,8 @@ static void Malloc3DThreadFunc(int gpu) {
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMalloc3D_Basic") {
+  CHECK_IMAGE_SUPPORT
+
   size_t width = SMALL_SIZE * sizeof(char);
   size_t height{SMALL_SIZE}, depth{SMALL_SIZE};
   hipPitchedPtr devPitchedPtr;
@@ -102,6 +104,8 @@ TEST_CASE("Unit_hipMalloc3D_Basic") {
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMalloc3D_SmallandBigChunks") {
+  CHECK_IMAGE_SUPPORT
+
   MemoryAlloc3DDiffSizes(0);
 }
 
@@ -119,6 +123,8 @@ TEST_CASE("Unit_hipMalloc3D_SmallandBigChunks") {
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMalloc3D_MultiThread") {
+  CHECK_IMAGE_SUPPORT
+
   std::vector<std::thread> threadlist;
   int devCnt = 0;
 

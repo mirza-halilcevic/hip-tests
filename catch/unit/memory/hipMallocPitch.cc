@@ -401,6 +401,8 @@ and verifies the hipMallocPitch API with small and big chunks data
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMallocPitch_MultiThread", "") {
+  CHECK_IMAGE_SUPPORT
+
   std::vector<std::thread> threadlist;
   int devCnt = 0;
 

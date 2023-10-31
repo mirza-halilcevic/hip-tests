@@ -83,8 +83,9 @@ Input : "A_h" initialized based on data type
 Output: Validating A_h with B_h both should be equal for
         the number of COLUMNS and ROWS copied
 */
-TEMPLATE_TEST_CASE("Unit_hipMemcpy2D_H2D-D2D-D2H_WithOffset", ""
-                   , int, float, double) {
+TEMPLATE_TEST_CASE("Unit_hipMemcpy2D_H2D-D2D-D2H_WithOffset", "", int, float, double) {
+  CHECK_IMAGE_SUPPORT
+
   // 1 refers to pinned host memory
   auto mem_type = GENERATE(0, 1);
   HIP_CHECK(hipSetDevice(0));

@@ -54,6 +54,8 @@ static constexpr std::initializer_list<tupletype> tableItems {
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMemset2D_BasicFunctional") {
+  CHECK_IMAGE_SUPPORT
+
   constexpr int memsetval = 0x24;
   constexpr size_t numH = 256;
   constexpr size_t numW = 256;
@@ -100,6 +102,8 @@ TEST_CASE("Unit_hipMemset2D_BasicFunctional") {
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMemset2D_UniqueWidthHeight") {
+  CHECK_IMAGE_SUPPORT
+
   int width2D, height2D;
   int memsetWidth, memsetHeight;
   char *A_d, *A_h;

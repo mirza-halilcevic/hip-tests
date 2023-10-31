@@ -58,6 +58,8 @@ THE SOFTWARE.
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMemcpy3D_Positive_Basic") {
+  CHECK_IMAGE_SUPPORT
+
   constexpr bool async = false;
 
   SECTION("Device to Host") { Memcpy3DDeviceToHostShell<async>(Memcpy3DWrapper<>); }
@@ -95,6 +97,8 @@ TEST_CASE("Unit_hipMemcpy3D_Positive_Basic") {
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMemcpy3D_Positive_Synchronization_Behavior") {
+  CHECK_IMAGE_SUPPORT
+
   HIP_CHECK(hipDeviceSynchronize());
 
   SECTION("Host to Device") { Memcpy3DHtoDSyncBehavior(Memcpy3DWrapper<>, true); }
@@ -127,6 +131,8 @@ TEST_CASE("Unit_hipMemcpy3D_Positive_Synchronization_Behavior") {
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMemcpy3D_Positive_Parameters") {
+  CHECK_IMAGE_SUPPORT
+
   constexpr bool async = false;
   Memcpy3DZeroWidthHeightDepth<async>(Memcpy3DWrapper<async>);
 }
@@ -150,6 +156,8 @@ TEST_CASE("Unit_hipMemcpy3D_Positive_Parameters") {
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMemcpy3D_Positive_Array") {
+  CHECK_IMAGE_SUPPORT
+
   constexpr bool async = false;
   SECTION("Array from/to Host") { Memcpy3DArrayHostShell<async>(Memcpy3DWrapper<async>); }
 #if HT_NVIDIA  // Disabled on AMD due to defect - EXSWHTEC-238
@@ -207,6 +215,8 @@ TEST_CASE("Unit_hipMemcpy3D_Positive_Array") {
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMemcpy3D_Negative_Parameters") {
+  CHECK_IMAGE_SUPPORT
+
   constexpr hipExtent extent{128 * sizeof(int), 128, 8};
 
   constexpr auto NegativeTests = [](hipPitchedPtr dst_ptr, hipPos dst_pos, hipPitchedPtr src_ptr,

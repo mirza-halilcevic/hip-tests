@@ -46,6 +46,8 @@ THE SOFTWARE.
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMemcpyAtoH_Positive_Default") {
+  CHECK_IMAGE_SUPPORT
+
   using namespace std::placeholders;
 
   const auto width = GENERATE(512, 1024, 2048);
@@ -67,6 +69,8 @@ TEST_CASE("Unit_hipMemcpyAtoH_Positive_Default") {
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMemcpyAtoH_Positive_Synchronization_Behavior") {
+  CHECK_IMAGE_SUPPORT
+
   using namespace std::placeholders;
 
   const auto width = GENERATE(512, 1024, 2048);
@@ -97,6 +101,8 @@ SWDEV-274683
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMemcpyAtoH_Positive_ZeroCount") {
+  CHECK_IMAGE_SUPPORT
+
   const auto width = 1024;
   const auto height = 0;
   const auto allocation_size = width * sizeof(int);
@@ -140,6 +146,8 @@ TEST_CASE("Unit_hipMemcpyAtoH_Positive_ZeroCount") {
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMemcpyAtoH_Negative_Parameters") {
+  CHECK_IMAGE_SUPPORT
+
   using namespace std::placeholders;
 
   const auto width = 1024;

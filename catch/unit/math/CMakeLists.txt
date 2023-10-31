@@ -38,6 +38,7 @@ set(TEST_SRC
   casting_half_float_funcs.cc
   casting_half2int_funcs.cc
   casting_int2half_funcs.cc
+  casting_half2_funcs.cc
 )
 
 if(HIP_PLATFORM MATCHES "nvidia")
@@ -70,14 +71,6 @@ add_test(NAME Unit_Device_log_Negative
          math_log_negative_kernels.cc 24)
                       TEST_TARGET_NAME build_tests COMMON_SHARED_SRC ${COMMON_SHARED_SRC})
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 add_test(NAME Unit_Device_Single_Precision_Trig_Functions_Negative
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
@@ -119,49 +112,42 @@ add_test(NAME Unit_Integer_Intrinsics_Negative
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
          integer_intrinsics_negative_kernels.cc 20)
-=======
+
 add_test(NAME Unit_Device_casting_double_Negative
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
          casting_double_negative_kernels.cc 69)
->>>>>>> 627bd32994e3e297bd1605e1d9ee815274324529
-=======
+
 add_test(NAME Unit_Device_casting_float_Negative
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
          casting_float_negative_kernels.cc 54)
->>>>>>> 1e46505629e5d45a9fbd79817c6d47ed41d98224
-=======
+
 add_test(NAME Unit_Device_casting_int_Negative
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
          casting_int_negative_kernels.cc 92)
->>>>>>> f7be3b3fd90ffeb1624d7917d191daccb8dbc44c
-=======
+
 add_test(NAME Unit_Half_Precision_Arithmetic_Negative
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
          half_precision_arithmetic_negative_kernels.cc 88)
->>>>>>> origin/fp16_arithmetic_tests
-=======
+
 add_test(NAME Unit_Half_Precision_Math_Negative
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
          half_precision_math_negative_kernels.cc 60)
->>>>>>> origin/fp16_math_tests
-=======
+
 add_test(NAME Unit_Half_Precision_Comparison_Negative
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
          half_precision_comparison_negative_kernels.cc 164)
->>>>>>> origin/fp16_comparison_tests
-=======
+
 add_test(NAME Unit_Device_casting_half_float_Negative
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
          casting_half_float_negative_kernels.cc 18)
->>>>>>> origin/fp16_casting_float_tests
-=======
+
 add_test(NAME Unit_Device_casting_half2int_Negative
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
@@ -171,4 +157,8 @@ add_test(NAME Unit_Device_casting_int2half_Negative
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
          casting_int2half_negative_kernels.cc 78)
->>>>>>> origin/fp16_casting_int_tests
+
+add_test(NAME Unit_Device_casting_half2_Negative
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         casting_half2_negative_kernels.cc 53)

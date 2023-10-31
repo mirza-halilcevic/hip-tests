@@ -432,6 +432,8 @@ static void seekAndSet3DArrayPortion(bool bAsync) {
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMemset3D_MemsetWithExtent") {
+  CHECK_IMAGE_SUPPORT
+
   hipExtent testExtent;
   size_t numH = NUMH_EXT, numW = NUMW_EXT, depth = DEPTH_EXT;
 
@@ -535,6 +537,8 @@ TEST_CASE("Unit_hipMemset3D_SeekSetArrayPortion") {
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMemset3DAsync_MemsetWithExtent") {
+  CHECK_IMAGE_SUPPORT
+
   hipExtent testExtent;
   size_t numH = NUMH_EXT, numW = NUMW_EXT, depth = DEPTH_EXT;
 
@@ -575,6 +579,8 @@ TEST_CASE("Unit_hipMemset3DAsync_MemsetWithExtent") {
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMemset3DAsync_MemsetMaxValue") {
+  CHECK_IMAGE_SUPPORT
+
   testMemsetMaxValue(1);
 }
 
@@ -591,6 +597,8 @@ TEST_CASE("Unit_hipMemset3DAsync_MemsetMaxValue") {
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMemset3DAsync_SeekSetSlice") {
+  CHECK_IMAGE_SUPPORT
+
   seekAndSet3DArraySlice(1);
 }
 
@@ -607,5 +615,7 @@ TEST_CASE("Unit_hipMemset3DAsync_SeekSetSlice") {
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMemset3DAsync_SeekSetArrayPortion") {
+  CHECK_IMAGE_SUPPORT
+
   seekAndSet3DArrayPortion(1);
 }

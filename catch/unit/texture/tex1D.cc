@@ -50,7 +50,9 @@ THE SOFTWARE.
  */
 TEMPLATE_TEST_CASE("Unit_tex1D_Positive_ReadModeElementType", "", char, unsigned char, short,
                    unsigned short, int, unsigned int, float) {
-  TextureTestParams<TestType> params = {0};
+  CHECK_IMAGE_SUPPORT;
+
+  TextureTestParams<TestType> params = {};
   params.extent = make_hipExtent(1024, 0, 0);
   params.num_subdivisions = 4;
   params.GenerateTextureDesc();
@@ -101,7 +103,9 @@ TEMPLATE_TEST_CASE("Unit_tex1D_Positive_ReadModeElementType", "", char, unsigned
  */
 TEMPLATE_TEST_CASE("Unit_tex1D_Positive_ReadModeNormalizedFloat", "", char, unsigned char, short,
                    unsigned short) {
-  TextureTestParams<TestType> params = {0};
+  CHECK_IMAGE_SUPPORT;
+
+  TextureTestParams<TestType> params = {};
   params.extent = make_hipExtent(1024, 0, 0);
   params.num_subdivisions = 4;
   params.GenerateTextureDesc(hipReadModeNormalizedFloat);
@@ -123,7 +127,6 @@ TEMPLATE_TEST_CASE("Unit_tex1D_Positive_ReadModeNormalizedFloat", "", char, unsi
     INFO("Filtering mode: " << FilteringModeToString(params.tex_desc.filterMode));
     INFO("Normalized coordinates: " << std::boolalpha << params.tex_desc.normalizedCoords);
     INFO("Address mode: " << AddressModeToString(params.tex_desc.addressMode[0]));
-    INFO("Filter mode: " << FilteringModeToString(params.tex_desc.filterMode));
     INFO("x: " << std::fixed << std::setprecision(16) << x);
 
     auto ref_val =

@@ -46,16 +46,18 @@ THE SOFTWARE.
  *    - unit/texture/tex1DGrad.cc
  * Test requirements
  * ------------------------
- *    - HIP_VERSION >= 5.2
+ *    - HIP_VERSION >= 5.7
  */
 TEMPLATE_TEST_CASE("Unit_tex1DGrad_Positive_ReadModeElementType", "", char, unsigned char, short,
                    unsigned short, int, unsigned int, float) {
-  TextureTestParams<TestType> params = {0};
+  CHECK_IMAGE_SUPPORT;
+
+  TextureTestParams<TestType> params = {};
   params.extent = make_hipExtent(1024, 0, 0);
   params.num_subdivisions = 4;
   params.GenerateTextureDesc();
 
-  TextureTestFixture<TestType> fixture{params};
+  TextureTestFixture<TestType, false, true> fixture{params};
 
   const auto [num_threads, num_blocks] = GetLaunchConfig(1024, params.NumItersX());
   tex1DGradKernel<vec4<TestType>><<<num_blocks, num_threads>>>(
@@ -97,16 +99,18 @@ TEMPLATE_TEST_CASE("Unit_tex1DGrad_Positive_ReadModeElementType", "", char, unsi
  *    - unit/texture/tex1DGrad.cc
  * Test requirements
  * ------------------------
- *    - HIP_VERSION >= 5.2
+ *    - HIP_VERSION >= 5.7
  */
 TEMPLATE_TEST_CASE("Unit_tex1DGrad_Positive_ReadModeNormalizedFloat", "", char, unsigned char,
                    short, unsigned short) {
-  TextureTestParams<TestType> params = {0};
+  CHECK_IMAGE_SUPPORT;
+
+  TextureTestParams<TestType> params = {};
   params.extent = make_hipExtent(1024, 0, 0);
   params.num_subdivisions = 4;
   params.GenerateTextureDesc(hipReadModeNormalizedFloat);
 
-  TextureTestFixture<TestType, true> fixture{params};
+  TextureTestFixture<TestType, true, true> fixture{params};
 
   const auto [num_threads, num_blocks] = GetLaunchConfig(1024, params.NumItersX());
   tex1DGradKernel<vec4<float>><<<num_blocks, num_threads>>>(
@@ -123,7 +127,6 @@ TEMPLATE_TEST_CASE("Unit_tex1DGrad_Positive_ReadModeNormalizedFloat", "", char, 
     INFO("Filtering mode: " << FilteringModeToString(params.tex_desc.filterMode));
     INFO("Normalized coordinates: " << std::boolalpha << params.tex_desc.normalizedCoords);
     INFO("Address mode: " << AddressModeToString(params.tex_desc.addressMode[0]));
-    INFO("Filter mode: " << FilteringModeToString(params.tex_desc.filterMode));
     INFO("x: " << std::fixed << std::setprecision(16) << x);
 
     auto ref_val =

@@ -170,6 +170,8 @@ TEST_CASE("Unit_hipMemcpy3DAsync_Positive_Parameters") {
  *  - HIP_VERSION >= 5.2
  */
 TEST_CASE("Unit_hipMemcpy3DAsync_Positive_Array") {
+  CHECK_IMAGE_SUPPORT
+
   constexpr bool async = true;
   SECTION("Array from/to Host") { Memcpy3DArrayHostShell<async>(Memcpy3DWrapper<async>); }
 #if HT_NVIDIA // Disabled on AMD due to defect - EXSWHTEC-238

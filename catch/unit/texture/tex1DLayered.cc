@@ -50,7 +50,9 @@ THE SOFTWARE.
  */
 TEMPLATE_TEST_CASE("Unit_tex1DLayered_Positive_ReadModeElementType", "", char, unsigned char, short,
                    unsigned short, int, unsigned int, float) {
-  TextureTestParams<TestType> params = {0};
+  CHECK_IMAGE_SUPPORT;
+
+  TextureTestParams<TestType> params = {};
   params.extent = make_hipExtent(1024, 0, 0);
   params.layers = 2;
   params.num_subdivisions = 4;
@@ -106,7 +108,9 @@ TEMPLATE_TEST_CASE("Unit_tex1DLayered_Positive_ReadModeElementType", "", char, u
  */
 TEMPLATE_TEST_CASE("Unit_tex1DLayered_Positive_ReadModeNormalizedFloat", "", char, unsigned char,
                    short, unsigned short) {
-  TextureTestParams<TestType> params = {0};
+  CHECK_IMAGE_SUPPORT;
+
+  TextureTestParams<TestType> params = {};
   params.extent = make_hipExtent(1024, 0, 0);
   params.layers = 2;
   params.num_subdivisions = 4;

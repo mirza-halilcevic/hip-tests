@@ -33,6 +33,7 @@ set(TEST_SRC
   coalesced_groups_shfl_up.cc
   hipCGTiledPartition.cc
   hipCGCoalescedGroups.cc
+  coalesced_tiled_groups_metagrp.cc
 )
 if(HIP_PLATFORM STREQUAL "nvidia")
   set_source_files_properties(multi_grid_group.cc PROPERTIES COMPILE_FLAGS "-D_CG_ABI_EXPERIMENTAL -rdc=true -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")

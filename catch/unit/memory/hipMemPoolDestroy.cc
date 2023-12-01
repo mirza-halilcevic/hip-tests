@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
+   Copyright (c) 2023 Advanced Micro Devices, Inc. All rights reserved.
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
    in the Software without restriction, including without limitation the rights
@@ -17,38 +17,32 @@
    THE SOFTWARE.
  */
 
-#include <hip_test_common.hh>
-
-#include <limits>
+#include "mempool_common.hh"
 
 /**
  * @addtogroup hipMemPoolDestroy hipMemPoolDestroy
  * @{
  * @ingroup StreamOTest
  * `hipMemPoolDestroy(hipMemPool_t mem_pool)` -
- * Destroys the specified memory pool.
- * ________________________
- * Test cases from other modules:
- *  - @ref Unit_hipMemPoolApi_Basic
- *  - @ref Unit_hipMemPoolApi_BasicAlloc
+ * Destroys the specified memory pool
  */
 
 /**
  * Test Description
  * ------------------------
- *  - Validates handling of invalid arguments:
- *    -# When the memory pool handle is invalid (-1)
- *      - Expected output: do not return `hipSuccess`
+ *  - Test to verify hipMemPoolCreate behavior with invalid arguments:
+ *    -# Nullptr mem_pool
+ *    -# Double hipMemPoolDestroy
+ *    -# Attempt to destroy default mempool
+ *
  * Test source
  * ------------------------
- *  - unit/memory/hipMemPoolDestroy.cc
+ *  - /unit/memory/hipMemPoolDestroy.cc
  * Test requirements
  * ------------------------
- *  - Runtime supports Memory Pools
- *  - HIP_VERSION >= 5.2
+ *  - HIP_VERSION >= 6.0
  */
 TEST_CASE("Unit_hipMemPoolDestroy_Negative_Parameter") {
-  HIP_CHECK(hipSetDevice(0));
   int mem_pool_support = 0;
   HIP_CHECK(hipDeviceGetAttribute(&mem_pool_support, hipDeviceAttributeMemoryPoolsSupported, 0));
   if (!mem_pool_support) {
@@ -56,7 +50,22 @@ TEST_CASE("Unit_hipMemPoolDestroy_Negative_Parameter") {
     return;
   }
 
-  SECTION("mem_pool is invalid") {
-    REQUIRE(hipMemPoolDestroy(reinterpret_cast<hipMemPool_t>(-1)) != hipSuccess);
+  hipMemPool_t mem_pool = nullptr;
+
+  SECTION("Passing nullptr to mempool") {
+    HIP_CHECK_ERROR(hipMemPoolDestroy(nullptr), hipErrorInvalidValue);
+  }
+
+  SECTION("Double hipMemPoolDestroy") {
+    HIP_CHECK(hipMemPoolCreate(&mem_pool, &kPoolProps));
+    HIP_CHECK(hipMemPoolDestroy(mem_pool));
+    HIP_CHECK_ERROR(hipMemPoolDestroy(mem_pool), hipErrorInvalidValue);
+  }
+
+  SECTION("Attempt to destroy default mempool") {
+    hipMemPool_t default_mem_pool = nullptr;
+    int device = 0;
+    HIP_CHECK(hipDeviceGetDefaultMemPool(&default_mem_pool, device));
+    HIP_CHECK_ERROR(hipMemPoolDestroy(default_mem_pool), hipErrorInvalidValue);
   }
 }

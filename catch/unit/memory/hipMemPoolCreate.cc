@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
+   Copyright (c) 2023 Advanced Micro Devices, Inc. All rights reserved.
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
    in the Software without restriction, including without limitation the rights
@@ -19,41 +19,32 @@
 
 #include <hip_test_common.hh>
 
-#include <limits>
-
 /**
  * @addtogroup hipMemPoolCreate hipMemPoolCreate
  * @{
  * @ingroup StreamOTest
  * `hipMemPoolCreate(hipMemPool_t* mem_pool, const hipMemPoolProps* pool_props)` -
- * Creates a HIP memory pool and returns the handle in mem pool.
- * ________________________
- * Test cases from other modules:
- *  - @ref Unit_hipMemPoolApi_Basic
- *  - @ref Unit_hipMemPoolApi_BasicAlloc
+ * Creates a memory pool and returns the handle in mem pool
  */
-
-constexpr hipMemPoolProps kPoolPropsValid = {
-    hipMemAllocationTypePinned, hipMemHandleTypeNone, {hipMemLocationTypeDevice, 0}, nullptr, {0}};
 
 /**
  * Test Description
  * ------------------------
- *  - Validates handling of invalid arguments:
- *    -# When output pointer to the memory pool is `nullptr`
- *      - Expected output: do not return `hipSuccess`
- *    -# When properties are `nullptr`
- *      - Expected output: do not return `hipSuccess`
+ *  - Test to verify hipMemPoolCreate behavior with invalid arguments:
+ *    -# Nullptr mem_pool
+ *    -# Nullptr props
+ *    -# Invalid props alloc type
+ *    -# Invalid props location type
+ *    -# Invalid props location id
+ *
  * Test source
  * ------------------------
- *  - unit/memory/hipMemPoolCreate.cc
+ *  - /unit/memory/hipMemPoolCreate.cc
  * Test requirements
  * ------------------------
- *  - Runtime supports Memory Pools
- *  - HIP_VERSION >= 5.2
+ *  - HIP_VERSION >= 6.0
  */
 TEST_CASE("Unit_hipMemPoolCreate_Negative_Parameter") {
-  HIP_CHECK(hipSetDevice(0));
   int mem_pool_support = 0;
   HIP_CHECK(hipDeviceGetAttribute(&mem_pool_support, hipDeviceAttributeMemoryPoolsSupported, 0));
   if (!mem_pool_support) {
@@ -61,12 +52,42 @@ TEST_CASE("Unit_hipMemPoolCreate_Negative_Parameter") {
     return;
   }
 
-  hipMemPool_t mem_pool = nullptr;
-  size_t max_size = std::numeric_limits<size_t>::max();
+  int num_dev = 0;
+  HIP_CHECK(hipGetDeviceCount(&num_dev));
 
-  SECTION("mem_pool ptr is nullptr") {
-    REQUIRE(hipMemPoolCreate(nullptr, &kPoolPropsValid) != hipSuccess);
+  hipMemPoolProps pool_props;
+  pool_props.allocType = hipMemAllocationTypePinned;
+  pool_props.handleTypes = hipMemHandleTypeNone;
+  pool_props.location.type = hipMemLocationTypeDevice;
+  pool_props.location.id = 0;
+  pool_props.win32SecurityAttributes = nullptr;
+  memset(pool_props.reserved, 0, sizeof(pool_props.reserved));
+
+  hipMemPool_t mem_pool = nullptr;
+
+  SECTION("Passing nullptr to mem_pool") {
+    HIP_CHECK_ERROR(hipMemPoolCreate(nullptr, &pool_props), hipErrorInvalidValue);
   }
 
-  SECTION("properties is null") { REQUIRE(hipMemPoolCreate(&mem_pool, nullptr) != hipSuccess); }
+  SECTION("Passing nullptr to props") {
+    HIP_CHECK_ERROR(hipMemPoolCreate(&mem_pool, nullptr), hipErrorInvalidValue);
+  }
+
+  SECTION("Passing invalid props alloc type") {
+    pool_props.allocType = hipMemAllocationTypeInvalid;
+    HIP_CHECK_ERROR(hipMemPoolCreate(&mem_pool, &pool_props), hipErrorInvalidValue);
+    pool_props.allocType = hipMemAllocationTypePinned;
+  }
+
+  SECTION("Passing invalid props location type") {
+    pool_props.location.type = hipMemLocationTypeInvalid;
+    HIP_CHECK_ERROR(hipMemPoolCreate(&mem_pool, &pool_props), hipErrorInvalidValue);
+    pool_props.location.type = hipMemLocationTypeDevice;
+  }
+
+  SECTION("Passing invalid props location id") {
+    pool_props.location.id = num_dev;
+    HIP_CHECK_ERROR(hipMemPoolCreate(&mem_pool, &pool_props), hipErrorInvalidValue);
+    pool_props.location.id = 0;
+  }
 }

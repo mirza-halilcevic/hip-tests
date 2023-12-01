@@ -1313,6 +1313,7 @@ TEST_CASE("Unit_StaticAssert_Negative_Basic")
  */
 
 /**
+<<<<<<< HEAD
  * @defgroup VectorTypeTest Vector types
  * @{
  * This section describes tests for the Vector type functions and operators.
@@ -1484,6 +1485,8 @@ TEST_CASE("Unit_CalculateAssignUnsigned4D_Negative_Parameters") {}
  */
 
 /**
+=======
+>>>>>>> origin/hipMemPool_basic_tests
  * @defgroup StreamOTest Ordered Memory Allocator
  * @{
  * This section describes the tests for Stream Ordered Memory Allocator functions of HIP runtime

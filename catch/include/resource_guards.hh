@@ -386,49 +386,44 @@ class StreamsGuard {
   std::vector<hipStream_t> streams_;
 };
 
-class VirtualMemoryGuard {
+enum class MemPools { dev_default, created };
+
+class MemPoolGuard {
  public:
-  void* virtual_memory_ptr;
-  hipMemGenericAllocationHandle_t handle;
+  MemPoolGuard(const MemPools mempool_type, int device,
+               hipMemAllocationHandleType handle_type = hipMemHandleTypeNone)
+      : mempool_type_{mempool_type}, device_{device}, handle_type_{handle_type} {
+    switch (mempool_type_) {
+      case MemPools::dev_default:
+        HIP_CHECK(hipDeviceGetDefaultMemPool(&mempool_, device_));
+        break;
+      case MemPools::created:
+        hipMemPoolProps pool_props;
+        pool_props.allocType = hipMemAllocationTypePinned;
+        pool_props.handleTypes = handle_type_;
+        pool_props.location.type = hipMemLocationTypeDevice;
+        pool_props.location.id = device_;
+        pool_props.win32SecurityAttributes = nullptr;
+        memset(pool_props.reserved, 0, sizeof(pool_props.reserved));
 
-  VirtualMemoryGuard(const size_t size, const int deviceId = 0,
-                     const hipMemGenericAllocationHandle_t* inheritedHandle = nullptr) {
-    hipMemAllocationProp properties{};
-    properties.type = hipMemAllocationTypePinned;
-    properties.location.id = deviceId;
-    properties.location.type = hipMemLocationTypeDevice;
-    hipMemAccessDesc access{};
-    access.flags = hipMemAccessFlagsProtReadWrite;
-    access.location = properties.location;
-    size_t granularity{0};
-
-    HIP_CHECK(hipMemGetAllocationGranularity(&granularity, &properties,
-                                             hipMemAllocationGranularityRecommended));
-    allocation_size_ = granularity * ((size + granularity - 1) / granularity);
-    HIP_CHECK(hipMemAddressReserve(&virtual_memory_ptr, allocation_size_, 0, nullptr, 0));
-    if (inheritedHandle) {
-      is_handle_inherited_ = true;
-      handle = *inheritedHandle;
-    } else {
-      is_handle_inherited_ = false;
-      HIP_CHECK(hipMemCreate(&handle, allocation_size_, &properties, 0));
+        HIP_CHECK(hipMemPoolCreate(&mempool_, &pool_props));
     }
-    HIP_CHECK(hipMemMap(virtual_memory_ptr, allocation_size_, 0, handle, 0));
-    HIP_CHECK(hipMemSetAccess(virtual_memory_ptr, allocation_size_, &access, 1));
   }
 
-  VirtualMemoryGuard(const VirtualMemoryGuard&) = delete;
-  VirtualMemoryGuard(VirtualMemoryGuard&&) = delete;
+  MemPoolGuard(const MemPoolGuard&) = delete;
+  MemPoolGuard(MemPoolGuard&&) = delete;
 
-  ~VirtualMemoryGuard() {
-    HIP_CHECK(hipMemUnmap(virtual_memory_ptr, allocation_size_));
-    if (!is_handle_inherited_) {
-      HIP_CHECK(hipMemRelease(handle));
+  ~MemPoolGuard() {
+    if (mempool_type_ == MemPools::created) {
+      static_cast<void>(hipMemPoolDestroy(mempool_));
     }
-    HIP_CHECK(hipMemAddressFree(virtual_memory_ptr, allocation_size_));
   }
+
+  hipMemPool_t mempool() const { return mempool_; }
 
  private:
-  size_t allocation_size_;
-  bool is_handle_inherited_;
+  const MemPools mempool_type_;
+  int device_;
+  hipMemAllocationHandleType handle_type_;
+  hipMemPool_t mempool_;
 };

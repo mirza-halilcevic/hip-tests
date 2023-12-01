@@ -1484,6 +1484,13 @@ TEST_CASE("Unit_CalculateAssignUnsigned4D_Negative_Parameters") {}
  */
 
 /**
+ * @defgroup StreamOTest Ordered Memory Allocator
+ * @{
+ * This section describes the tests for Stream Ordered Memory Allocator functions of HIP runtime
+ * API.
+ */
+
+/**
  * @defgroup StreamTest Stream Management
  * @{
  * This section describes the stream management types & functions of HIP runtime API.

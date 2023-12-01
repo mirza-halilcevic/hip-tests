@@ -208,6 +208,7 @@ set(TEST_SRC
     hipMemcpyFromSymbol.cc
     hipPtrGetAttribute.cc
     hipMemPoolApi.cc
+    hipMallocFromPoolAsync.cc
     hipMemcpyPeer.cc
     hipMemcpyPeer_old.cc
     hipMemcpyPeerAsync.cc

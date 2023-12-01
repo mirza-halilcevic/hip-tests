@@ -48,6 +48,7 @@ set(TEST_SRC
     tex1Dfetch.cc
     tex1D.cc
     tex1DLayered.cc
+    tex2Dgather.cc
     tex2D.cc
     tex2DLayered.cc
     tex3D.cc

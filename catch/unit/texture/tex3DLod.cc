@@ -46,16 +46,18 @@ THE SOFTWARE.
  *    - unit/texture/tex3DLod.cc
  * Test requirements
  * ------------------------
- *    - HIP_VERSION >= 5.2
+ *    - HIP_VERSION >= 5.7
  */
 TEMPLATE_TEST_CASE("Unit_tex3DLod_Positive_ReadModeElementType", "", char, unsigned char, short,
                    unsigned short, int, unsigned int, float) {
-  TextureTestParams<TestType> params = {0};
+  CHECK_IMAGE_SUPPORT;
+
+  TextureTestParams<TestType> params = {};
   params.extent = make_hipExtent(2, 2, 2);
   params.num_subdivisions = 2;
   params.GenerateTextureDesc();
 
-  TextureTestFixture<TestType> fixture{params};
+  TextureTestFixture<TestType, false, true> fixture{params};
 
   const auto [num_threads_x, num_blocks_x] = GetLaunchConfig(10, params.NumItersX());
   const auto [num_threads_y, num_blocks_y] = GetLaunchConfig(10, params.NumItersY());
@@ -79,36 +81,33 @@ TEMPLATE_TEST_CASE("Unit_tex3DLod_Positive_ReadModeElementType", "", char, unsig
 
   fixture.LoadOutput();
 
-  for (auto k = 0u; k < params.NumItersZ(); ++k) {
-    for (auto j = 0u; j < params.NumItersY(); ++j) {
-      for (auto i = 0u; i < params.NumItersX(); ++i) {
-        float x = GetCoordinate(i, params.NumItersX(), params.Width(), params.num_subdivisions,
-                                params.tex_desc.normalizedCoords);
-        float y = GetCoordinate(j, params.NumItersY(), params.Height(), params.num_subdivisions,
-                                params.tex_desc.normalizedCoords);
-        float z = GetCoordinate(k, params.NumItersZ(), params.Depth(), params.num_subdivisions,
-                                params.tex_desc.normalizedCoords);
+  for (auto i = 0u; i < params.NumIters(); ++i) {
+    const auto plane = i % (params.NumItersX() * params.NumItersY());
+    float x = plane % params.NumItersX();
+    float y = plane / params.NumItersX();
+    float z = i / (params.NumItersX() * params.NumItersY());
 
-        INFO("i: " << i);
-        INFO("j: " << j);
-        INFO("k: " << k);
-        INFO("Normalized coordinates: " << std::boolalpha << params.tex_desc.normalizedCoords);
-        INFO("Address mode X: " << AddressModeToString(params.tex_desc.addressMode[0]));
-        INFO("Address mode Y: " << AddressModeToString(params.tex_desc.addressMode[1]));
-        INFO("Address mode Z: " << AddressModeToString(params.tex_desc.addressMode[2]));
-        INFO("x: " << std::fixed << std::setprecision(16) << x);
-        INFO("y: " << std::fixed << std::setprecision(16) << y);
-        INFO("z: " << std::fixed << std::setprecision(16) << z);
+    x = GetCoordinate(x, params.NumItersX(), params.Width(), params.num_subdivisions,
+                      params.tex_desc.normalizedCoords);
+    y = GetCoordinate(y, params.NumItersY(), params.Height(), params.num_subdivisions,
+                      params.tex_desc.normalizedCoords);
+    z = GetCoordinate(z, params.NumItersZ(), params.Depth(), params.num_subdivisions,
+                      params.tex_desc.normalizedCoords);
 
-        auto index = k * params.NumItersX() * params.NumItersY() + j * params.NumItersX() + i;
+    INFO("Filtering mode: " << FilteringModeToString(params.tex_desc.filterMode));
+    INFO("Normalized coordinates: " << std::boolalpha << params.tex_desc.normalizedCoords);
+    INFO("Address mode X: " << AddressModeToString(params.tex_desc.addressMode[0]));
+    INFO("Address mode Y: " << AddressModeToString(params.tex_desc.addressMode[1]));
+    INFO("Address mode Z: " << AddressModeToString(params.tex_desc.addressMode[2]));
+    INFO("x: " << std::fixed << std::setprecision(16) << x);
+    INFO("y: " << std::fixed << std::setprecision(16) << y);
+    INFO("z: " << std::fixed << std::setprecision(16) << z);
 
-        const auto ref_val = fixture.tex_h.Tex3D(x, y, z, params.tex_desc);
-        REQUIRE(ref_val.x == fixture.out_alloc_h[index].x);
-        REQUIRE(ref_val.y == fixture.out_alloc_h[index].y);
-        REQUIRE(ref_val.z == fixture.out_alloc_h[index].z);
-        REQUIRE(ref_val.w == fixture.out_alloc_h[index].w);
-      }
-    }
+    const auto ref_val = fixture.tex_h.Tex3D(x, y, z, params.tex_desc);
+    REQUIRE(ref_val.x == fixture.out_alloc_h[i].x);
+    REQUIRE(ref_val.y == fixture.out_alloc_h[i].y);
+    REQUIRE(ref_val.z == fixture.out_alloc_h[i].z);
+    REQUIRE(ref_val.w == fixture.out_alloc_h[i].w);
   }
 }
 
@@ -127,16 +126,18 @@ TEMPLATE_TEST_CASE("Unit_tex3DLod_Positive_ReadModeElementType", "", char, unsig
  *    - unit/texture/tex3DLod.cc
  * Test requirements
  * ------------------------
- *    - HIP_VERSION >= 5.2
+ *    - HIP_VERSION >= 5.7
  */
 TEMPLATE_TEST_CASE("Unit_tex3DLod_Positive_ReadModeNormalizedFloat", "", char, unsigned char, short,
                    unsigned short) {
-  TextureTestParams<TestType> params = {0};
+  CHECK_IMAGE_SUPPORT;
+
+  TextureTestParams<TestType> params = {};
   params.extent = make_hipExtent(2, 2, 2);
   params.num_subdivisions = 2;
   params.GenerateTextureDesc(hipReadModeNormalizedFloat);
 
-  TextureTestFixture<TestType, true> fixture{params};
+  TextureTestFixture<TestType, true, true> fixture{params};
 
   const auto [num_threads_x, num_blocks_x] = GetLaunchConfig(10, params.NumItersX());
   const auto [num_threads_y, num_blocks_y] = GetLaunchConfig(10, params.NumItersY());
@@ -160,36 +161,33 @@ TEMPLATE_TEST_CASE("Unit_tex3DLod_Positive_ReadModeNormalizedFloat", "", char, u
 
   fixture.LoadOutput();
 
-  for (auto k = 0u; k < params.NumItersZ(); ++k) {
-    for (auto j = 0u; j < params.NumItersY(); ++j) {
-      for (auto i = 0u; i < params.NumItersX(); ++i) {
-        float x = GetCoordinate(i, params.NumItersX(), params.Width(), params.num_subdivisions,
-                                params.tex_desc.normalizedCoords);
-        float y = GetCoordinate(j, params.NumItersY(), params.Height(), params.num_subdivisions,
-                                params.tex_desc.normalizedCoords);
-        float z = GetCoordinate(k, params.NumItersZ(), params.Depth(), params.num_subdivisions,
-                                params.tex_desc.normalizedCoords);
+  for (auto i = 0u; i < params.NumIters(); ++i) {
+    const auto plane = i % (params.NumItersX() * params.NumItersY());
+    float x = plane % params.NumItersX();
+    float y = plane / params.NumItersX();
+    float z = i / (params.NumItersX() * params.NumItersY());
 
-        INFO("i: " << i);
-        INFO("j: " << j);
-        INFO("k: " << k);
-        INFO("Normalized coordinates: " << std::boolalpha << params.tex_desc.normalizedCoords);
-        INFO("Address mode X: " << AddressModeToString(params.tex_desc.addressMode[0]));
-        INFO("Address mode Y: " << AddressModeToString(params.tex_desc.addressMode[1]));
-        INFO("Address mode Z: " << AddressModeToString(params.tex_desc.addressMode[2]));
-        INFO("x: " << std::fixed << std::setprecision(16) << x);
-        INFO("y: " << std::fixed << std::setprecision(16) << y);
-        INFO("z: " << std::fixed << std::setprecision(16) << z);
+    x = GetCoordinate(x, params.NumItersX(), params.Width(), params.num_subdivisions,
+                      params.tex_desc.normalizedCoords);
+    y = GetCoordinate(y, params.NumItersY(), params.Height(), params.num_subdivisions,
+                      params.tex_desc.normalizedCoords);
+    z = GetCoordinate(z, params.NumItersZ(), params.Depth(), params.num_subdivisions,
+                      params.tex_desc.normalizedCoords);
 
-        auto index = k * params.NumItersX() * params.NumItersY() + j * params.NumItersX() + i;
+    INFO("Filtering mode: " << FilteringModeToString(params.tex_desc.filterMode));
+    INFO("Normalized coordinates: " << std::boolalpha << params.tex_desc.normalizedCoords);
+    INFO("Address mode X: " << AddressModeToString(params.tex_desc.addressMode[0]));
+    INFO("Address mode Y: " << AddressModeToString(params.tex_desc.addressMode[1]));
+    INFO("Address mode Z: " << AddressModeToString(params.tex_desc.addressMode[2]));
+    INFO("x: " << std::fixed << std::setprecision(16) << x);
+    INFO("y: " << std::fixed << std::setprecision(16) << y);
+    INFO("z: " << std::fixed << std::setprecision(16) << z);
 
-        auto ref_val = Vec4Map<TestType>(fixture.tex_h.Tex3D(x, y, z, params.tex_desc),
-                                         NormalizeInteger<TestType>);
-        REQUIRE(ref_val.x == fixture.out_alloc_h[index].x);
-        REQUIRE(ref_val.y == fixture.out_alloc_h[index].y);
-        REQUIRE(ref_val.z == fixture.out_alloc_h[index].z);
-        REQUIRE(ref_val.w == fixture.out_alloc_h[index].w);
-      }
-    }
+    auto ref_val = Vec4Map<TestType>(fixture.tex_h.Tex3D(x, y, z, params.tex_desc),
+                                     NormalizeInteger<TestType>);
+    REQUIRE(ref_val.x == fixture.out_alloc_h[i].x);
+    REQUIRE(ref_val.y == fixture.out_alloc_h[i].y);
+    REQUIRE(ref_val.z == fixture.out_alloc_h[i].z);
+    REQUIRE(ref_val.w == fixture.out_alloc_h[i].w);
   }
 }

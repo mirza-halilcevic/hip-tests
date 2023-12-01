@@ -68,6 +68,12 @@ set(TEST_SRC
     tex3DGrad.cc
     texCubemapLayeredLod.cc
     texCubemapLayeredGrad.cc
+    hipMallocMipmappedArray.cc
+    hipFreeMipmappedArray.cc
+    hipGetMipmappedArrayLevel.cc
+    hipMipmappedArrayCreate.cc
+    hipMipmappedArrayDestroy.cc
+    hipMipmappedArrayGetLevel.cc
 )
 
 if(WIN32)

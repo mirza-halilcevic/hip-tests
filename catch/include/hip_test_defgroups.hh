@@ -1519,3 +1519,9 @@ TEST_CASE("Unit_CalculateAssignUnsigned4D_Negative_Parameters") {}
  * @}
  */
 
+/**
+ * @defgroup SurfaceTest Surface Management
+ * @{
+ * This section describes tests for the surface management functions of HIP runtime API.
+ * @}
+ */

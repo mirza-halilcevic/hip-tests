@@ -50,7 +50,9 @@ THE SOFTWARE.
  */
 TEMPLATE_TEST_CASE("Unit_texCubemapLayered_Positive_ReadModeElementType", "", char, unsigned char,
                    short, unsigned short, int, unsigned int, float) {
-  TextureTestParams<TestType> params = {0};
+  CHECK_IMAGE_SUPPORT;
+
+  TextureTestParams<TestType> params = {};
   params.extent = make_hipExtent(2, 2, 6);
   params.num_subdivisions = 4;
   params.layers = 1;
@@ -96,6 +98,7 @@ TEMPLATE_TEST_CASE("Unit_texCubemapLayered_Positive_ReadModeElementType", "", ch
           INFO("i: " << i);
           INFO("j: " << j);
           INFO("k: " << k);
+          INFO("Filtering mode: " << FilteringModeToString(params.tex_desc.filterMode));
           INFO("Normalized coordinates: " << std::boolalpha << params.tex_desc.normalizedCoords);
           INFO("Address mode X: " << AddressModeToString(params.tex_desc.addressMode[0]));
           INFO("Address mode Y: " << AddressModeToString(params.tex_desc.addressMode[1]));
@@ -136,7 +139,9 @@ TEMPLATE_TEST_CASE("Unit_texCubemapLayered_Positive_ReadModeElementType", "", ch
  */
 TEMPLATE_TEST_CASE("Unit_texCubemapLayered_Positive_ReadModeNormalizedFloat", "", char,
                    unsigned char, short, unsigned short) {
-  TextureTestParams<TestType> params = {0};
+  CHECK_IMAGE_SUPPORT;
+
+  TextureTestParams<TestType> params = {};
   params.extent = make_hipExtent(2, 2, 6);
   params.num_subdivisions = 4;
   params.layers = 1;
@@ -182,6 +187,7 @@ TEMPLATE_TEST_CASE("Unit_texCubemapLayered_Positive_ReadModeNormalizedFloat", ""
           INFO("i: " << i);
           INFO("j: " << j);
           INFO("k: " << k);
+          INFO("Filtering mode: " << FilteringModeToString(params.tex_desc.filterMode));
           INFO("Normalized coordinates: " << std::boolalpha << params.tex_desc.normalizedCoords);
           INFO("Address mode X: " << AddressModeToString(params.tex_desc.addressMode[0]));
           INFO("Address mode Y: " << AddressModeToString(params.tex_desc.addressMode[1]));

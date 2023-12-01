@@ -126,7 +126,7 @@ struct TextureTestFixture {
       : params{p},
         host_alloc{LinearAllocs::hipHostMalloc, sizeof(VecType) * params.Size()},
         tex_h{host_alloc.ptr(), params.extent, params.layers},
-        tex_alloc_d{params.LayeredExtent(), params.Flags()},
+        tex_alloc_d{params.LayeredExtent(), params.Layered() ? hipArrayLayered : 0u},
         tex{ResDesc(), &params.tex_desc},
         out_alloc_d{LinearAllocs::hipMalloc, sizeof(OutType) * params.NumIters()},
         out_alloc_h(params.NumIters()) {}

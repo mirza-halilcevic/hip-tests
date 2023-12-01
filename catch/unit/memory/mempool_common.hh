@@ -35,19 +35,33 @@ __global__ void kernel_500ms(T* host_res, int clk_rate) {
   __threadfence_system();
   // expecting that the data is getting flushed to host here!
 <<<<<<< HEAD
+<<<<<<< HEAD
   uint64_t start = clock64() / clk_rate, cur;
   if (clk_rate > 1) {
     do {
+=======
+  uint64_t start = clock64()/clk_rate, cur;
+  if (clk_rate > 1) {
+    do { cur = clock64()/clk_rate-start;}while (cur < wait_ms);
+  } else {
+>>>>>>> origin/hipMemPoolSetGetAccessAttribute
     do { cur = clock64()/start;}while (cur < wait_ms);
   }
 }
 
 template <typename T>
 __global__ void kernel_500ms_gfx11(T* host_res, int clk_rate) {
+<<<<<<< HEAD
 >>>>>>> origin/hipMemPool_basic_tests
 #if HT_AMD
   int tid = threadIdx.x + blockIdx.x * blockDim.x;
   host_res[tid] = tid + 1;
+=======
+#if HT_AMD
+  int tid = threadIdx.x + blockIdx.x * blockDim.x;
+  host_res[tid] = tid + 1;
+  __threadfence_system();
+>>>>>>> origin/hipMemPoolSetGetAccessAttribute
   // expecting that the data is getting flushed to host here!
   uint64_t start = wall_clock64()/clk_rate, cur;
   if (clk_rate > 1) {

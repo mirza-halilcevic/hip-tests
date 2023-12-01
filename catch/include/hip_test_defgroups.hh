@@ -1485,8 +1485,11 @@ TEST_CASE("Unit_CalculateAssignUnsigned4D_Negative_Parameters") {}
  */
 
 /**
+<<<<<<< HEAD
 =======
 >>>>>>> origin/hipMemPool_basic_tests
+=======
+>>>>>>> origin/hipMemPoolSetGetAccessAttribute
  * @defgroup StreamOTest Ordered Memory Allocator
  * @{
  * This section describes the tests for Stream Ordered Memory Allocator functions of HIP runtime

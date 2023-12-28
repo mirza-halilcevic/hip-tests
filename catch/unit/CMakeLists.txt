@@ -49,6 +49,8 @@ add_subdirectory(p2p)
 add_subdirectory(gcc)
 add_subdirectory(threadfence)
 add_subdirectory(syncthreads)
+add_subdirectory(launchBounds)
+add_subdirectory(assertion)
 
 if(HIP_PLATFORM STREQUAL "amd")
 add_subdirectory(callback)
@@ -57,4 +59,3 @@ add_subdirectory(clock)
 add_subdirectory(vulkan_interop)
 add_subdirectory(gl_interop) # Disabled on NVIDIA due to defect - EXSWHTEC-246
 endif()
-add_subdirectory(launchBounds)

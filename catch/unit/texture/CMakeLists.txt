@@ -67,6 +67,13 @@ set(TEST_SRC
     tex2DLayeredGrad.cc
     tex2DLod.cc
     tex2DLayeredLod.cc
+    tex1Dfetch.cc
+    tex1D.cc
+    tex1DLayered.cc
+    tex1DGrad.cc
+    tex1DLayeredGrad.cc
+    tex1DLayeredLod.cc
+    tex1DLod.cc
 )
 
 if(WIN32)

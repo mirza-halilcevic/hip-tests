@@ -31,6 +31,7 @@ set(TEST_SRC
     safeAtomicAdd.cc
     acquire_release.cc
     sequential_consistency.cc
+    atomic_builtins.cc
     atomicExch.cc
     atomicExch_system.cc
 )

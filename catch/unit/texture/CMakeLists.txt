@@ -51,6 +51,12 @@ set(TEST_SRC
     hipMipmappedArrayCreate.cc
     hipMipmappedArrayDestroy.cc
     hipMipmappedArrayGetLevel.cc
+    texCubemap.cc
+    texCubemapLod.cc
+    texCubemapGrad.cc
+    texCubemapLayered.cc
+    texCubemapLayeredLod.cc
+    texCubemapLayeredGrad.cc
 )
 
 if(WIN32)

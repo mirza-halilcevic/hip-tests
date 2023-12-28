@@ -25,7 +25,10 @@ set(TEST_SRC
     hipMemPoolSetGetAttribute.cc
     hipMemPoolCreate.cc
     hipMemPoolDestroy.cc
-    hipMemPoolTrimTo.cc)
+    hipMemPoolTrimTo.cc
+    hipMallocAsync.cc
+    hipMallocFromPoolAsync.cc
+    hipFreeAsync.cc)
 
 hip_add_exe_to_target(NAME StreamOrderedTest
   TEST_SRC ${TEST_SRC}

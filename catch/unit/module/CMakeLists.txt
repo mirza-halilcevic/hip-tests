@@ -22,6 +22,8 @@
 set(TEST_SRC
     hip_module_common.cc
     hipModuleLaunchKernel.cc
+    hipModuleLaunchCooperativeKernel.cc
+    hipModuleLaunchCooperativeKernelMultiDevice.cc
 )
 
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/launch_kernel_module.code

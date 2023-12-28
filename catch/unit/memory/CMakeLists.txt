@@ -133,8 +133,10 @@ set(TEST_SRC
     hipMemsetFunctional.cc
     hipMalloc.cc
     hipMallocPitch.cc
+    hipMallocArray.cc
     hipMalloc3D.cc
     hipMalloc3DArray.cc
+    hipArrayCreate.cc
     hipArray3DCreate.cc
     hipDrvMemcpy3D.cc
     hipDrvMemcpy3D_old.cc
@@ -200,18 +202,3 @@ endif()
 hip_add_exe_to_target(NAME MemoryTest2
   TEST_SRC ${TEST_SRC}
   TEST_TARGET_NAME build_tests COMMON_SHARED_SRC ${COMMON_SHARED_SRC})
-
-if(HIP_PLATFORM MATCHES "amd")
-  set(TEST_SRC
-    hipSVMTestByteGranularity.cpp
-    hipSVMTestFineGrainMemoryConsistency.cpp
-    hipSVMTestFineGrainSyncBuffers.cpp
-    hipSVMTestSharedAddressSpaceFineGrain.cpp
-  )
-
-  hip_add_exe_to_target(NAME SVMAtomicTest
-    TEST_SRC ${TEST_SRC}
-    TEST_TARGET_NAME build_tests COMMON_SHARED_SRC ${COMMON_SHARED_SRC})
-
-  add_dependencies(build_tests hipHostRegisterPerf)
-endif()

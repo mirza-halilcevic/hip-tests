@@ -29,6 +29,8 @@ set(TEST_SRC
     atomicAdd_system.cc
     unsafeAtomicAdd.cc
     safeAtomicAdd.cc
+    acquire_release.cc
+    sequential_consistency.cc
     atomicExch.cc
     atomicExch_system.cc
 )

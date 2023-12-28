@@ -42,8 +42,6 @@ set(TEST_SRC
     hipTextureObj3DCheckModes.cc
     hipTextureObj1DCheckSRGBModes.cc
     hipTextureObj2DCheckSRGBModes.cc
-    tex2D.cc
-    tex2DLayered.cc
     hipTexObjectTests.cc
     hipTextureObjectTests.cc
     hipBindTextureToMipmappedArray.cc
@@ -62,6 +60,13 @@ set(TEST_SRC
     tex3D.cc
     tex3DLod.cc
     tex3DGrad.cc
+    tex2Dgather.cc
+    tex2D.cc
+    tex2DLayered.cc
+    tex2DGrad.cc
+    tex2DLayeredGrad.cc
+    tex2DLod.cc
+    tex2DLayeredLod.cc
 )
 
 if(WIN32)

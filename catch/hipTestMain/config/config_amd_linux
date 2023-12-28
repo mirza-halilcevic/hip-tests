@@ -189,6 +189,7 @@
         "Unit_hipFuncSetAttribute_Positive_PreferredSharedMemoryCarveout",
         "Unit_hipFuncSetAttribute_Positive_Parameters",
         "Unit_hipFuncSetAttribute_Negative_Parameters",
+        "Unit_hipGraphAddMemcpyNode_Negative_Parameters",
         "Unit_hipMemAddressFree_negative",
         "Unit_hipMemAddressReserve_AlignmentTest",
         "Unit_hipMemAddressReserve_Negative",

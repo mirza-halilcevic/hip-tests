@@ -262,6 +262,7 @@
         "Unit_hipExtLaunchKernel_Negative_Parameters",
         "NOTE: The following test is disabled due to defect - EXSWHTEC-244",
         "Unit_hipExtLaunchMultiKernelMultiDevice_Negative_Parameters",
+        "Unit_hipGraphAddMemcpyNode_Negative_Parameters",
         "Unit_hipMemAddressFree_negative",
         "Unit_hipMemAddressReserve_AlignmentTest",
         "Unit_hipMemAddressReserve_Negative",

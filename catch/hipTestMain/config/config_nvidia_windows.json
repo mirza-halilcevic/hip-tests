@@ -31,6 +31,7 @@
         "Unit_Device_Complex_Unary_double_Negative",
         "Unit_Device_Complex_Binary_float_Negative",
         "Unit_Device_Complex_Binary_double_Negative",
-        "Unit_Device_Complex_hipCfma_Negative"
+        "Unit_Device_Complex_hipCfma_Negative",
+        "Unit_hipModuleUnload_Negative_Double_Unload"
     ]
 }

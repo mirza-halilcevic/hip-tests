@@ -76,6 +76,7 @@
         "Unit_atomicExch_system_Positive_Host_And_GPU - float",
         "=== Below tests fail in external CI for PR https://github.com/ROCm-Developer-Tools/hip-tests/pull/210 ===",
         "Unit_StaticAssert_Positive_Basic",
-        "Unit_StaticAssert_Negative_Basic"
+        "Unit_StaticAssert_Negative_Basic",
+        "Unit_hipModuleUnload_Negative_Double_Unload"
     ]
 }

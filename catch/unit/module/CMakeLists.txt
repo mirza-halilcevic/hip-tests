@@ -26,6 +26,10 @@ set(TEST_SRC
     hipModuleLaunchCooperativeKernelMultiDevice.cc
     hipModuleGetFunction.cc
     hipFuncGetAttribute.cc
+    hipModuleLoad.cc 
+    hipModuleLoadData.cc 
+    hipModuleLoadDataEx.cc 
+    hipModuleUnload.cc 
 )
 
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/launch_kernel_module.code
@@ -38,6 +42,13 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/get_function_module.code
                    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/get_function_module.cc)   
 add_custom_target(get_function_module ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/get_function_module.code)
 
+add_custom_target(empty_module.code
+                  COMMAND ${CMAKE_CXX_COMPILER} --genco ${OFFLOAD_ARCH_STR}
+                  ${CMAKE_CURRENT_SOURCE_DIR}/empty_module.cc
+                  -o ${CMAKE_CURRENT_BINARY_DIR}/../../unit/module/empty_module.code
+                  -I${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/
+                  -I${CMAKE_CURRENT_SOURCE_DIR}/../../include --rocm-path=${ROCM_PATH})
+
 if(HIP_PLATFORM MATCHES "amd")
 set(TEST_SRC
     ${TEST_SRC}
@@ -45,6 +56,11 @@ set(TEST_SRC
 
 # Note to pass arch use format like -DOFFLOAD_ARCH_STR="--offload-arch=gfx900  --offload-arch=gfx906"
 # having space at the start/end of OFFLOAD_ARCH_STR can cause build failures
+
+if(HIP_PLATFORM MATCHES "amd")
+set(TEST_SRC
+    ${TEST_SRC}
+    hipExtModuleLaunchKernel.cc)
 
 add_custom_target(copyKernel.code
                   COMMAND ${CMAKE_CXX_COMPILER} -mcode-object-version=5 --genco ${OFFLOAD_ARCH_STR}
@@ -134,6 +150,7 @@ hip_add_exe_to_target(NAME ModuleTest
 
 add_dependencies(ModuleTest launch_kernel_module)
 add_dependencies(ModuleTest get_function_module)
+add_dependencies(build_tests empty_module.code)
 
 if(HIP_PLATFORM MATCHES "amd")
 add_dependencies(build_tests copyKernel.code copyKernel.s)

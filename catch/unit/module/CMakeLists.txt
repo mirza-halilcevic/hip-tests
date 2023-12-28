@@ -19,10 +19,20 @@
 # SOFTWARE.
 
 # Common Tests - Test independent of all platforms
+set(TEST_SRC
+    hip_module_common.cc
+    hipModuleLaunchKernel.cc
+)
+
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/launch_kernel_module.code
+                   COMMAND ${CMAKE_CXX_COMPILER} --genco --std=c++17 ${CMAKE_CURRENT_SOURCE_DIR}/launch_kernel_module.cc -o launch_kernel_module.code
+                   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/launch_kernel_module.cc)   
+add_custom_target(launch_kernel_module ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/launch_kernel_module.code)
+
 if(HIP_PLATFORM MATCHES "amd")
 set(TEST_SRC
-    hipExtModuleLaunchKernel.cc
-)
+    ${TEST_SRC}
+    hipExtModuleLaunchKernel.cc)
 
 # Note to pass arch use format like -DOFFLOAD_ARCH_STR="--offload-arch=gfx900  --offload-arch=gfx906"
 # having space at the start/end of OFFLOAD_ARCH_STR can cause build failures
@@ -100,11 +110,22 @@ add_custom_target(copiousArgKernel17.code
                   -I${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/
                   -I${CMAKE_CURRENT_SOURCE_DIR}/../../include --rocm-path=${ROCM_PATH})
 endif()
+endif()
 
+if(HIP_PLATFORM MATCHES "amd")
+    set(RTCLIB "hiprtc")
+else()
+    set(RTCLIB "nvrtc")
+endif()
 hip_add_exe_to_target(NAME ModuleTest
   TEST_SRC ${TEST_SRC}
-  TEST_TARGET_NAME build_tests COMMON_SHARED_SRC ${COMMON_SHARED_SRC})
+  TEST_TARGET_NAME build_tests
+  LINKER_LIBS ${RTCLIB}
+  COMMON_SHARED_SRC ${COMMON_SHARED_SRC})
 
+add_dependencies(ModuleTest launch_kernel_module)
+
+if(HIP_PLATFORM MATCHES "amd")
 add_dependencies(build_tests copyKernel.code copyKernel.s)
 if(UNIX)
 add_dependencies(build_tests copiousArgKernel.code copiousArgKernel0.code copiousArgKernel1.code copiousArgKernel2.code

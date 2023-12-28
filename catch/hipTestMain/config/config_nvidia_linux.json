@@ -48,6 +48,8 @@
         "=== Below 2 tests are disabled due to defect EXSWHTEC-342 ===",
         "Unit_hipDeviceSetLimit_Negative_Parameters",
         "Unit_hipDeviceGetLimit_Negative_Parameters",
+        "=== Below test fails in external CI for PR https://github.com/ROCm-Developer-Tools/hip-tests/pull/274 ===",
+        "Unit_Printf_Negative",
         "Unit_atomicExch_Positive_Same_Address_Compile_Time - int",
         "Unit_atomicExch_Positive_Same_Address_Compile_Time - unsigned int",
         "Unit_atomicExch_Positive_Same_Address_Compile_Time - unsigned long long",

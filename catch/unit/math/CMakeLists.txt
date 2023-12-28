@@ -27,6 +27,7 @@ set(TEST_SRC
     remainder_and_rounding_funcs.cc
     misc_funcs.cc
     trig_funcs.cc
+    root_funcs.cc
 )
 
 if(HIP_PLATFORM MATCHES "nvidia")
@@ -89,3 +90,13 @@ add_test(NAME Unit_Device_Double_Precision_Trig_Functions_Negative
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
          trig_double_precision_negative_kernels.cc 66)
+         
+add_test(NAME Unit_Device_root_1Dand2D_Negative
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         math_root_negative_kernels_1Dand2D.cc 68)
+
+add_test(NAME Unit_Device_root_3Dand4D_Negative
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         math_root_negative_kernels_3Dand4D.cc 56)

@@ -23,6 +23,7 @@ set(TEST_SRC
     double_precision_intrinsics.cc
     integer_intrinsics.cc
     half_precision_arithmetic.cc
+    half_precision_math.cc
 )
 
 hip_add_exe_to_target(NAME MathsTest
@@ -48,3 +49,8 @@ add_test(NAME Unit_Half_Precision_Arithmetic_Negative
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
          half_precision_arithmetic_negative_kernels.cc 88)
+         
+add_test(NAME Unit_Half_Precision_Math_Negative
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         half_precision_math_negative_kernels.cc 60)

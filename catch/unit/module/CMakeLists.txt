@@ -25,6 +25,7 @@ set(TEST_SRC
     hipModuleLaunchCooperativeKernel.cc
     hipModuleLaunchCooperativeKernelMultiDevice.cc
     hipModuleGetFunction.cc
+    hipFuncGetAttribute.cc
 )
 
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/launch_kernel_module.code

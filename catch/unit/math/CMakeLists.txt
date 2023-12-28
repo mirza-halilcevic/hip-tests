@@ -25,6 +25,7 @@ set(TEST_SRC
     half_precision_arithmetic.cc
     half_precision_math.cc
     remainder_and_rounding_funcs.cc
+    misc_funcs.cc
 )
 
 if(HIP_PLATFORM MATCHES "nvidia")
@@ -72,3 +73,8 @@ add_test(NAME Unit_Device_rounding_Negative
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
          math_rounding_negative_kernels.cc 40)
+
+add_test(NAME Unit_Device_Misc_Functions_Negative
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         misc_negative_kernels.cc 76)

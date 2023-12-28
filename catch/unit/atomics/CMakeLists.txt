@@ -32,6 +32,7 @@ set(TEST_SRC
     acquire_release.cc
     sequential_consistency.cc
     atomic_builtins.cc
+    __hip_atomic_fetch_add.cc
     atomicExch.cc
     atomicExch_system.cc
     __hip_atomic_exchange.cc

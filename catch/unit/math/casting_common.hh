@@ -36,6 +36,17 @@ namespace cg = cooperative_groups;
     }                                                                                              \
   }
 
+#define CAST_BINARY_KERNEL_DEF(func_name, T1, T2)                                                  \
+  __global__ void func_name##_kernel(T1* const ys, const size_t num_xs, T2* const x1s,             \
+                                     T2* const x2s) {                                              \
+    const auto tid = cg::this_grid().thread_rank();                                                \
+    const auto stride = cg::this_grid().size();                                                    \
+                                                                                                   \
+    for (auto i = tid; i < num_xs; i += stride) {                                                  \
+      ys[i] = func_name(x1s[i], x2s[i]);                                                           \
+    }                                                                                              \
+  }
+
 #define CAST_F2I_REF_DEF(func_name, T1, T2, ref_func)                                              \
   T1 func_name##_ref(T2 arg) {                                                                     \
     if (arg >= static_cast<T2>(std::numeric_limits<T1>::max()))                                    \

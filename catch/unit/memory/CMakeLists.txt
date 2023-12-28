@@ -157,7 +157,9 @@ set(TEST_SRC
     hipMallocAsync.cc
     hipStreamAttachMemAsync.cc
     hipMemRangeGetAttributes_old.cc
-    hipMemGetAddressRange.cc)
+    hipMemGetAddressRange.cc
+    hipMallocMipmappedArray.cc
+    hipFreeMipmappedArray.cc)
 
 if(HIP_PLATFORM MATCHES "amd")
   set(TEST_SRC

@@ -220,6 +220,8 @@
         "Unit_Device___uhadd_Sanity_Positive",
         "Unit_Device___rhadd_Sanity_Positive",
         "Unit_Device___urhadd_Sanity_Positive",
+        "=== Below test is disabled due to defect EXSWHTEC-347 ===",
+        "Unit_hipPointerSetAttribute_Positive_SyncMemops",
         "=== SWDEV-430116:Below tests failed in stress test on 27/10/23 ===",
         "Unit_hipFreeAsync_negative",
         "Unit_hipLaunchHostFunc_multistreams",

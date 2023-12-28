@@ -80,6 +80,7 @@ if(HIP_PLATFORM MATCHES "amd")
       hipMallocMngdMultiThread.cc
       hipArray.cc
       hipMemVmm.cc
+      hipPointerSetAttribute.cc # Should be compiled for NVIDIA as well after EXSWHTEC-346 is addressed
       hipMemCreate.cc
       hipMemMap.cc
       hipMemGetAllocationGranularity.cc

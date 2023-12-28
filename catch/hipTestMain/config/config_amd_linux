@@ -167,6 +167,8 @@
         "Unit_Device___uhadd_Sanity_Positive",
         "Unit_Device___rhadd_Sanity_Positive",
         "Unit_Device___urhadd_Sanity_Positive",
+        "=== Below test is disabled due to defect EXSWHTEC-347 ===",
+        "Unit_hipPointerSetAttribute_Positive_SyncMemops",
         "=== Patch which removes the typetraits implementation from std namespace in hiprtc is reverted ===",
         "Unit_hiprtc_stdheaders",
         "Unit_hipMemAddressFree_negative",

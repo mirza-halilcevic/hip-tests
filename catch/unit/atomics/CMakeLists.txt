@@ -34,6 +34,14 @@ set(TEST_SRC
     atomic_builtins.cc
     __hip_atomic_fetch_add.cc
     __hip_atomic_compare_exchange_strong.cc
+    atomicMin.cc
+    atomicMin_system.cc
+    atomicMax.cc
+    atomicMax_system.cc
+    safeAtomicMin.cc
+    unsafeAtomicMin.cc
+    safeAtomicMax.cc
+    unsafeAtomicMax.cc
     atomicExch.cc
     atomicExch_system.cc
     __hip_atomic_exchange.cc
@@ -44,15 +52,19 @@ if(HIP_PLATFORM MATCHES "nvidia")
     set_source_files_properties(atomicSub_system.cc PROPERTIES COMPILE_FLAGS "-gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
     set_source_files_properties(atomicAdd_system.cc PROPERTIES COMPILE_FLAGS "-gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
     set_source_files_properties(atomicExch_system.cc PROPERTIES COMPILE_FLAGS "-gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
+    set_source_files_properties(atomicMin_system.cc PROPERTIES COMPILE_FLAGS "-gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
+    set_source_files_properties(atomicMax_system.cc PROPERTIES COMPILE_FLAGS "-gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
     hip_add_exe_to_target(NAME AtomicsTest
                         TEST_SRC ${TEST_SRC}
                         TEST_TARGET_NAME build_tests
                         LINKER_LIBS "nvrtc -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
+    set(EXPECTED_ERRORS 42) # EXSWHTEC-278
 elseif(HIP_PLATFORM MATCHES "amd")
     hip_add_exe_to_target(NAME AtomicsTest
-                        TEST_SRC ${TEST_SRC}
-                        TEST_TARGET_NAME build_tests
-                        LINKER_LIBS hiprtc)
+                          TEST_SRC ${TEST_SRC}
+                          TEST_TARGET_NAME build_tests
+                          LINKER_LIBS hiprtc)
+    set(EXPECTED_ERRORS 48)
 endif()
 
 add_test(NAME Unit_atomicCAS_Negative_Parameters
@@ -84,6 +96,16 @@ add_test(NAME Unit_AtomicBuiltins_Negative_Parameters
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
          ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
          atomic_builtins_kernels.cc 60 27) # Should be 35 warnings, see EXSWHTEC-309
+         
+add_test(NAME Unit_atomicMin_Negative_Parameters
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         atomicMin_negative_kernels.cc ${EXPECTED_ERRORS})
+
+add_test(NAME Unit_atomicMax_Negative_Parameters
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../compileAndCaptureOutput.py
+         ${CMAKE_CURRENT_SOURCE_DIR} ${HIP_PLATFORM} ${HIP_PATH}
+         atomicMax_negative_kernels.cc ${EXPECTED_ERRORS})
 
 # SWDEV-435667: Below 2 tests failed in stress test on 01/12/23
 #add_test(NAME Unit_atomicExch_Negative_Parameters

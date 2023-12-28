@@ -53,6 +53,7 @@ add_subdirectory(threadfence)
 add_subdirectory(syncthreads)
 add_subdirectory(launchBounds)
 add_subdirectory(assertion)
+add_subdirectory(stream_ordered)
 
 if(HIP_PLATFORM STREQUAL "amd")
 add_subdirectory(callback)

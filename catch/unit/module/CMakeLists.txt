@@ -31,7 +31,13 @@ set(TEST_SRC
     hipModuleLoadDataEx.cc 
     hipModuleUnload.cc 
     hipModuleGetGlobal.cc
+    hipModuleGetTexRef.cc
 )
+
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/get_tex_ref_module.code
+                   COMMAND ${CMAKE_CXX_COMPILER} --genco --std=c++17 ${CMAKE_CURRENT_SOURCE_DIR}/get_tex_ref_module.cc -o get_tex_ref_module.code
+                   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/get_tex_ref_module.cc)   
+add_custom_target(get_tex_ref_module ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/get_tex_ref_module.code)
 
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/get_global_test_module.code
                    COMMAND ${CMAKE_CXX_COMPILER} --genco --std=c++17 ${CMAKE_CURRENT_SOURCE_DIR}/get_global_test_module.cc -o get_global_test_module.code 
@@ -154,10 +160,11 @@ hip_add_exe_to_target(NAME ModuleTest
   LINKER_LIBS ${RTCLIB}
   COMMON_SHARED_SRC ${COMMON_SHARED_SRC})
 
+add_dependencies(build_tests empty_module.code)
 add_dependencies(ModuleTest launch_kernel_module)
 add_dependencies(ModuleTest get_function_module)
-add_dependencies(build_tests empty_module.code)
 add_dependencies(ModuleTest get_global_test_module)
+add_dependencies(ModuleTest get_tex_ref_module)
 
 if(HIP_PLATFORM MATCHES "amd")
 add_dependencies(build_tests copyKernel.code copyKernel.s)

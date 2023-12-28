@@ -22,7 +22,10 @@
 
 set(TEST_SRC
     hipMemPoolSetGetAccess.cc
-    hipMemPoolSetGetAttribute.cc)
+    hipMemPoolSetGetAttribute.cc
+    hipMemPoolCreate.cc
+    hipMemPoolDestroy.cc
+    hipMemPoolTrimTo.cc)
 
 hip_add_exe_to_target(NAME StreamOrderedTest
   TEST_SRC ${TEST_SRC}

@@ -152,6 +152,15 @@ set(TEST_SRC
     hipMemRangeGetAttributes_old.cc
     hipMemGetAddressRange.cc)
 
+if(HIP_PLATFORM MATCHES "amd")
+  set(TEST_SRC
+      ${TEST_SRC}
+      # Below 3 tests should be compiled for NVIDIA as well after EXSWHTEC-349 is addressed
+      hipArrayGetInfo.cc
+      hipArrayGetDescriptor.cc
+      hipArray3DGetDescriptor.cc)
+endif()
+
 set(NOT_FOR_MI200_AND_ABOVE_TEST hipMallocArray.cc hipArrayCreate.cc) # tests not for MI200+
 set(MI200_AND_ABOVE_TARGETS gfx90a gfx940 gfx941 gfx942)
 function(CheckRejectedArchs OFFLOAD_ARCH_STR_LOCAL)

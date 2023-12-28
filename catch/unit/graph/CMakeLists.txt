@@ -55,6 +55,7 @@ set(TEST_SRC
   hipGraphAddMemcpyNode1D.cc
   hipGraphAddChildGraphNode.cc
   hipGraphNodeGetType.cc
+  hipGraphExecMemcpyNodeSetParams1D_old.cc
   hipGraphExecMemcpyNodeSetParams1D.cc
   hipGraphGetEdges.cc
   hipGraphGetEdges_old.cc
@@ -74,6 +75,8 @@ set(TEST_SRC
   hipGraphExecMemcpyNodeSetParams.cc
   hipGraphExecMemcpyNodeSetParams_old.cc
   hipStreamBeginCapture.cc
+  hipGraphAddMemcpyNode1D_old.cc
+  hipGraphAddMemcpyNode1D.cc
   hipStreamBeginCapture_old.cc
   hipStreamIsCapturing.cc
   hipStreamIsCapturing_old.cc)
@@ -109,6 +112,7 @@ set(TEST_SRC
   hipGraphLaunch.cc
   hipGraphLaunch_old.cc
   hipGraphMemcpyNodeSetParams1D.cc
+  hipGraphMemcpyNodeSetParams1D_old.cc
   hipGraphExecMemcpyNodeSetParamsToSymbol_old.cc
   hipGraphExecMemcpyNodeSetParamsToSymbol.cc
   hipGraphNodeGetDependentNodes.cc

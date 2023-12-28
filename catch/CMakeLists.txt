@@ -89,7 +89,6 @@ else()
    set(HIP_PACKAGING_VERSION_PATCH ${HIP_VERSION_PATCH}-${HIP_VERSION_GITHASH})
 endif()
 
-
 find_package(Boost 1.70.0)
 
 if(NOT DEFINED CATCH2_PATH)

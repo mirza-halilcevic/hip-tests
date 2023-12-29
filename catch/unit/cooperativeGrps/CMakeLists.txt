@@ -2,6 +2,7 @@
 set(TEST_SRC
   multi_grid_group.cc
   thread_block.cc
+  thread_block_tile.cc
   hipCGThreadBlockType_old.cc
   hipCGMultiGridGroupType_old.cc
   hipCGGridGroupType_old.cc

@@ -21,6 +21,7 @@ THE SOFTWARE.
 
 #include <functional>
 
+ 
 #include <hip_test_common.hh>
 
 #include "graph_memset_node_test_common.hh"

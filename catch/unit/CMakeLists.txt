@@ -54,6 +54,7 @@ add_subdirectory(syncthreads)
 add_subdirectory(launchBounds)
 add_subdirectory(assertion)
 add_subdirectory(stream_ordered)
+add_subdirectory(virtualMemoryManagement)
 
 if(HIP_PLATFORM STREQUAL "amd")
 add_subdirectory(callback)

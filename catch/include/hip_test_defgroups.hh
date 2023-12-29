@@ -228,3 +228,10 @@ THE SOFTWARE.
  * This section describes tests for the Complex type functions.
  * @}
  */
+
+/**
+ * @defgroup VirtualMemoryManagementTest Virtual Memory Management APIs
+ * @{
+ * This section describes the virtual memory management types & functions of HIP runtime API.
+ * @}
+ */

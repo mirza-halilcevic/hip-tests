@@ -9,8 +9,9 @@ set(TEST_SRC
   hipLaunchCooperativeKernel_old.cc
   hipLaunchCooperativeKernelMultiDevice_old.cc
   grid_group.cc
-  coalesced_groups_shfl_down.cc
-  coalesced_groups_shfl_up.cc
+  coalesced_group.cc
+  coalesced_groups_shfl_down_old.cc
+  coalesced_groups_shfl_up_old.cc
   coalesced_tiled_groups_metagrp.cc
 )
 if(HIP_PLATFORM STREQUAL "nvidia")

@@ -19,8 +19,11 @@
 # SOFTWARE.
 
 # Common Tests - Test independent of all platforms
+set(COMMON_SHARED_SRC helper_multiprocess.cc)
 
 set(TEST_SRC
+    hipMemPoolImportExport.cc
+    hipMemPoolImportExportIPC.cc
     hipMemPoolSetGetAccess.cc
     hipMemPoolSetGetAttribute.cc
     hipMemPoolCreate.cc
@@ -32,4 +35,4 @@ set(TEST_SRC
 
 hip_add_exe_to_target(NAME StreamOrderedTest
   TEST_SRC ${TEST_SRC}
-  TEST_TARGET_NAME build_tests)
+  TEST_TARGET_NAME build_tests COMMON_SHARED_SRC ${COMMON_SHARED_SRC})

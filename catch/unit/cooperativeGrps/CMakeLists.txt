@@ -1,5 +1,6 @@
 # Common Tests - Test independent of all platforms
 set(TEST_SRC
+  multi_grid_group.cc
   hipCGThreadBlockType_old.cc
   hipCGMultiGridGroupType_old.cc
   hipCGGridGroupType_old.cc
@@ -15,6 +16,7 @@ set(TEST_SRC
   coalesced_tiled_groups_metagrp.cc
 )
 if(HIP_PLATFORM STREQUAL "nvidia")
+  set_source_files_properties(multi_grid_group.cc PROPERTIES COMPILE_FLAGS "-D_CG_ABI_EXPERIMENTAL -rdc=true -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
   set_source_files_properties(hipCGMultiGridGroupType_old.cc PROPERTIES COMPILE_FLAGS "-D_CG_ABI_EXPERIMENTAL -rdc=true -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
   set_source_files_properties(hipLaunchCooperativeKernelMultiDevice_old.cc PROPERTIES COMPILE_FLAGS "-D_CG_ABI_EXPERIMENTAL -rdc=true -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_80,code=sm_80")
   hip_add_exe_to_target(NAME coopGrpTest

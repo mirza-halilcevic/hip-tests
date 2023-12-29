@@ -326,7 +326,7 @@ class StreamGuard {
   }
 
   ~StreamGuard() {
-    if (stream_type_ == Streams::created) {
+    if (stream_type_ == Streams::created && stream_ != nullptr) {
       static_cast<void>(hipStreamDestroy(stream_));
     }
   }
